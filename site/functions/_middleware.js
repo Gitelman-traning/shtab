@@ -12,6 +12,7 @@
  */
 
 const COOKIE = "okk_auth";
+const LOGIN = "admin";          // единый логин к общему паролю (решение 04.09.2026)
 const MONTH = 60 * 60 * 24 * 30;
 const KEY = "password";
 const MIN_LEN = 6;
@@ -46,7 +47,7 @@ function page({ setup, message }) {
   const title = setup ? "Придумайте пароль" : "Вход";
   const hint = setup
     ? "Пароль ещё не задан. Тот, что вы введёте, станет общим для всех, кто открывает дашборд."
-    : "Страница закрыта: внутри разборы встреч с клиентами.";
+    : "Страница закрыта: внутри данные компании. Логин один на всех, пароль общий.";
   const action = setup ? "/__setup" : "/__login";
   const button = setup ? "Сохранить пароль" : "Войти";
   const autocomplete = setup ? "new-password" : "current-password";
@@ -54,7 +55,7 @@ function page({ setup, message }) {
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>ОКК · Разбор диагностик</title>
+<title>Штаб · Вход</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=TikTok+Sans:opsz,wght@12..36,300..900&display=swap">
@@ -82,9 +83,10 @@ function page({ setup, message }) {
 </style></head><body>
 <form method="POST" action="${action}">
   <div class="mark">12</div>
-  <h1>ОКК · ${title}</h1>
+  <h1>Штаб · ${title}</h1>
   ${note}
-  <input type="password" name="password" placeholder="Пароль" autofocus required
+  <input type="text" name="login" placeholder="Логин" autofocus required autocomplete="username" aria-label="Логин">
+  <input type="password" name="password" placeholder="Пароль" required
          autocomplete="${autocomplete}" aria-label="Пароль"${setup ? ` minlength="${MIN_LEN}"` : ""}>
   <button type="submit">${button}</button>
 </form></body></html>`;
@@ -125,11 +127,19 @@ export async function onRequest(context) {
   const isForm = request.method === "POST" &&
     (url.pathname === "/__login" || url.pathname === "/__setup");
   const posted = isForm;
-  const value = isForm ? String((await request.formData()).get("password") || "") : "";
+  let value = "", login = "";
+  if (isForm) {
+    const form = await request.formData();
+    value = String(form.get("password") || "");
+    login = String(form.get("login") || "").trim().toLowerCase();
+  }
 
   // пароля ещё нет — первый вошедший его задаёт
   if (!stored) {
     if (posted && url.pathname === "/__setup") {
+      if (!same(login, LOGIN)) {
+        return html(page({ setup: true, message: "Логин должен быть " + LOGIN + "." }), 400);
+      }
       if (value.length < MIN_LEN) {
         return html(page({ setup: true, message: `Пароль короче ${MIN_LEN} символов — так не пойдёт.` }), 400);
       }
@@ -144,8 +154,8 @@ export async function onRequest(context) {
 
   // пароль задан — обычный вход
   if (posted && url.pathname === "/__login") {
-    if (!same(value, stored)) {
-      return html(page({ setup: false, message: "Пароль не подошёл. Попробуйте ещё раз." }), 401);
+    if (!same(login, LOGIN) || !same(value, stored)) {
+      return html(page({ setup: false, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
     }
     return letIn(await sign(stored));
   }
