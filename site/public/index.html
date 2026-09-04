@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Штаб · витрина</title>
+<style>
+:root{--page:#faf8f4;--card:#fff;--line:#ebe7df;--ink:#2b2721;--dim:#7b766f;--gold:#8a6f3d;--gold-soft:#efe7d6;--ok:#38765a;--bad:#ad4636}
+*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 Inter,Arial,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:16px 24px;background:var(--card);border-bottom:1px solid var(--line)}
+.mark{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;background:var(--gold-soft);color:var(--gold);font-weight:700;font-size:12px}
+h1{margin:0;font-size:15px}.sub{margin:0;font-size:12px;color:var(--dim)}
+main{padding:22px 24px;display:flex;flex-direction:column;gap:18px;max-width:1100px}
+.card{background:var(--card);border-radius:14px;padding:18px 20px;border:1px solid var(--line)}
+h2{margin:0 0 10px;font-size:14px}table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line)}th{font-weight:500;color:var(--dim);font-size:11.5px}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;width:340px}
+button{font:inherit;padding:8px 14px;border:0;border-radius:8px;background:var(--gold);color:#fff;cursor:pointer}
+.err{color:var(--bad)}.ok{color:var(--ok)}
+</style>
+</head>
+<body>
+<header><div class="mark">12</div><div><h1>Штаб · витрина показателей</h1><p class="sub">служебная страница этапа 1: что собрано и когда</p></div></header>
+<main>
+  <div class="card" id="auth">
+    <h2>Доступ</h2>
+    <p class="sub">До появления персональных логинов страница открывается по токену сборщика.</p>
+    <input id="tok" type="password" placeholder="токен"> <button id="go">Показать</button> <span id="msg"></span>
+  </div>
+  <div class="card" hidden id="runs"><h2>Последние прогоны</h2><div id="runs-t"></div></div>
+  <div class="card" hidden id="cov"><h2>Покрытие по показателям</h2><div id="cov-t"></div></div>
+  <div class="card" hidden id="week"><h2>Последние 14 дней</h2><div id="week-t"></div></div>
+</main>
+<script>
+var KEY="shtab-token";
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function api(path,tok){return fetch(path,{headers:{Authorization:"Bearer "+tok}}).then(function(r){return r.json()})}
+function table(rows,cols){
+  return '<table><thead><tr>'+cols.map(function(c){return '<th>'+esc(c[0])+'</th>'}).join("")+'</tr></thead><tbody>'
+    +rows.map(function(r){return '<tr>'+cols.map(function(c){var v=r[c[1]];return '<td class="'+(typeof v==="number"?"num":"")+'">'+esc(v)+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table>';
+}
+function load(tok){
+  var msg=document.getElementById("msg");
+  api("/api/status",tok).then(function(s){
+    if(!s.ok){msg.textContent="нет доступа";msg.className="err";return}
+    try{localStorage.setItem(KEY,tok)}catch(e){}
+    msg.textContent="ок";msg.className="ok";
+    document.getElementById("runs").hidden=false;document.getElementById("cov").hidden=false;
+    document.getElementById("runs-t").innerHTML=s.runs.length?table(s.runs,[["сборщик","collector"],["начало","started"],["конец","finished"],["точек","points"],["заметка","note"]]):"<p class='sub'>прогонов ещё не было</p>";
+    document.getElementById("cov-t").innerHTML=s.coverage.length?table(s.coverage,[["показатель","metric"],["тип","ptype"],["точек","n"],["с","first"],["по","last"],["снимок","asof"],["обновлено","updated"]]):"<p class='sub'>точек ещё нет</p>";
+    var to=new Date();to.setDate(to.getDate()-1);var from=new Date(to);from.setDate(from.getDate()-13);
+    var f=function(d){return d.toISOString().slice(0,10)};
+    return api("/api/points?metric=mkt.leads,l1.leads,l1.booked,l2.held,l2.sales&ptype=day&dim=&from="+f(from)+"&to="+f(to),tok);
+  }).then(function(p){
+    if(!p||!p.ok)return;
+    var by={};p.rows.forEach(function(r){(by[r.period]=by[r.period]||{period:r.period})[r.metric]=r.value});
+    var rows=Object.keys(by).sort().map(function(k){return by[k]});
+    document.getElementById("week").hidden=false;
+    document.getElementById("week-t").innerHTML=table(rows,[["день","period"],["лиды (маркетинг)","mkt.leads"],["лиды 1-я линия","l1.leads"],["назначено","l1.booked"],["проведено","l2.held"],["продажи","l2.sales"]]);
+  });
+}
+document.getElementById("go").addEventListener("click",function(){load(document.getElementById("tok").value.trim())});
+try{var t=localStorage.getItem(KEY);if(t){document.getElementById("tok").value=t;load(t)}}catch(e){}
+</script>
+</body>
+</html>

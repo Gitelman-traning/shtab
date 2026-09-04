@@ -1,0 +1,8 @@
+name = "shtab"
+compatibility_date = "2025-06-01"
+pages_build_output_dir = "public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shtab"
+database_id = "d0671a0c-e19a-44f6-ac76-39f8c79b499c"

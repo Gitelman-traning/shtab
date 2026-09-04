@@ -1,0 +1,39 @@
+name: Shtab collect
+
+on:
+  schedule:
+    - cron: '0 2 * * *'     # 05:00 МСК, после ночной выгрузки amo
+  workflow_dispatch:
+    inputs:
+      from:
+        description: 'From date, YYYY-MM-DD (empty = 14 days back)'
+        required: false
+        default: ''
+      to:
+        description: 'To date, YYYY-MM-DD (empty = yesterday)'
+        required: false
+        default: ''
+      sync_metrics:
+        description: 'Also sync metrics registry (1 = yes)'
+        required: false
+        default: ''
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r collector/requirements.txt
+      - run: python collector/collect.py
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          LAYOUT_JSON: ${{ secrets.LAYOUT_JSON }}
+          SHTAB_URL: ${{ secrets.SHTAB_URL }}
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
+          FROM: ${{ inputs.from }}
+          TO: ${{ inputs.to }}
+          SYNC_METRICS: ${{ inputs.sync_metrics }}
