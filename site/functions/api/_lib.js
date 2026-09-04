@@ -45,10 +45,29 @@ export async function currentUser(request, env) {
   return row || null;
 }
 
-// Читать данные можно либо по токену сборщика, либо с сессией
+// Общий пароль страниц (тот же, что проверяет _middleware): cookie okk_auth = HMAC пароля из KV
+async function signShared(password) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("okk-dashboard"));
+  return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function hasSharedCookie(request, env) {
+  if (!env.OKK_KV) return false;
+  const c = getCookie(request, "okk_auth");
+  if (!c) return false;
+  const stored = await env.OKK_KV.get("password");
+  return !!stored && timingSafeEqual(c, await signShared(stored));
+}
+
+// Читать данные можно по токену сборщика, с персональной сессией или с cookie общего пароля
 export async function canRead(request, env) {
   if (hasIngestToken(request, env)) return { login: "collector", role: "admin", sections: "" };
-  return currentUser(request, env);
+  const user = await currentUser(request, env);
+  if (user) return user;
+  if (await hasSharedCookie(request, env)) return { login: "shared", role: "viewer", sections: "" };
+  return null;
 }
 
 export function now() {
