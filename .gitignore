@@ -7,3 +7,4 @@ __pycache__/
 # страницы ОКК собираются из закрытых данных — только shtab.html в git
 site/public/*.html
 !site/public/shtab*.html
+!site/public/404.html
