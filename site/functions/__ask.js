@@ -5,11 +5,14 @@
  * и отвечает по ней через OpenRouter. Доступ уже проверен в _middleware:
  * без пароля сюда не попасть.
  *
- * Ключ модели — секрет проекта OPENROUTER_API_KEY.
+ * Провайдер — любой OpenAI-совместимый: секреты LLM_BASE_URL + LLM_API_KEY
+ * (например ProxyAPI). Без них — OpenRouter с ключом OPENROUTER_API_KEY и бесплатными моделями.
  */
 
-const OR = "https://openrouter.ai/api/v1/chat/completions";
-const MAX_CHARS = 45000;   // столько расшифровки отдаём модели
+const DEFAULT_BASE = "https://openrouter.ai/api/v1";
+const PAID_MODEL = "anthropic/claude-sonnet-5";   // модель у платного провайдера, если ASK_MODEL не задан
+const FREE_MAX_CHARS = 45000;    // бесплатным моделям — обрезка
+const PAID_MAX_CHARS = 250000;   // платным — расшифровка целиком
 const FALLBACK = [
   "minimax/minimax-m3:free",
   "z-ai/glm-5.2:free",
@@ -37,8 +40,13 @@ function json(body, status = 200) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!env.OPENROUTER_API_KEY) {
-    return json({ error: "Ключ модели не настроен. Добавьте секрет OPENROUTER_API_KEY в проект." }, 503);
+  const base = (env.LLM_BASE_URL || DEFAULT_BASE).replace(/\/+$/, "");
+  const key = env.LLM_API_KEY || env.OPENROUTER_API_KEY;
+  const paid = !!env.LLM_BASE_URL && !/openrouter\.ai/.test(base);
+  const OR = base + "/chat/completions";
+  const MAX_CHARS = paid ? PAID_MAX_CHARS : FREE_MAX_CHARS;
+  if (!key) {
+    return json({ error: "Ключ модели не настроен. Добавьте секреты LLM_BASE_URL и LLM_API_KEY в проект." }, 503);
   }
 
   let body;
@@ -60,9 +68,9 @@ export async function onRequestPost(context) {
     ? transcript
     : transcript.slice(0, MAX_CHARS / 3) + "\n…\n" + transcript.slice(-2 * MAX_CHARS / 3);
 
-  const models = env.ASK_MODEL ? [env.ASK_MODEL, ...FALLBACK] : FALLBACK;
+  const models = paid ? [env.ASK_MODEL || PAID_MODEL] : (env.ASK_MODEL ? [env.ASK_MODEL, ...FALLBACK] : FALLBACK);
   const headers = {
-    "Authorization": "Bearer " + env.OPENROUTER_API_KEY,
+    "Authorization": "Bearer " + key,
     "Content-Type": "application/json",
     "HTTP-Referer": "https://okk-dashboard.pages.dev",
     "X-Title": "OKK ask",
