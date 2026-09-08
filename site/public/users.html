@@ -89,14 +89,14 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font-size:12.5px
 <main>
   <div class="card" id="denied" hidden><p class="err">Раздел только для администратора. Вы вошли под общим паролем или без прав.</p></div>
   <div class="card" id="me-card" hidden><h2>Мой пароль</h2>
-    <div class="row"><input id="p-old" type="password" placeholder="Текущий пароль" autocomplete="current-password"><input id="p-new" type="password" placeholder="Новый пароль, от 8 символов" autocomplete="new-password"><button id="p-save">Сменить</button><span id="p-msg" class="sub"></span></div>
+    <div class="row"><form autocomplete="off" onsubmit="return false" style="display:contents"><input id="p-old" type="password" placeholder="Текущий пароль" autocomplete="off" name="x-old"><input id="p-new" type="password" placeholder="Новый пароль, от 8 символов" autocomplete="new-password" name="x-new"></form><button id="p-save">Сменить</button><span id="p-msg" class="sub"></span></div>
   </div>
   <div class="card" id="pending-card" hidden><h2>Заявки на доступ <small class="sub">зарегистрировались и ждут подтверждения: выберите роль и разделы</small></h2><div id="pending"></div></div>
   <div class="card" id="list-card" hidden><h2>Пользователи <small class="sub" id="cnt"></small></h2><div id="list"></div><div id="u-out"></div></div>
   <div class="card" id="add-card" hidden><h2>Добавить пользователя</h2>
     <div class="row">
-      <input id="n-login" placeholder="логин, латиницей" style="width:170px">
-      <input id="n-name" placeholder="Имя Фамилия" style="width:200px">
+      <input id="n-login" placeholder="логин, латиницей" style="width:170px" autocomplete="off" name="new-user-login">
+      <input id="n-name" placeholder="Имя Фамилия" style="width:200px" autocomplete="off" name="new-user-name">
       <select id="n-role"><option value="head">руководитель раздела</option><option value="member">сотрудник</option><option value="viewer">только смотрит</option><option value="admin">администратор</option></select>
       <div class="pick" id="n-sections"></div>
       <button id="n-add">Создать</button>
