@@ -25,7 +25,8 @@
 
   function showCustom(version) {
     if (!frame) { frame = document.createElement("iframe"); frame.id = "section-custom"; frame.setAttribute("sandbox", "allow-scripts allow-same-origin"); box.parentNode.insertBefore(frame, box.nextSibling); }
-    frame.src = "/api/sections/" + SEC + "/view" + (version ? "?v=" + version : "") + "&_=" + Date.now();
+    var th = document.documentElement.getAttribute("data-theme") || "";
+    frame.src = "/api/sections/" + SEC + "/view?v=" + (version || "") + "&theme=" + th + "&_=" + Date.now();
     frame.hidden = false; if (std) std.hidden = true;
   }
   function showStandard() { if (frame) frame.hidden = true; if (std) std.hidden = false; }

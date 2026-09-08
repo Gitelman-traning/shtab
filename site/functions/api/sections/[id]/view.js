@@ -11,7 +11,10 @@ export async function onRequestGet({ request, env, params }) {
     : await env.DB.prepare("SELECT html, version FROM section_versions WHERE section = ? AND active = 1").bind(params.id).first();
   if (!row) return new Response("<!doctype html><meta charset=utf-8><p style=\"font-family:Inter,Arial;color:#7b766f;padding:20px\">Собственного вида ещё нет.</p>",
     { status: 404, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
-  return new Response(row.html, {
+  const theme = u.searchParams.get("theme");
+  let body = row.html;
+  if (theme === "light" || theme === "dark") body = body.replace(/<html(\s[^>]*)?>/i, (m, a) => "<html" + (a || "") + ' data-theme="' + theme + '">');
+  return new Response(body, {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",

@@ -17,9 +17,10 @@ const SYSTEM = `Ты делаешь ОДНУ самодостаточную HTML
    Если в ответе есть stock — это снимки состояния (участники по месяцам потока: pay.full полные оплаты, pay.prepaid предоплаты,
    pay.bloggers блогеры, pay.participants участники, pay.receipts прислали чек; period "shortlist" — шортлист). Их не складывают по дням.
    Недели и месяцы складывай сам из дней. Конверсия = отношение показателей.
-4. Палитра через CSS-переменные, светлая и тёмная тема:
+4. Палитра через CSS-переменные. Тему задаёт сайт атрибутом data-theme на <html> ("light" или "dark"); без атрибута — системная. Ровно так:
    :root{--page:#faf8f4;--card:#fff;--soft:#f3f1ec;--line:#f1eee8;--ink:#2b2721;--dim:#7b766f;--faint:#a29d95;--gold:#8a6f3d;--gold-soft:#efe7d6;--gold-b:#b59f76;--ok:#38765a;--ok-bg:#e8f2ec;--bad:#ad4636;--bad-bg:#fbe9e6;--blue:#4f6d8f}
-   @media (prefers-color-scheme:dark){:root{--page:#161718;--card:#1e2021;--soft:#232526;--line:#282a2b;--ink:#eceae5;--dim:#9a958d;--faint:#75716a;--gold:#c9b487;--gold-soft:#2a2721;--gold-b:#b59f76;--ok:#7cc396;--ok-bg:#1b2b23;--bad:#e58975;--bad-bg:#2f1e1a;--blue:#8fa8c4}}
+   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--page:#161718;--card:#1e2021;--soft:#232526;--line:#282a2b;--ink:#eceae5;--dim:#9a958d;--faint:#75716a;--gold:#c9b487;--gold-soft:#2a2721;--gold-b:#b59f76;--ok:#7cc396;--ok-bg:#1b2b23;--bad:#e58975;--bad-bg:#2f1e1a;--blue:#8fa8c4}}
+   :root[data-theme="dark"]{--page:#161718;--card:#1e2021;--soft:#232526;--line:#282a2b;--ink:#eceae5;--dim:#9a958d;--faint:#75716a;--gold:#c9b487;--gold-soft:#2a2721;--gold-b:#b59f76;--ok:#7cc396;--ok-bg:#1b2b23;--bad:#e58975;--bad-bg:#2f1e1a;--blue:#8fa8c4}
    Шрифт: Inter, Arial, sans-serif. Фон body — var(--page), карточки var(--card) с радиусом 16px. Без боковых меню и шапок сайта: только содержимое раздела.
 5. Русский язык, аккуратные подписи, числа с разрядами. Если данных нет — честно написать «данных нет».
 6. Размер страницы — до 30 000 символов, без длинных комментариев и повторов кода: чем компактнее, тем быстрее ответ. Без localStorage, без запросов куда-либо, кроме DATA_URL.
@@ -59,13 +60,25 @@ export async function onRequestPost({ request, env, params }) {
       (base ? "Текущая версия страницы (v" + base.version + "):\n<<<\n" + String(base.html).slice(0, MAX_BASE) + "\n>>>\n\n" : "Текущей версии нет — сделай страницу с нуля: ключевые цифры за вчера/неделю/месяц, таблица по неделям, один-два графика.\n\n") +
       "Просьба редактора: " + prompt + "\n\nВерни только HTML." },
   ];
-  let out;
+  let out, html = "";
   try {
     out = await llmChat(env, messages, { max_tokens: 14000, temperature: 0.2 });
+    html = stripFences(out.text);
+    // поток у провайдера иногда обрывается на середине: просим дописать с места обрыва, до трёх раз
+    for (let i = 0; i < 3 && !/<\/html>\s*$/i.test(html); i++) {
+      const more = await llmChat(env, messages.concat([
+        { role: "assistant", content: html },
+        { role: "user", content: "Ответ оборвался. Продолжи РОВНО с того места, где остановился — с первого недостающего символа, без повтора уже написанного, без пояснений и без ограждений. Доведи документ до </html>." },
+      ]), { max_tokens: 14000, temperature: 0.2 });
+      let add = more.text.replace(/^```(?:html)?\s*/i, "").replace(/\s*```$/, "");
+      // модель могла повторить хвост — срезаем пересечение
+      for (let k = Math.min(400, add.length); k > 20; k--) { if (html.endsWith(add.slice(0, k))) { add = add.slice(k); break; } }
+      html += add;
+    }
   } catch (e) {
     return bad("модель не успела: " + e.message + ". Нажмите «Сделать вариант» ещё раз или сократите просьбу.", 502);
   }
-  const html = stripFences(out.text);
+  if (!/<\/html>\s*$/i.test(html)) return bad("модель не дописала страницу до конца, попробуйте ещё раз или сократите просьбу", 502);
   if (!/<!doctype html/i.test(html) || html.length < 500) return bad("модель вернула не страницу, попробуйте переформулировать", 502);
   if (/<script[^>]+src=|<link[^>]+href=|@import/i.test(html)) return bad("модель подключила внешние файлы — это запрещено, попробуйте ещё раз", 502);
   const last = await env.DB.prepare("SELECT MAX(version) AS v FROM section_versions WHERE section = ?").bind(sec.id).first();

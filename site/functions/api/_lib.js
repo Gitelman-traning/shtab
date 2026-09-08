@@ -155,7 +155,7 @@ export async function llmChat(env, messages, opts = {}) {
       });
       if (!r.ok) { last = "ответ " + r.status; continue; }
       const ctype = r.headers.get("content-type") || "";
-      let text = "";
+      let text = "", finish = "";
       if (/event-stream/.test(ctype)) {
         // SSE: строки "data: {...}" с choices[0].delta.content
         const reader = r.body.getReader();
@@ -173,19 +173,27 @@ export async function llmChat(env, messages, opts = {}) {
             if (payload === "[DONE]") continue;
             try {
               const j = JSON.parse(payload);
-              const d = j.choices && j.choices[0] && (j.choices[0].delta || j.choices[0].message);
+              const c0 = j.choices && j.choices[0];
+              const d = c0 && (c0.delta || c0.message);
               if (d && d.content) text += d.content;
+              if (c0 && c0.finish_reason) finish = c0.finish_reason;
             } catch (e) { /* неполная строка — подождём следующий кусок */ }
           }
         }
+        // хвост без перевода строки
+        const tail = buf.trim();
+        if (tail.startsWith("data:")) {
+          try { const j = JSON.parse(tail.slice(5).trim()); const d = j.choices && j.choices[0] && (j.choices[0].delta || j.choices[0].message); if (d && d.content) text += d.content; } catch (e) {}
+        }
       } else {
         const data = await r.json();
-        const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
-        text = msg.content || "";
+        const c0 = data.choices && data.choices[0];
+        text = (c0 && c0.message && c0.message.content) || "";
+        finish = (c0 && c0.finish_reason) || "";
       }
       text = text.trim();
       if (!text) { last = "пустой ответ"; continue; }
-      return { text, model };
+      return { text, model, finish };
     } catch (e) {
       last = String(e).slice(0, 120);
     }
