@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Пользователи</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{--page:#faf8f4;--card:#fff;--soft:#f3f1ec;--zebra:#faf9f6;--line:#f1eee8;--line-2:#e7e3da;--ink:#2b2721;--dim:#7b766f;--faint:#a29d95;--gold:#8a6f3d;--gold-soft:#efe7d6;--gold-b:#b59f76;--ok:#38765a;--ok-bg:#e8f2ec;--bad:#ad4636;--bad-bg:#fbe9e6}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--page:#161718;--card:#1e2021;--soft:#232526;--zebra:#202223;--line:#282a2b;--line-2:#333637;--ink:#eceae5;--dim:#9a958d;--faint:#75716a;--gold:#c9b487;--gold-soft:#2a2721;--ok:#7cc396;--ok-bg:#1b2b23;--bad:#e58975;--bad-bg:#2f1e1a}}
+:root[data-theme="dark"]{--page:#161718;--card:#1e2021;--soft:#232526;--zebra:#202223;--line:#282a2b;--line-2:#333637;--ink:#eceae5;--dim:#9a958d;--faint:#75716a;--gold:#c9b487;--gold-soft:#2a2721;--ok:#7cc396;--ok-bg:#1b2b23;--bad:#e58975;--bad-bg:#2f1e1a}
+*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font-family:Inter,Arial,sans-serif;font-size:14px;line-height:1.5}
+a{color:var(--gold)}
+.layout{display:flex;min-height:100vh}
+.side{width:216px;flex:none;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;padding:16px 12px 14px;overflow:hidden;transition:width .16s ease;position:sticky;top:0;height:100vh}
+:root[data-menu="mini"] .side{width:66px}
+.side .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 16px;min-width:0}
+.mark{width:30px;height:30px;flex:none;display:grid;place-items:center;border-radius:9px;background:var(--gold-soft);color:var(--gold);font-weight:700;font-size:12px}
+.side .brand .txt b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap}.side .brand .txt span{display:block;font-size:11.5px;color:var(--faint);white-space:nowrap}
+.side nav{display:flex;flex-direction:column;gap:3px}
+.side nav .grp{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;padding:10px 10px 4px;white-space:nowrap}
+.side nav a{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:10px;color:var(--dim);text-decoration:none;font-size:13.5px;white-space:nowrap}
+.side nav a:hover{background:var(--soft);color:var(--ink)}.side nav a.on{background:var(--gold-soft);color:var(--gold);font-weight:600}
+.side nav a svg{flex:none;width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6}
+.side .grow{flex:1}
+.side .collapse{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;background:none;border:0;color:var(--faint);font-family:inherit;font-size:12.5px;cursor:pointer;text-align:left;white-space:nowrap}
+.side .collapse svg{flex:none;width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;transition:transform .16s ease}
+:root[data-menu="mini"] .side .collapse svg{transform:rotate(180deg)}
+:root[data-menu="mini"] .side .txt,:root[data-menu="mini"] .side nav a span,:root[data-menu="mini"] .side .collapse span,:root[data-menu="mini"] .side nav .grp{display:none}
+:root[data-menu="mini"] .side nav a,:root[data-menu="mini"] .side .collapse{justify-content:center;padding:11px 0}
+.pane{flex:1;min-width:0;display:flex;flex-direction:column}
+@media (max-width:760px){.side{width:66px}.side .txt,.side nav a span,.side .collapse span,.side nav .grp{display:none}.side nav a,.side .collapse{justify-content:center;padding:11px 0}}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 24px;background:var(--card);border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:15px;font-weight:600}header .sub{margin:0;font-size:12px;color:var(--dim)}header .spacer{flex:1}
+main{padding:22px 24px 70px;display:flex;flex-direction:column;gap:18px;max-width:1200px}
+.card{background:var(--card);border-radius:16px;padding:18px 20px}
+h2{margin:0 0 10px;font-size:14.5px;font-weight:600}table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{font-weight:500;color:var(--faint);font-size:11.5px;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+.sub{color:var(--dim);font-size:12.5px}.err{color:var(--bad)}.ok{color:var(--ok)}
+.pill{font-size:11px;padding:2px 8px;border-radius:7px;background:var(--soft);color:var(--dim)}
+.pill.admin{background:var(--gold-soft);color:var(--gold)}.pill.head{background:var(--ok-bg);color:var(--ok)}.pill.off{background:var(--bad-bg);color:var(--bad)}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--page);color:var(--ink)}
+button{font:inherit;font-size:12.5px;padding:7px 12px;border:0;border-radius:8px;background:var(--gold);color:#fff;cursor:pointer}
+button.ghost{background:var(--soft);color:var(--ink)}button.danger{background:var(--bad-bg);color:var(--bad)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.temp{background:var(--gold-soft);color:var(--gold);padding:10px 12px;border-radius:10px;font-size:13px;margin-top:10px}
+.temp code{font-size:15px;font-weight:600;user-select:all}
+.actions button{margin-right:4px;padding:5px 9px;font-size:12px}
+details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side">
+  <div class="brand"><div class="mark">12</div><div class="txt"><b>Штаб</b><span>центр компании</span></div></div>
+  <nav>
+    <div class="grp">Штаб</div>
+    <a href="shtab.html" title="Общий экран"><svg viewBox="0 0 20 20"><path d="M3 3h6v6H3V3zM11 3h6v4h-6V3zM11 9h6v8h-6V9zM3 11h6v6H3v-6z" stroke-linejoin="round"/></svg><span>Общий экран</span></a>
+    <a href="sales.html" title="Отдел продаж"><svg viewBox="0 0 20 20"><path d="M3 16l4-6 3 3 3-5 4 2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 4v12h14" stroke-linecap="round"/></svg><span>Отдел продаж</span></a>
+    <a href="marketing.html" title="Маркетинг"><svg viewBox="0 0 20 20"><path d="M3 8v4h3l6 4V4L6 8H3z" stroke-linejoin="round"/><path d="M15 7a4 4 0 010 6" stroke-linecap="round"/></svg><span>Маркетинг</span></a>
+    <a href="shtab-status.html" title="Витрина"><svg viewBox="0 0 20 20"><ellipse cx="10" cy="5" rx="6" ry="2.4"/><path d="M4 5v10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4V5M4 10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4"/></svg><span>Витрина</span></a>
+    <div class="grp">Продажи · 2 линия · ОКК</div>
+    <a href="./" title="Встречи"><svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h9" stroke-linecap="round"/></svg><span>Встречи</span></a>
+    <a href="managers.html" title="Менеджеры"><svg viewBox="0 0 20 20"><circle cx="7" cy="7" r="3"/><circle cx="14" cy="8" r="2.4"/><path d="M2.5 16c.6-3 2.6-4.5 4.5-4.5S11 13 11.5 16M11.5 15.5c.4-2 1.4-3.2 2.7-3.2s2.4 1 3 3.2" stroke-linecap="round"/></svg><span>Менеджеры</span></a>
+    <a href="compare.html" title="Сверка"><svg viewBox="0 0 20 20"><path d="M4 4v12M16 4v12M4 8h4M12 8h4M4 12h4M12 12h4" stroke-linecap="round"/></svg><span>Сверка</span></a>
+    <a href="stats.html" title="Статистика"><svg viewBox="0 0 20 20"><path d="M4 16V9M10 16V4M16 16v-5" stroke-linecap="round"/></svg><span>Статистика</span></a>
+    <a href="charts.html" title="Дашборд ОКК"><svg viewBox="0 0 20 20"><path d="M3 15l4-5 4 3 6-8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Дашборд ОКК</span></a>
+    <a href="guide.html" title="Гайд"><svg viewBox="0 0 20 20"><path d="M4 4h5a2 2 0 012 2v10a2 2 0 00-2-2H4V4zM16 4h-5a2 2 0 00-2 2v10a2 2 0 012-2h5V4z" stroke-linejoin="round"/></svg><span>Гайд</span></a>
+    <a href="users.html" id="nav-users" class="on" title="Пользователи"><svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2"/><path d="M4 17c.8-3.2 3.2-4.8 6-4.8s5.2 1.6 6 4.8" stroke-linecap="round"/></svg><span>Пользователи</span></a>
+  </nav>
+  <div class="grow"></div>
+  <button type="button" class="collapse" id="menu-toggle"><svg viewBox="0 0 20 20"><path d="M12 5l-5 5 5 5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Свернуть меню</span></button>
+</aside>
+<div class="pane">
+<header><div><h1>Штаб · Пользователи</h1><p class="sub">кто заходит, что может, что менял</p></div><div class="spacer"></div><div id="who" class="sub"></div></header>
+<main>
+  <div class="card" id="denied" hidden><p class="err">Раздел только для администратора. Вы вошли под общим паролем или без прав.</p></div>
+  <div class="card" id="me-card" hidden><h2>Мой пароль</h2>
+    <div class="row"><input id="p-old" type="password" placeholder="Текущий пароль" autocomplete="current-password"><input id="p-new" type="password" placeholder="Новый пароль, от 8 символов" autocomplete="new-password"><button id="p-save">Сменить</button><span id="p-msg" class="sub"></span></div>
+  </div>
+  <div class="card" id="list-card" hidden><h2>Пользователи <small class="sub" id="cnt"></small></h2><div id="list"></div></div>
+  <div class="card" id="add-card" hidden><h2>Добавить пользователя</h2>
+    <div class="row">
+      <input id="n-login" placeholder="логин, латиницей" style="width:170px">
+      <input id="n-name" placeholder="Имя Фамилия" style="width:200px">
+      <select id="n-role"><option value="head">руководитель раздела</option><option value="member">сотрудник</option><option value="viewer">только смотрит</option><option value="admin">администратор</option></select>
+      <input id="n-sections" placeholder="разделы: marketing, sales" style="width:220px">
+      <button id="n-add">Создать</button>
+    </div>
+    <p class="sub" style="margin:8px 0 0">Роли: администратор видит всё и управляет пользователями; руководитель и сотрудник видят всё, но менять вид могут только в своих разделах; «только смотрит» — как общий пароль, но под своим именем. Временный пароль показывается один раз, при первом входе его нужно сменить.</p>
+    <div id="n-out"></div>
+  </div>
+  <div class="card" id="log-card" hidden><h2>Журнал действий <small class="sub">последние 100</small></h2><div id="log"></div></div>
+</main>
+</div>
+</div>
+<script>
+(function(){var KEY="okk-menu";function read(){try{return localStorage.getItem(KEY)}catch(e){return null}}
+function store(v){try{localStorage.setItem(KEY,v)}catch(e){}}
+function paint(m){document.documentElement.setAttribute("data-menu",m)}
+paint(read()||"full");var b=document.getElementById("menu-toggle");
+if(b)b.addEventListener("click",function(){var n=document.documentElement.getAttribute("data-menu")==="mini"?"full":"mini";store(n);paint(n)});})();
+(function(){var KEY="okk-theme";var m=null;try{m=localStorage.getItem(KEY)}catch(e){}if(m==="light"||m==="dark")document.documentElement.setAttribute("data-theme",m);})();
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function api(path,opt){opt=opt||{};opt.credentials="same-origin";if(opt.body){opt.headers={"content-type":"application/json"};opt.body=JSON.stringify(opt.body)}return fetch(path,opt).then(function(r){return r.json()})}
+function dt(s){return s?String(s).replace("T"," ").slice(0,16):"—"}
+var ROLE={admin:"администратор",head:"руководитель",member:"сотрудник",viewer:"смотрит"};
+var ME=null;
+api("/api/me").then(function(m){
+  if(!m.ok){document.getElementById("denied").hidden=false;return}
+  ME=m.user;document.getElementById("who").textContent=(m.user.name||m.user.login)+" · "+(ROLE[m.user.role]||m.user.role);
+  if(m.user.personal)document.getElementById("me-card").hidden=false;
+  if(m.user.role!=="admin"){document.getElementById("denied").hidden=false;return}
+  ["list-card","add-card","log-card"].forEach(function(id){document.getElementById(id).hidden=false});
+  loadUsers();loadLog();
+});
+function loadUsers(){
+  api("/api/users").then(function(r){
+    if(!r.ok){document.getElementById("list").innerHTML='<p class="err">'+esc(r.error)+'</p>';return}
+    document.getElementById("cnt").textContent=r.users.length+" чел.";
+    document.getElementById("list").innerHTML='<table><thead><tr><th>Логин</th><th>Имя</th><th>Роль</th><th>Разделы</th><th>Создан</th><th>Последний вход</th><th></th></tr></thead><tbody>'
+      +r.users.map(function(u){return '<tr'+(u.active?'':' style="opacity:.55"')+'><td><b>'+esc(u.login)+'</b>'+(u.must_change?' <span class="pill">временный пароль</span>':'')+(u.active?'':' <span class="pill off">отключён</span>')+'</td><td>'+esc(u.name)+'</td><td><span class="pill '+esc(u.role)+'">'+esc(ROLE[u.role]||u.role)+'</span></td><td>'+esc(u.sections||"—")+'</td><td>'+dt(u.created_at)+'</td><td>'+dt(u.last_login)+'</td>'
+        +'<td class="actions"><button class="ghost" data-a="edit" data-l="'+esc(u.login)+'">изменить</button><button class="ghost" data-a="reset" data-l="'+esc(u.login)+'">сбросить пароль</button>'
+        +(u.active?'<button class="danger" data-a="disable" data-l="'+esc(u.login)+'">отключить</button>':'<button data-a="enable" data-l="'+esc(u.login)+'">включить</button>')+'</td></tr>'
+        +'<tr hidden id="edit-'+esc(u.login)+'"><td colspan="7"><div class="row"><input value="'+esc(u.name)+'" id="e-name-'+esc(u.login)+'" placeholder="Имя"><select id="e-role-'+esc(u.login)+'">'+Object.keys(ROLE).map(function(k){return '<option value="'+k+'"'+(k===u.role?' selected':'')+'>'+ROLE[k]+'</option>'}).join("")+'</select><input value="'+esc(u.sections)+'" id="e-sec-'+esc(u.login)+'" placeholder="разделы через запятую"><button data-a="save" data-l="'+esc(u.login)+'">Сохранить</button></div></td></tr>'}).join("")
+      +'</tbody></table><div id="u-out"></div>';
+  });
+}
+document.getElementById("list").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-a]");if(!b)return;var a=b.getAttribute("data-a"),l=b.getAttribute("data-l"),out=document.getElementById("u-out");
+  if(a==="edit"){var r=document.getElementById("edit-"+l);r.hidden=!r.hidden;return}
+  if(a==="save"){api("/api/users",{method:"PATCH",body:{login:l,action:"update",name:document.getElementById("e-name-"+l).value,role:document.getElementById("e-role-"+l).value,sections:document.getElementById("e-sec-"+l).value}}).then(function(r){out.innerHTML=r.ok?'<p class="ok">Сохранено</p>':'<p class="err">'+esc(r.error)+'</p>';loadUsers();loadLog()});return}
+  if(a==="reset"&&!confirm("Сбросить пароль пользователю "+l+"? Текущие сессии закроются."))return;
+  if(a==="disable"&&!confirm("Отключить "+l+"?"))return;
+  api("/api/users",{method:"PATCH",body:{login:l,action:a}}).then(function(r){
+    if(!r.ok){out.innerHTML='<p class="err">'+esc(r.error)+'</p>';return}
+    out.innerHTML=r.password?'<div class="temp">Новый временный пароль для <b>'+esc(l)+'</b>: <code>'+esc(r.password)+'</code> — передайте лично, повторно показать нельзя.</div>':'<p class="ok">Готово</p>';
+    loadUsers();loadLog();
+  });
+});
+document.getElementById("n-add").addEventListener("click",function(){
+  var body={login:document.getElementById("n-login").value,name:document.getElementById("n-name").value,role:document.getElementById("n-role").value,sections:document.getElementById("n-sections").value};
+  api("/api/users",{method:"POST",body:body}).then(function(r){
+    var out=document.getElementById("n-out");
+    if(!r.ok){out.innerHTML='<p class="err">'+esc(r.error)+'</p>';return}
+    out.innerHTML='<div class="temp">Создан <b>'+esc(r.login)+'</b>. Временный пароль: <code>'+esc(r.password)+'</code> — передайте лично, повторно показать нельзя.</div>';
+    document.getElementById("n-login").value="";document.getElementById("n-name").value="";document.getElementById("n-sections").value="";
+    loadUsers();loadLog();
+  });
+});
+document.getElementById("p-save").addEventListener("click",function(){
+  api("/api/me",{method:"PUT",body:{password:document.getElementById("p-old").value,new_password:document.getElementById("p-new").value}}).then(function(r){
+    var m=document.getElementById("p-msg");m.className=r.ok?"ok":"err";m.textContent=r.ok?"пароль изменён":r.error;
+    if(r.ok){document.getElementById("p-old").value="";document.getElementById("p-new").value=""}
+  });
+});
+function loadLog(){
+  api("/api/audit?limit=100").then(function(r){
+    if(!r.ok)return;
+    document.getElementById("log").innerHTML=r.rows.length?'<table><thead><tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Что</th><th>Подробности</th></tr></thead><tbody>'
+      +r.rows.map(function(x){return '<tr><td>'+dt(x.at)+'</td><td>'+esc(x.login)+'</td><td>'+esc(x.action)+'</td><td>'+esc(x.target)+'</td><td class="sub">'+esc(x.note)+'</td></tr>'}).join("")+'</tbody></table>':'<p class="sub">пока пусто</p>';
+  });
+}
+</script>
+</body>
+</html>

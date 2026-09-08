@@ -10,3 +10,4 @@ site/public/*.html
 !site/public/404.html
 !site/public/sales.html
 !site/public/marketing.html
+!site/public/users.html

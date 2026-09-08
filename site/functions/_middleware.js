@@ -11,6 +11,8 @@
  * После сброса первый вошедший задаёт новый.
  */
 
+import { currentUser, createSession, dropSession, verifyPassword, audit } from "./api/_lib.js";
+
 const COOKIE = "okk_auth";
 const LOGIN = "admin";          // единый логин к общему паролю (решение 04.09.2026)
 const MONTH = 60 * 60 * 24 * 30;
@@ -132,6 +134,31 @@ export async function onRequest(context) {
     const form = await request.formData();
     value = String(form.get("password") || "");
     login = String(form.get("login") || "").trim().toLowerCase();
+  }
+
+  // выход: снимаем и общую cookie, и именную сессию
+  if (url.pathname === "/__logout") {
+    const gone = await dropSession(env, request);
+    return new Response(null, { status: 303, headers: [["Location", "/"], ["Set-Cookie", `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`], ["Set-Cookie", gone], ["Cache-Control", "no-store"]] });
+  }
+
+  // именной пользователь: логин не «admin» — ищем в базе, сессия в cookie shtab_s
+  if (posted && url.pathname === "/__login" && login && login !== LOGIN) {
+    const row = env.DB ? await env.DB.prepare("SELECT login, pass_hash, salt, active FROM users WHERE login = ?").bind(login).first() : null;
+    if (!row || !row.active || !(await verifyPassword(value, row.salt, row.pass_hash))) {
+      await audit(env, login, "login.fail");
+      return html(page({ setup: false, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
+    }
+    const s = await createSession(env, row.login);
+    await audit(env, row.login, "login");
+    return new Response(null, { status: 303, headers: { Location: "/shtab", "Set-Cookie": s.cookie, "Cache-Control": "no-store" } });
+  }
+  if (env.DB && await currentUser(request, env)) {
+    const response = await next();
+    const out = new Response(response.body, response);
+    out.headers.set("Cache-Control", "no-store");
+    out.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return out;
   }
 
   // пароля ещё нет — первый вошедший его задаёт
