@@ -51,6 +51,15 @@ button.ghost{background:var(--soft);color:var(--ink)}button.danger{background:va
 .temp code{font-size:15px;font-weight:600;user-select:all}
 .actions button{margin-right:4px;padding:5px 9px;font-size:12px}
 details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font-size:12.5px}
+.pick{position:relative;display:inline-block}
+.pick>button{font:inherit;font-size:13px;padding:8px 30px 8px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--page);color:var(--ink);cursor:pointer;min-width:220px;text-align:left;position:relative}
+.pick>button::after{content:"";position:absolute;right:11px;top:50%;width:7px;height:7px;border-right:1.6px solid var(--dim);border-bottom:1.6px solid var(--dim);transform:translateY(-70%) rotate(45deg)}
+.pick>button .ph{color:var(--faint)}
+.pick .menu{position:absolute;z-index:20;top:calc(100% + 4px);left:0;min-width:240px;background:var(--card);border:1px solid var(--line-2);border-radius:10px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);display:none}
+.pick.open .menu{display:block}
+.pick label{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:7px;cursor:pointer;font-size:13px}
+.pick label:hover{background:var(--soft)}.pick label small{color:var(--faint);margin-left:auto}
+.pick input[type=checkbox]{width:15px;height:15px;margin:0;accent-color:var(--gold)}
 </style>
 </head>
 <body>
@@ -88,7 +97,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font-size:12.5px
       <input id="n-login" placeholder="логин, латиницей" style="width:170px">
       <input id="n-name" placeholder="Имя Фамилия" style="width:200px">
       <select id="n-role"><option value="head">руководитель раздела</option><option value="member">сотрудник</option><option value="viewer">только смотрит</option><option value="admin">администратор</option></select>
-      <input id="n-sections" placeholder="разделы: marketing, sales" style="width:220px">
+      <div class="pick" id="n-sections"></div>
       <button id="n-add">Создать</button>
     </div>
     <p class="sub" style="margin:8px 0 0">Роли: администратор видит всё и управляет пользователями; руководитель и сотрудник видят всё, но менять вид могут только в своих разделах; «только смотрит» — как общий пароль, но под своим именем. Временный пароль показывается один раз, при первом входе его нужно сменить.</p>
@@ -109,6 +118,21 @@ function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return
 function api(path,opt){opt=opt||{};opt.credentials="same-origin";if(opt.body){opt.headers={"content-type":"application/json"};opt.body=JSON.stringify(opt.body)}return fetch(path,opt).then(function(r){return r.json()})}
 function dt(s){return s?String(s).replace("T"," ").slice(0,16):"—"}
 var ROLE={admin:"администратор",head:"руководитель",member:"сотрудник",viewer:"смотрит"};
+var SECTIONS=[];   // [{id,name}] — из /api/sections
+function pickValue(el){ return el ? [].map.call(el.querySelectorAll('input:checked'), function(c){ return c.value; }).join(',') : ''; }
+function picker(el, csv){
+  var sel = String(csv||'').split(',').map(function(s){return s.trim()}).filter(Boolean);
+  function label(){ var names = SECTIONS.filter(function(s){ return sel.indexOf(s.id)>=0; }).map(function(s){ return s.name; });
+    return names.length ? esc(names.join(', ')) : '<span class="ph">разделы: не выбраны</span>'; }
+  el.innerHTML = '<button type="button">'+label()+'</button><div class="menu">'
+    + (SECTIONS.length ? SECTIONS.map(function(s){ return '<label><input type="checkbox" value="'+esc(s.id)+'"'+(sel.indexOf(s.id)>=0?' checked':'')+'> '+esc(s.name)+'<small>'+esc(s.id)+'</small></label>'; }).join('') : '<div class="sub" style="padding:6px 8px">разделов нет</div>')
+    + '</div>';
+  var btn = el.querySelector('button');
+  btn.addEventListener('click', function(e){ e.stopPropagation(); document.querySelectorAll('.pick.open').forEach(function(o){ if(o!==el) o.classList.remove('open'); }); el.classList.toggle('open'); });
+  el.querySelector('.menu').addEventListener('click', function(e){ e.stopPropagation(); });
+  el.addEventListener('change', function(){ sel = [].map.call(el.querySelectorAll('input:checked'), function(c){ return c.value; }); btn.innerHTML = label(); });
+}
+document.addEventListener('click', function(){ document.querySelectorAll('.pick.open').forEach(function(o){ o.classList.remove('open'); }); });
 var ME=null;
 api("/api/me").then(function(m){
   if(!m.ok){document.getElementById("denied").hidden=false;return}
@@ -116,7 +140,8 @@ api("/api/me").then(function(m){
   if(m.user.personal)document.getElementById("me-card").hidden=false;
   if(m.user.role!=="admin"){document.getElementById("denied").hidden=false;return}
   ["list-card","add-card","log-card"].forEach(function(id){document.getElementById(id).hidden=false});
-  loadUsers();loadLog();
+  api("/api/sections").then(function(r){ SECTIONS = (r.ok && r.sections) || []; picker(document.getElementById("n-sections"), ""); loadUsers(); });
+  loadLog();
 });
 function loadUsers(){
   api("/api/users").then(function(r){
@@ -126,14 +151,15 @@ function loadUsers(){
       +r.users.map(function(u){return '<tr'+(u.active?'':' style="opacity:.55"')+'><td><b>'+esc(u.login)+'</b>'+(u.must_change?' <span class="pill">временный пароль</span>':'')+(u.active?'':' <span class="pill off">отключён</span>')+'</td><td>'+esc(u.name)+'</td><td><span class="pill '+esc(u.role)+'">'+esc(ROLE[u.role]||u.role)+'</span></td><td>'+esc(u.sections||"—")+'</td><td>'+dt(u.created_at)+'</td><td>'+dt(u.last_login)+'</td>'
         +'<td class="actions"><button class="ghost" data-a="edit" data-l="'+esc(u.login)+'">изменить</button><button class="ghost" data-a="reset" data-l="'+esc(u.login)+'">сбросить пароль</button>'
         +(u.active?'<button class="danger" data-a="disable" data-l="'+esc(u.login)+'">отключить</button>':'<button data-a="enable" data-l="'+esc(u.login)+'">включить</button>')+'</td></tr>'
-        +'<tr hidden id="edit-'+esc(u.login)+'"><td colspan="7"><div class="row"><input value="'+esc(u.name)+'" id="e-name-'+esc(u.login)+'" placeholder="Имя"><select id="e-role-'+esc(u.login)+'">'+Object.keys(ROLE).map(function(k){return '<option value="'+k+'"'+(k===u.role?' selected':'')+'>'+ROLE[k]+'</option>'}).join("")+'</select><input value="'+esc(u.sections)+'" id="e-sec-'+esc(u.login)+'" placeholder="разделы через запятую"><button data-a="save" data-l="'+esc(u.login)+'">Сохранить</button></div></td></tr>'}).join("")
+        +'<tr hidden id="edit-'+esc(u.login)+'"><td colspan="7"><div class="row"><input value="'+esc(u.name)+'" id="e-name-'+esc(u.login)+'" placeholder="Имя"><select id="e-role-'+esc(u.login)+'">'+Object.keys(ROLE).map(function(k){return '<option value="'+k+'"'+(k===u.role?' selected':'')+'>'+ROLE[k]+'</option>'}).join("")+'</select><div class="pick" id="e-sec-'+esc(u.login)+'" data-value="'+esc(u.sections)+'"></div><button data-a="save" data-l="'+esc(u.login)+'">Сохранить</button></div></td></tr>'}).join("")
       +'</tbody></table><div id="u-out"></div>';
+    document.querySelectorAll('#list .pick').forEach(function(el){ picker(el, el.getAttribute('data-value')||''); });
   });
 }
 document.getElementById("list").addEventListener("click",function(e){
   var b=e.target.closest("button[data-a]");if(!b)return;var a=b.getAttribute("data-a"),l=b.getAttribute("data-l"),out=document.getElementById("u-out");
   if(a==="edit"){var r=document.getElementById("edit-"+l);r.hidden=!r.hidden;return}
-  if(a==="save"){api("/api/users",{method:"PATCH",body:{login:l,action:"update",name:document.getElementById("e-name-"+l).value,role:document.getElementById("e-role-"+l).value,sections:document.getElementById("e-sec-"+l).value}}).then(function(r){out.innerHTML=r.ok?'<p class="ok">Сохранено</p>':'<p class="err">'+esc(r.error)+'</p>';loadUsers();loadLog()});return}
+  if(a==="save"){api("/api/users",{method:"PATCH",body:{login:l,action:"update",name:document.getElementById("e-name-"+l).value,role:document.getElementById("e-role-"+l).value,sections:pickValue(document.getElementById("e-sec-"+l))}}).then(function(r){out.innerHTML=r.ok?'<p class="ok">Сохранено</p>':'<p class="err">'+esc(r.error)+'</p>';loadUsers();loadLog()});return}
   if(a==="reset"&&!confirm("Сбросить пароль пользователю "+l+"? Текущие сессии закроются."))return;
   if(a==="disable"&&!confirm("Отключить "+l+"?"))return;
   api("/api/users",{method:"PATCH",body:{login:l,action:a}}).then(function(r){
@@ -143,12 +169,12 @@ document.getElementById("list").addEventListener("click",function(e){
   });
 });
 document.getElementById("n-add").addEventListener("click",function(){
-  var body={login:document.getElementById("n-login").value,name:document.getElementById("n-name").value,role:document.getElementById("n-role").value,sections:document.getElementById("n-sections").value};
+  var body={login:document.getElementById("n-login").value,name:document.getElementById("n-name").value,role:document.getElementById("n-role").value,sections:pickValue(document.getElementById("n-sections"))};
   api("/api/users",{method:"POST",body:body}).then(function(r){
     var out=document.getElementById("n-out");
     if(!r.ok){out.innerHTML='<p class="err">'+esc(r.error)+'</p>';return}
     out.innerHTML='<div class="temp">Создан <b>'+esc(r.login)+'</b>. Временный пароль: <code>'+esc(r.password)+'</code> — передайте лично, повторно показать нельзя.</div>';
-    document.getElementById("n-login").value="";document.getElementById("n-name").value="";document.getElementById("n-sections").value="";
+    document.getElementById("n-login").value="";document.getElementById("n-name").value="";picker(document.getElementById("n-sections"),"");
     loadUsers();loadLog();
   });
 });
@@ -166,5 +192,6 @@ function loadLog(){
   });
 }
 </script>
+<script>(function(){function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}fetch("/api/me",{credentials:"same-origin"}).then(function(r){return r.json()}).then(function(m){var a=document.getElementById("nav-users");var u=m&&m.ok&&m.user;if(a&&u&&u.role==="admin")a.hidden=false;var h=document.querySelector("header");if(!h||document.querySelector(".acct"))return;var s=document.createElement("style");s.textContent=".acct{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim,#7b766f);margin-left:8px;white-space:nowrap}.acct b{color:var(--ink,#2b2721);font-weight:600}.acct a{color:var(--gold,#8a6f3d);text-decoration:none;padding:4px 9px;border-radius:7px;background:var(--gold-soft,#efe7d6);font-weight:600}";document.head.appendChild(s);var R={admin:"администратор",head:"руководитель",member:"сотрудник",viewer:"смотрит"};var d=document.createElement("div");d.className="acct";if(u&&u.personal){d.innerHTML="<span><b>"+esc(u.name||u.login)+"</b> · "+esc(R[u.role]||u.role)+"</span><a href=\"/__logout\">Выйти</a>"}else{d.innerHTML="<span>общий вход</span><a href=\"/__logout\">Войти под своим именем</a>"}h.appendChild(d)}).catch(function(){});})();</script>
 </body>
 </html>
