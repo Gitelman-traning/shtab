@@ -39,7 +39,7 @@
       + '<span class="sub" id="se-msg"></span></div>';
     if (state.canEdit && state.mode === "edit") {
       h += '<div><textarea id="se-prompt" placeholder="Что изменить? Например: «покажи источники кругом вместо таблицы» или «добавь сравнение с прошлым месяцем в каждую карточку»"></textarea></div>'
-        + '<div class="row"><button data-a="draft">Сделать вариант</button><span class="sub">Модель перепишет страницу раздела' + (act ? ' на основе v' + act.version : ' с нуля') + '. Это займёт до минуты. Вариант сохранится как черновик — публикуете отдельно.</span></div>';
+        + '<div class="row"><button data-a="draft">Сделать вариант</button><span class="sub">Модель перепишет страницу раздела' + (act ? ' на основе v' + act.version : ' с нуля') + '. Это займёт от одной до трёх минут, не закрывайте страницу. Вариант сохранится как черновик — публикуете отдельно.</span></div>';
     }
     if (state.canEdit && state.mode === "versions") {
       h += v.length ? '<table><thead><tr><th>Версия</th><th>Автор</th><th>Когда</th><th>Просьба</th><th></th></tr></thead><tbody>'
