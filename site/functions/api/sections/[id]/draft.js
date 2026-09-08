@@ -51,6 +51,14 @@ export async function onRequestPost({ request, env, params }) {
   try { b = await request.json(); } catch (e) { return bad("тело не JSON"); }
   const prompt = String(b.prompt || "").trim().slice(0, MAX_PROMPT);
   if (prompt.length < 5) return bad("опишите, что изменить");
+  // вложения: до 4 штук, картинки как data:image/...;base64 (до 2 МБ каждая), текст и html до 60 тыс. символов
+  const attachments = (Array.isArray(b.attachments) ? b.attachments : []).slice(0, 4).filter((a) => a && a.name && a.data);
+  const images = [], texts = [];
+  for (const a of attachments) {
+    const name = String(a.name).slice(0, 80);
+    if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,/.test(a.data) && a.data.length < 2800000) images.push({ name, url: a.data });
+    else if (typeof a.data === "string" && !/^data:/.test(a.data)) texts.push({ name, text: a.data.slice(0, 60000) });
+  }
 
   let base = null;
   if (b.base_version) {
@@ -61,12 +69,18 @@ export async function onRequestPost({ request, env, params }) {
   let cfg = {};
   try { cfg = JSON.parse(sec.config || "{}"); } catch (e) {}
   const dataUrl = "/api/sections/" + sec.id + "/data?days=120";
-  const messages = [
-    { role: "system", content: SYSTEM },
-    { role: "user", content:
+  const userText =
       "Раздел: «" + sec.name + "» (id " + sec.id + ").\nDATA_URL = \"" + dataUrl + "\".\nПоказатели раздела: " + (cfg.metrics || []).join(", ") + ".\n" +
       (base ? "Текущая версия страницы (v" + base.version + "):\n<<<\n" + String(base.html).slice(0, MAX_BASE) + "\n>>>\n\n" : "Текущей версии нет — сделай страницу с нуля: ключевые цифры за вчера/неделю/месяц, таблица по неделям, один-два графика.\n\n") +
-      "Просьба редактора: " + prompt + "\n\nВерни только HTML." },
+      (texts.length ? texts.map((x) => "Приложенный файл «" + x.name + "»:\n<<<\n" + x.text + "\n>>>\n").join("\n") + "\n" : "") +
+      (images.length ? "Приложены примеры-картинки (" + images.map((x) => x.name).join(", ") + "): повтори их структуру и подачу, но с нашими данными и нашей палитрой.\n\n" : "") +
+      "Просьба редактора: " + prompt + "\n\nВерни только HTML.";
+  const content = images.length
+    ? [{ type: "text", text: userText }].concat(images.map((x) => ({ type: "image_url", image_url: { url: x.url } })))
+    : userText;
+  const messages = [
+    { role: "system", content: SYSTEM },
+    { role: "user", content },
   ];
   let out, html = "";
   try {
@@ -94,6 +108,6 @@ export async function onRequestPost({ request, env, params }) {
   await env.DB.prepare(
     "INSERT INTO section_versions (section, version, html, prompt, author, created_at, active) VALUES (?,?,?,?,?,?,0)")
     .bind(sec.id, version, html.slice(0, 60000), prompt, user.login, now()).run();
-  await audit(env, user.login, "section.draft", sec.id, "v" + version + " · " + out.model + " · " + prompt.slice(0, 120));
+  await audit(env, user.login, "section.draft", sec.id, "v" + version + " · " + out.model + (attachments.length ? " · вложений " + attachments.length : "") + " · " + prompt.slice(0, 120));
   return json({ ok: true, version, model: out.model, size: html.length });
 }
