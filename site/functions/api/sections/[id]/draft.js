@@ -24,7 +24,15 @@ const SYSTEM = `Ты делаешь ОДНУ самодостаточную HTML
    Шрифт: Inter, Arial, sans-serif. Фон body — var(--page), карточки var(--card) с радиусом 16px. Без боковых меню и шапок сайта: только содержимое раздела.
 5. Русский язык, аккуратные подписи, числа с разрядами. Если данных нет — честно написать «данных нет».
 6. Размер страницы — до 30 000 символов, без длинных комментариев и повторов кода: чем компактнее, тем быстрее ответ. Без localStorage, без запросов куда-либо, кроме DATA_URL.
-7. Если дана текущая версия страницы — измени её по просьбе, сохранив всё остальное, а не переписывай с нуля.`;
+7. Если дана текущая версия страницы — измени её по просьбе, сохранив всё остальное, а не переписывай с нуля.
+8. ДАТЫ. Никогда не используй new Date("YYYY-MM-DD"), toISOString(), getDay() для дат: часовой пояс сдвигает день и циклы зависают.
+   Используй ровно эти функции (скопируй их в страницу как есть) и работай со строками "YYYY-MM-DD":
+   function dParse(s){const p=s.split("-");return Date.UTC(+p[0],+p[1]-1,+p[2]);}
+   function dStr(ms){const d=new Date(ms);return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");}
+   function addDays(s,n){return dStr(dParse(s)+n*86400000);}
+   function mondayOf(s){const d=new Date(dParse(s));const w=(d.getUTCDay()+6)%7;return dStr(dParse(s)-w*86400000);}
+   function daysBetween(a,b){return Math.round((dParse(b)-dParse(a))/86400000);}
+   Любой цикл по дням — for со счётчиком по daysBetween, не while по строкам. Сегодняшняя дата = поле to из данных (последний день), не new Date().`;
 
 function stripFences(t) {
   t = t.trim();
