@@ -8,3 +8,5 @@ __pycache__/
 site/public/*.html
 !site/public/shtab*.html
 !site/public/404.html
+!site/public/sales.html
+!site/public/marketing.html

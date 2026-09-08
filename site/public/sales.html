@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Отдел продаж</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{
+  --page:#faf8f4; --card:#ffffff; --soft:#f3f1ec; --zebra:#faf9f6; --line:#f1eee8; --line-2:#e7e3da;
+  --ink:#2b2721; --dim:#7b766f; --faint:#a29d95;
+  --gold:#8a6f3d; --gold-soft:#efe7d6; --gold-a:#d8c9a8; --gold-b:#b59f76;
+  --ok:#38765a; --ok-bg:#e8f2ec; --mid:#8d6a17; --mid-bg:#fbf1de; --bad:#ad4636; --bad-bg:#fbe9e6;
+  --ok-bar:#6aa87f; --mid-bar:#e0b45a; --bad-bar:#d8735c; --blue:#4f6d8f; --blue-bar:#8fa8c4;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --page:#161718; --card:#1e2021; --soft:#232526; --zebra:#202223; --line:#282a2b; --line-2:#333637;
+    --ink:#eceae5; --dim:#9a958d; --faint:#75716a; --gold:#c9b487; --gold-soft:#2a2721;
+    --ok:#7cc396; --ok-bg:#1b2b23; --mid:#dcb463; --mid-bg:#2c2617; --bad:#e58975; --bad-bg:#2f1e1a; --blue:#8fa8c4;
+  }
+}
+:root[data-theme="dark"]{
+  --page:#161718; --card:#1e2021; --soft:#232526; --zebra:#202223; --line:#282a2b; --line-2:#333637;
+  --ink:#eceae5; --dim:#9a958d; --faint:#75716a; --gold:#c9b487; --gold-soft:#2a2721;
+  --ok:#7cc396; --ok-bg:#1b2b23; --mid:#dcb463; --mid-bg:#2c2617; --bad:#e58975; --bad-bg:#2f1e1a; --blue:#8fa8c4;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font-family:Inter,Arial,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--gold)} :focus-visible{outline:2px solid var(--gold-b);outline-offset:2px}
+.layout{display:flex;min-height:100vh}
+.side{width:216px;flex:none;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;
+  padding:16px 12px 14px;overflow:hidden;transition:width .16s ease;position:sticky;top:0;height:100vh}
+:root[data-menu="mini"] .side{width:66px}
+.side .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 16px;min-width:0}
+.mark{width:30px;height:30px;flex:none;display:grid;place-items:center;border-radius:9px;background:var(--gold-soft);color:var(--gold);font-weight:700;font-size:12px}
+.side .brand .txt b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap}
+.side .brand .txt span{display:block;font-size:11.5px;color:var(--faint);white-space:nowrap}
+.side nav{display:flex;flex-direction:column;gap:3px}
+.side nav .grp{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;padding:10px 10px 4px;white-space:nowrap}
+.side nav a{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:10px;color:var(--dim);text-decoration:none;font-size:13.5px;white-space:nowrap}
+.side nav a:hover{background:var(--soft);color:var(--ink)}
+.side nav a.on{background:var(--gold-soft);color:var(--gold);font-weight:600}
+.side nav a svg{flex:none;width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6}
+.side .grow{flex:1}
+.side .collapse{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;background:none;border:0;color:var(--faint);font-family:inherit;font-size:12.5px;cursor:pointer;text-align:left;white-space:nowrap}
+.side .collapse:hover{background:var(--soft);color:var(--ink)}
+.side .collapse svg{flex:none;width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;transition:transform .16s ease}
+:root[data-menu="mini"] .side .collapse svg{transform:rotate(180deg)}
+:root[data-menu="mini"] .side .txt,:root[data-menu="mini"] .side nav a span,:root[data-menu="mini"] .side .collapse span,:root[data-menu="mini"] .side nav .grp{display:none}
+:root[data-menu="mini"] .side nav a,:root[data-menu="mini"] .side .collapse{justify-content:center;padding:11px 0}
+.pane{flex:1;min-width:0;display:flex;flex-direction:column}
+@media (max-width:760px){.side{width:66px}.side .txt,.side nav a span,.side .collapse span,.side nav .grp{display:none}.side nav a,.side .collapse{justify-content:center;padding:11px 0}}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 24px;background:var(--card);border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:15px;font-weight:600} header .sub{margin:0;font-size:12px;color:var(--dim)} header .spacer{flex:1}
+.stamp{font-size:12px;color:var(--faint)}
+.themer{display:inline-flex;background:var(--soft);border-radius:10px;padding:3px}
+.themer button{font-family:inherit;font-size:12px;font-weight:500;background:none;border:0;color:var(--dim);padding:5px 11px;border-radius:7px;cursor:pointer}
+.themer button[aria-pressed="true"]{background:var(--card);color:var(--gold);font-weight:600}
+main{padding:22px 24px 70px;display:flex;flex-direction:column;gap:20px}
+.card{background:var(--card);border-radius:16px;padding:18px 20px}
+.card h2{margin:0 0 12px;font-size:15px;font-weight:600;display:flex;align-items:baseline;gap:10px}
+.card h2 small{font-size:12px;font-weight:400;color:var(--faint)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.kpi{background:var(--card);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.kpi .nm{font-size:12px;color:var(--dim)} .kpi .v{font-size:28px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .row{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)} .kpi .row b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.d{font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:7px;margin-left:6px}
+.d.up{background:var(--ok-bg);color:var(--ok)} .d.down{background:var(--bad-bg);color:var(--bad)} .d.flat{background:var(--soft);color:var(--dim)}
+.plan{font-size:11.5px;color:var(--faint)}
+.grid2{display:grid;grid-template-columns:1.2fr .8fr;gap:20px}
+@media (max-width:1100px){.grid2{grid-template-columns:1fr}}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11.5px;font-weight:500;color:var(--faint);white-space:nowrap}
+tbody tr:last-child td{border-bottom:0} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.k{color:var(--dim)} tr.tot td{font-weight:600;background:var(--zebra)}
+.tag{font-size:10.5px;padding:2px 7px;border-radius:7px;background:var(--soft);color:var(--dim);margin-left:6px}
+.tag.paid{background:var(--gold-soft);color:var(--gold)} .tag.org{background:var(--ok-bg);color:var(--ok)}
+.funnel{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:stretch}
+.step{background:var(--soft);border-radius:12px;padding:12px 14px;position:relative}
+.step .nm{font-size:12px;color:var(--dim)} .step .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.step .cr{font-size:12px;color:var(--dim);margin-top:4px} .step .cr b{color:var(--ink)}
+.step.bad{background:var(--bad-bg)} .step.bad .cr b{color:var(--bad)}
+.step.ok{background:var(--ok-bg)} .step.ok .cr b{color:var(--ok)}
+.note{font-size:12.5px;color:var(--dim);margin:10px 0 0}
+.note b{color:var(--ink)}
+.bar{height:8px;border-radius:4px;background:var(--soft);position:relative;overflow:hidden;margin-top:6px}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--gold-b)}
+.legend{display:flex;gap:14px;font-size:11.5px;color:var(--faint);flex-wrap:wrap;margin-top:8px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:middle}
+svg text{font-family:Inter,Arial,sans-serif}
+.empty{color:var(--faint);font-size:13px}
+footer{padding:8px 24px 30px;font-size:12px;color:var(--faint)}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side">
+  <div class="brand"><div class="mark">12</div><div class="txt"><b>Штаб</b><span>центр компании</span></div></div>
+  <nav>
+    <div class="grp">Штаб</div>
+    <a href="shtab.html" title="Общий экран"><svg viewBox="0 0 20 20"><path d="M3 3h6v6H3V3zM11 3h6v4h-6V3zM11 9h6v8h-6V9zM3 11h6v6H3v-6z" stroke-linejoin="round"/></svg><span>Общий экран</span></a>
+    <a href="sales.html" class="on" title="Отдел продаж"><svg viewBox="0 0 20 20"><path d="M3 16l4-6 3 3 3-5 4 2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 4v12h14" stroke-linecap="round"/></svg><span>Отдел продаж</span></a>
+    <a href="marketing.html" title="Маркетинг"><svg viewBox="0 0 20 20"><path d="M3 8v4h3l6 4V4L6 8H3z" stroke-linejoin="round"/><path d="M15 7a4 4 0 010 6" stroke-linecap="round"/></svg><span>Маркетинг</span></a>
+    <a href="shtab-status.html" title="Витрина"><svg viewBox="0 0 20 20"><ellipse cx="10" cy="5" rx="6" ry="2.4"/><path d="M4 5v10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4V5M4 10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4"/></svg><span>Витрина</span></a>
+    <div class="grp">Продажи · 2 линия · ОКК</div>
+    <a href="./" title="Встречи"><svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h9" stroke-linecap="round"/></svg><span>Встречи</span></a>
+    <a href="managers.html" title="Менеджеры"><svg viewBox="0 0 20 20"><circle cx="7" cy="7" r="3"/><circle cx="14" cy="8" r="2.4"/><path d="M2.5 16c.6-3 2.6-4.5 4.5-4.5S11 13 11.5 16M11.5 15.5c.4-2 1.4-3.2 2.7-3.2s2.4 1 3 3.2" stroke-linecap="round"/></svg><span>Менеджеры</span></a>
+    <a href="compare.html" title="Сверка"><svg viewBox="0 0 20 20"><path d="M4 4v12M16 4v12M4 8h4M12 8h4M4 12h4M12 12h4" stroke-linecap="round"/></svg><span>Сверка</span></a>
+    <a href="stats.html" title="Статистика"><svg viewBox="0 0 20 20"><path d="M4 16V9M10 16V4M16 16v-5" stroke-linecap="round"/></svg><span>Статистика</span></a>
+    <a href="charts.html" title="Дашборд ОКК"><svg viewBox="0 0 20 20"><path d="M3 15l4-5 4 3 6-8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Дашборд ОКК</span></a>
+    <a href="guide.html" title="Гайд"><svg viewBox="0 0 20 20"><path d="M4 4h5a2 2 0 012 2v10a2 2 0 00-2-2H4V4zM16 4h-5a2 2 0 00-2 2v10a2 2 0 012-2h5V4z" stroke-linejoin="round"/></svg><span>Гайд</span></a>
+  </nav>
+  <div class="grow"></div>
+  <button type="button" class="collapse" id="menu-toggle"><svg viewBox="0 0 20 20"><path d="M12 5l-5 5 5 5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Свернуть меню</span></button>
+</aside>
+<div class="pane">
+<header>
+  <div><h1>Штаб · Отдел продаж</h1><p class="sub">Первая линия: лиды и назначенные встречи. Вторая линия: проведённые диагностики и продажи, по менеджерам</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div class="card"><h2>Первая линия <small>квалификация: лид → назначенная диагностика</small></h2><div class="kpis" id="l1"></div></div>
+  <div class="card"><h2>Вторая линия <small>диагносты: проведённая диагностика → продажа</small></h2><div class="kpis" id="l2"></div></div>
+  <div class="grid2">
+    <div class="card"><h2>Вторая линия по менеджерам <small id="mgr-sub"></small></h2><div id="mgr"></div>
+      <p class="note">Качество диагностик по менеджерам — в разделе <a href="managers.html">ОКК · Менеджеры</a>.</p></div>
+    <div class="card"><h2>По неделям <small>8 полных недель + текущая</small></h2><div id="weeks"></div></div>
+  </div>
+  <footer>Лид — сделка Первой линии по дате «вступил в чат», назначено — по дате «встреча назначена», проведено — по дате «диагностика проведена», продажа — по дате «клиент прислал чек». Менеджер — ответственный по сделке в amoCRM.</footer>
+</main>
+</div>
+</div>
+<script>
+(function(){var KEY="okk-menu";function read(){try{return localStorage.getItem(KEY)}catch(e){return null}}
+function store(v){try{localStorage.setItem(KEY,v)}catch(e){}}
+function paint(m){document.documentElement.setAttribute("data-menu",m)}
+paint(read()||"full");var b=document.getElementById("menu-toggle");
+if(b)b.addEventListener("click",function(){var n=document.documentElement.getAttribute("data-menu")==="mini"?"full":"mini";store(n);paint(n)});})();
+(function(){var KEY="okk-theme";function store(v){try{v?localStorage.setItem(KEY,v):localStorage.removeItem(KEY)}catch(e){}}
+function read(){try{return localStorage.getItem(KEY)}catch(e){return null}}
+function paint(mode){if(mode==="light"||mode==="dark"){document.documentElement.setAttribute("data-theme",mode)}else{document.documentElement.removeAttribute("data-theme")}
+document.querySelectorAll(".themer button").forEach(function(b){b.setAttribute("aria-pressed",b.getAttribute("data-set")===(mode||"auto")?"true":"false")})}
+paint(read()||"auto");document.querySelector(".themer").addEventListener("click",function(e){var b=e.target.closest("button[data-set]");if(!b)return;var m=b.getAttribute("data-set");store(m==="auto"?null:m);paint(m)});})();
+
+var HEADERS = {};
+try { var t = localStorage.getItem("shtab-token"); if (t) HEADERS["Authorization"] = "Bearer " + t; } catch (e) {}
+function api(q){ return fetch("/api/points?" + q, { headers: HEADERS, credentials: "same-origin" }).then(function(r){ return r.json(); }); }
+function iso(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function addDays(d,n){ var x = new Date(d); x.setDate(x.getDate()+n); return x; }
+function dmy(d){ return String(d.getDate()).padStart(2,"0") + "." + String(d.getMonth()+1).padStart(2,"0"); }
+function monday(d){ var x = new Date(d); var wd = (x.getDay()+6)%7; x.setDate(x.getDate()-wd); return x; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]}); }
+function pct(a,b){ return b ? Math.round(100*a/b) : null; }
+function fmtPct(p){ return p==null ? "—" : p + "%"; }
+function delta(cur, prev){
+  if (prev == null || cur == null) return "";
+  if (!prev) return cur ? '<span class="d up">новое</span>' : '<span class="d flat">0</span>';
+  var d = Math.round(100*(cur-prev)/prev); var cls = d > 3 ? "up" : d < -3 ? "down" : "flat";
+  return '<span class="d ' + cls + '">' + (d>0?"+":"") + d + '%</span>';
+}
+var today = new Date(); today.setHours(0,0,0,0);
+var yesterday = addDays(today, -1);
+var wkStart = monday(yesterday), wkPrevStart = addDays(wkStart,-7), wkPrevEnd = addDays(yesterday,-7);
+var monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+var pmStart = new Date(today.getFullYear(), today.getMonth()-1, 1);
+var pmEnd = new Date(pmStart.getFullYear(), pmStart.getMonth(), Math.min(yesterday.getDate(), new Date(pmStart.getFullYear(), pmStart.getMonth()+1, 0).getDate()));
+var histStart = addDays(wkStart, -7*8);
+var from = pmStart < histStart ? pmStart : histStart;
+
+Promise.all([
+  api("metric=l1.leads,l1.booked,l2.held,l2.sales&ptype=day&dim=&from=" + iso(from) + "&to=" + iso(yesterday)),
+  api("metric=l2.held,l2.sales&ptype=day&from=" + iso(histStart) + "&to=" + iso(yesterday))
+]).then(function(res){
+  if (!res[0].ok) { document.getElementById("l1").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span></div>'; return; }
+  var day = {}; res[0].rows.forEach(function(r){ (day[r.metric] = day[r.metric] || {})[r.period] = r.value; });
+  var mgr = {};  // manager → {metric → {date → value}}
+  res[1].rows.forEach(function(r){ if (!r.dim) return; ((mgr[r.dim] = mgr[r.dim] || {})[r.metric] = mgr[r.dim][r.metric] || {})[r.period] = r.value; });
+  render(day, mgr);
+});
+
+function sum(tbl, metric, a, b){ var s = 0, d = new Date(a); while (d <= b) { s += (tbl[metric] && tbl[metric][iso(d)]) || 0; d = addDays(d,1); } return s; }
+
+function kpi(name, sub, y, w, wp, mt, mp){
+  return '<div class="kpi"><span class="nm">' + name + ' <span class="plan">· ' + sub + '</span></span><span class="v">' + y + ' <span class="plan">вчера</span></span>'
+    + '<span class="row"><span>неделя ' + dmy(wkStart) + '—' + dmy(yesterday) + '</span><b>' + w + delta(w, wp) + '</b></span>'
+    + '<span class="row"><span>месяц по ' + dmy(yesterday) + '</span><b>' + mt + delta(mt, mp) + '</b></span></div>';
+}
+function crKpi(name, num, den, day){
+  var w = pct(sum(day,num,wkStart,yesterday), sum(day,den,wkStart,yesterday)), wp = pct(sum(day,num,wkPrevStart,wkPrevEnd), sum(day,den,wkPrevStart,wkPrevEnd));
+  var m = pct(sum(day,num,monthStart,yesterday), sum(day,den,monthStart,yesterday)), mp = pct(sum(day,num,pmStart,pmEnd), sum(day,den,pmStart,pmEnd));
+  return '<div class="kpi"><span class="nm">' + name + '</span><span class="v">' + fmtPct(m) + ' <span class="plan">месяц</span></span>'
+    + '<span class="row"><span>неделя</span><b>' + fmtPct(w) + (wp!=null&&w!=null?' <span class="plan">было ' + wp + '%</span>':'') + '</b></span>'
+    + '<span class="row"><span>прошлый месяц</span><b>' + fmtPct(mp) + '</b></span></div>';
+}
+
+function render(day, mgr){
+  var last = Object.keys(day["l1.leads"]||{}).sort().pop();
+  document.getElementById("stamp").textContent = last ? "данные по " + last.split("-").reverse().join(".") : "данных нет";
+  function block(id, items){
+    document.getElementById(id).innerHTML = items.map(function(m){
+      if (m.cr) return crKpi(m.name, m.num, m.den, day);
+      var y = (day[m.id] && day[m.id][iso(yesterday)]) || 0;
+      return kpi(m.name, m.sub, y, sum(day,m.id,wkStart,yesterday), sum(day,m.id,wkPrevStart,wkPrevEnd), sum(day,m.id,monthStart,yesterday), sum(day,m.id,pmStart,pmEnd));
+    }).join("");
+  }
+  block("l1", [{id:"l1.leads",name:"Лиды",sub:"все воронки 1-й линии"},{id:"l1.booked",name:"Назначено",sub:"встреча назначена"},{cr:true,name:"Конверсия лид → встреча",num:"l1.booked",den:"l1.leads"}]);
+  block("l2", [{id:"l2.held",name:"Проведено",sub:"диагностика проведена"},{id:"l2.sales",name:"Продажи",sub:"прислали чек"},{cr:true,name:"Конверсия диагностика → продажа",num:"l2.sales",den:"l2.held"}]);
+
+  // менеджеры: месяц и 8 недель
+  var rows = Object.keys(mgr).map(function(name){
+    var t = mgr[name];
+    return { name: name, hm: sum(t,"l2.held",monthStart,yesterday), sm: sum(t,"l2.sales",monthStart,yesterday),
+      h8: sum(t,"l2.held",histStart,yesterday), s8: sum(t,"l2.sales",histStart,yesterday) };
+  }).filter(function(r){ return r.h8 || r.s8; }).sort(function(a,b){ return b.hm - a.hm || b.h8 - a.h8; });
+  document.getElementById("mgr-sub").textContent = "месяц с " + dmy(monthStart) + " · и 8 недель с " + dmy(histStart);
+  var tot = rows.reduce(function(a,r){ a.hm+=r.hm; a.sm+=r.sm; a.h8+=r.h8; a.s8+=r.s8; return a; }, {hm:0,sm:0,h8:0,s8:0});
+  document.getElementById("mgr").innerHTML = rows.length ? '<table><thead><tr><th>Менеджер</th><th class="num">Проведено · мес.</th><th class="num">Продажи · мес.</th><th class="num">CR · мес.</th><th class="num">Проведено · 8 нед.</th><th class="num">Продажи · 8 нед.</th><th class="num">CR · 8 нед.</th></tr></thead><tbody>'
+    + rows.map(function(r){ return '<tr><td>' + esc(r.name) + '</td><td class="num">' + r.hm + '</td><td class="num">' + r.sm + '</td><td class="num">' + fmtPct(pct(r.sm,r.hm)) + '</td><td class="num">' + r.h8 + '</td><td class="num">' + r.s8 + '</td><td class="num"><b>' + fmtPct(pct(r.s8,r.h8)) + '</b></td></tr>'; }).join("")
+    + '<tr class="tot"><td>Все</td><td class="num">' + tot.hm + '</td><td class="num">' + tot.sm + '</td><td class="num">' + fmtPct(pct(tot.sm,tot.hm)) + '</td><td class="num">' + tot.h8 + '</td><td class="num">' + tot.s8 + '</td><td class="num">' + fmtPct(pct(tot.s8,tot.h8)) + '</td></tr></tbody></table>'
+    : '<p class="empty">по менеджерам данных нет</p>';
+
+  // недели
+  var weeks = [];
+  for (var k = 8; k >= 1; k--) { var s = addDays(wkStart, -7*k); weeks.push({ s: s, e: addDays(s,6), partial: false }); }
+  weeks.push({ s: wkStart, e: yesterday, partial: true });
+  document.getElementById("weeks").innerHTML = '<table><thead><tr><th>Неделя</th><th class="num">Лиды</th><th class="num">Назнач.</th><th class="num">CR</th><th class="num">Провед.</th><th class="num">Продажи</th><th class="num">CR</th></tr></thead><tbody>'
+    + weeks.map(function(w){ var L=sum(day,"l1.leads",w.s,w.e), B=sum(day,"l1.booked",w.s,w.e), H=sum(day,"l2.held",w.s,w.e), S=sum(day,"l2.sales",w.s,w.e);
+      return '<tr' + (w.partial?' style="color:var(--gold)"':'') + '><td class="k">' + dmy(w.s) + (w.partial?' · идёт':'') + '</td><td class="num">' + L + '</td><td class="num">' + B + '</td><td class="num">' + fmtPct(pct(B,L)) + '</td><td class="num">' + H + '</td><td class="num">' + S + '</td><td class="num">' + fmtPct(pct(S,H)) + '</td></tr>'; }).join("")
+    + '</tbody></table>';
+}
+</script>
+</body>
+</html>
