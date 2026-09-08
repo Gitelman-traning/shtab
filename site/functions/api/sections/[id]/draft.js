@@ -14,6 +14,8 @@ const SYSTEM = `Ты делаешь ОДНУ самодостаточную HTML
 3. Данные — только через fetch(DATA_URL, {credentials:"same-origin"}). Ответ JSON:
    {ok, section, name, from, to, metrics:[{id,name,unit,definition}], rows:[[metric, "YYYY-MM-DD", dim, value], ...]}
    dim "" — итог за день; непустой dim — срез (источник лида, менеджер). Не суммируй срезы с итогом.
+   Если в ответе есть stock — это снимки состояния (участники по месяцам потока: pay.full полные оплаты, pay.prepaid предоплаты,
+   pay.bloggers блогеры, pay.participants участники, pay.receipts прислали чек; period "shortlist" — шортлист). Их не складывают по дням.
    Недели и месяцы складывай сам из дней. Конверсия = отношение показателей.
 4. Палитра через CSS-переменные, светлая и тёмная тема:
    :root{--page:#faf8f4;--card:#fff;--soft:#f3f1ec;--line:#f1eee8;--ink:#2b2721;--dim:#7b766f;--faint:#a29d95;--gold:#8a6f3d;--gold-soft:#efe7d6;--gold-b:#b59f76;--ok:#38765a;--ok-bg:#e8f2ec;--bad:#ad4636;--bad-bg:#fbe9e6;--blue:#4f6d8f}

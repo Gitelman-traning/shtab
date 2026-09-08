@@ -20,8 +20,14 @@ export async function onRequestGet({ request, env, params }) {
     "SELECT metric, period, dim, value FROM points WHERE ptype = 'day' AND metric IN (" + metrics.map(() => "?").join(",") + ")" +
     " AND period >= ? AND period <= ? ORDER BY period"
   ).bind(...metrics, iso(from), iso(to)).all();
-  const reg = await env.DB.prepare("SELECT id, name, unit, definition FROM metrics WHERE id IN (" + metrics.map(() => "?").join(",") + ")").bind(...metrics).all();
+  const reg = await env.DB.prepare("SELECT id, name, unit, kind, definition FROM metrics WHERE id IN (" + metrics.map(() => "?").join(",") + ")").bind(...metrics).all();
+  // снимки (участники по потокам): последний срез по каждому показателю
+  const stock = await env.DB.prepare(
+    "SELECT metric, period, value, asof FROM points p WHERE ptype = 'potok' AND metric IN (" + metrics.map(() => "?").join(",") + ")" +
+    " AND asof = (SELECT MAX(asof) FROM points p2 WHERE p2.metric = p.metric AND p2.ptype = 'potok') ORDER BY metric, period"
+  ).bind(...metrics).all();
   return json({ ok: true, section: sec.id, name: sec.name, from: iso(from), to: iso(to),
     metrics: reg.results || [], rows: (rows.results || []).map((r) => [r.metric, r.period, r.dim, r.value]),
-    format: "rows: [metric, day YYYY-MM-DD, dim ('' = всего), value]" });
+    stock: (stock.results || []).map((r) => [r.metric, r.period, r.value, r.asof]),
+    format: "rows: [metric, day YYYY-MM-DD, dim ('' = всего), value]; stock: [metric, месяц потока YYYY-MM или 'shortlist', value, дата снимка]" });
 }
