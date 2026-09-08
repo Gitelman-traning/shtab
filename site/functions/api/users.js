@@ -61,7 +61,8 @@ export async function onRequestPatch({ request, env }) {
     const password = tempPassword(), salt = randomId(16);
     await env.DB.prepare("UPDATE users SET pass_hash = ?, salt = ?, must_change = 1 WHERE login = ?")
       .bind(await hashPassword(password, salt), salt, login).run();
-    await env.DB.prepare("DELETE FROM sessions WHERE login = ?").bind(login).run();
+    // чужие сессии закрываем; свою — оставляем, иначе админ выкинет сам себя, не успев прочитать пароль
+    if (login !== me.login) await env.DB.prepare("DELETE FROM sessions WHERE login = ?").bind(login).run();
     await audit(env, me.login, "user.reset", login);
     return json({ ok: true, password });
   }

@@ -91,7 +91,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font-size:12.5px
   <div class="card" id="me-card" hidden><h2>Мой пароль</h2>
     <div class="row"><input id="p-old" type="password" placeholder="Текущий пароль" autocomplete="current-password"><input id="p-new" type="password" placeholder="Новый пароль, от 8 символов" autocomplete="new-password"><button id="p-save">Сменить</button><span id="p-msg" class="sub"></span></div>
   </div>
-  <div class="card" id="list-card" hidden><h2>Пользователи <small class="sub" id="cnt"></small></h2><div id="list"></div></div>
+  <div class="card" id="list-card" hidden><h2>Пользователи <small class="sub" id="cnt"></small></h2><div id="list"></div><div id="u-out"></div></div>
   <div class="card" id="add-card" hidden><h2>Добавить пользователя</h2>
     <div class="row">
       <input id="n-login" placeholder="логин, латиницей" style="width:170px">
@@ -152,7 +152,7 @@ function loadUsers(){
         +'<td class="actions"><button class="ghost" data-a="edit" data-l="'+esc(u.login)+'">изменить</button><button class="ghost" data-a="reset" data-l="'+esc(u.login)+'">сбросить пароль</button>'
         +(u.active?'<button class="danger" data-a="disable" data-l="'+esc(u.login)+'">отключить</button>':'<button data-a="enable" data-l="'+esc(u.login)+'">включить</button>')+'</td></tr>'
         +'<tr hidden id="edit-'+esc(u.login)+'"><td colspan="7"><div class="row"><input value="'+esc(u.name)+'" id="e-name-'+esc(u.login)+'" placeholder="Имя"><select id="e-role-'+esc(u.login)+'">'+Object.keys(ROLE).map(function(k){return '<option value="'+k+'"'+(k===u.role?' selected':'')+'>'+ROLE[k]+'</option>'}).join("")+'</select><div class="pick" id="e-sec-'+esc(u.login)+'" data-value="'+esc(u.sections)+'"></div><button data-a="save" data-l="'+esc(u.login)+'">Сохранить</button></div></td></tr>'}).join("")
-      +'</tbody></table><div id="u-out"></div>';
+      +'</tbody></table>';
     document.querySelectorAll('#list .pick').forEach(function(el){ picker(el, el.getAttribute('data-value')||''); });
   });
 }
@@ -160,7 +160,7 @@ document.getElementById("list").addEventListener("click",function(e){
   var b=e.target.closest("button[data-a]");if(!b)return;var a=b.getAttribute("data-a"),l=b.getAttribute("data-l"),out=document.getElementById("u-out");
   if(a==="edit"){var r=document.getElementById("edit-"+l);r.hidden=!r.hidden;return}
   if(a==="save"){api("/api/users",{method:"PATCH",body:{login:l,action:"update",name:document.getElementById("e-name-"+l).value,role:document.getElementById("e-role-"+l).value,sections:pickValue(document.getElementById("e-sec-"+l))}}).then(function(r){out.innerHTML=r.ok?'<p class="ok">Сохранено</p>':'<p class="err">'+esc(r.error)+'</p>';loadUsers();loadLog()});return}
-  if(a==="reset"&&!confirm("Сбросить пароль пользователю "+l+"? Текущие сессии закроются."))return;
+  if(a==="reset"&&!confirm(l===(ME&&ME.login)?"Сбросить свой пароль? Новый временный пароль появится ниже, текущий вход сохранится — смените пароль в блоке «Мой пароль».":"Сбросить пароль пользователю "+l+"? Его текущие сессии закроются."))return;
   if(a==="disable"&&!confirm("Отключить "+l+"?"))return;
   api("/api/users",{method:"PATCH",body:{login:l,action:a}}).then(function(r){
     if(!r.ok){out.innerHTML='<p class="err">'+esc(r.error)+'</p>';return}
