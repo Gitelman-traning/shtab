@@ -162,3 +162,30 @@ export async function llmChat(env, messages, opts = {}) {
   }
   throw new Error("модель не ответила (" + last + ")");
 }
+
+// ---------- Telegram Login Widget ----------
+// Виджет присылает id, first_name, last_name, username, photo_url, auth_date, hash.
+// Подпись: HMAC-SHA256(data_check_string, SHA256(bot_token)). Годна сутки.
+export async function tgVerify(params, botToken) {
+  const data = {};
+  for (const [k, v] of params) if (k !== "hash") data[k] = v;
+  const hash = params.get("hash") || "";
+  if (!hash || !data.id || !data.auth_date) return null;
+  if (Math.abs(Date.now() / 1000 - Number(data.auth_date)) > 86400) return null;
+  const check = Object.keys(data).sort().map((k) => k + "=" + data[k]).join("\n");
+  const secret = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(botToken));
+  const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(check)));
+  return timingSafeEqual(mac, hash) ? data : null;
+}
+
+export async function tgSend(env, chatId, text) {
+  if (!env.TG_BOT_TOKEN || !chatId) return false;
+  try {
+    const r = await fetch("https://api.telegram.org/bot" + env.TG_BOT_TOKEN + "/sendMessage", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+    });
+    return r.ok;
+  } catch (e) { return false; }
+}

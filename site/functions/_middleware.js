@@ -11,7 +11,7 @@
  * После сброса первый вошедший задаёт новый.
  */
 
-import { currentUser, createSession, dropSession, verifyPassword, audit } from "./api/_lib.js";
+import { currentUser, createSession, dropSession, verifyPassword, audit, tgVerify, tgSend, now } from "./api/_lib.js";
 
 const COOKIE = "okk_auth";
 const LOGIN = "admin";          // единый логин к общему паролю (решение 04.09.2026)
@@ -45,7 +45,7 @@ function cookieValue(request, name) {
   return null;
 }
 
-function page({ setup, message }) {
+function page({ setup, message, tgBot }) {
   const title = setup ? "Придумайте пароль" : "Вход";
   const hint = setup
     ? "Пароль ещё не задан. Тот, что вы введёте, станет общим для всех, кто открывает дашборд."
@@ -82,6 +82,8 @@ function page({ setup, message }) {
     letter-spacing:.08em;padding:11px;border:0;cursor:pointer;color:#151616;
     background:linear-gradient(135deg,var(--gold-a),var(--gold-b))}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+  .tg{display:flex;justify-content:center;min-height:40px}
 </style></head><body>
 <form method="POST" action="${action}">
   <div class="mark">12</div>
@@ -91,6 +93,9 @@ function page({ setup, message }) {
   <input type="password" name="password" placeholder="Пароль" required
          autocomplete="${autocomplete}" aria-label="Пароль"${setup ? ` minlength="${MIN_LEN}"` : ""}>
   <button type="submit">${button}</button>
+  ${tgBot && !setup ? `<div class="or"><span>или</span></div>
+  <div class="tg"><script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="${tgBot}" data-size="large" data-userpic="false" data-radius="6" data-auth-url="/__tg" data-request-access="write"></script></div>
+  <p class="hint">Через Telegram: первый вход создаёт заявку, администратор подтверждает доступ.</p>` : ""}
 </form></body></html>`;
 }
 
@@ -142,12 +147,43 @@ export async function onRequest(context) {
     return new Response(null, { status: 303, headers: [["Location", "/"], ["Set-Cookie", `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`], ["Set-Cookie", gone], ["Cache-Control", "no-store"]] });
   }
 
+  // вход через Telegram: виджет возвращает сюда подписанные данные аккаунта
+  if (url.pathname === "/__tg") {
+    if (!env.TG_BOT_TOKEN || !env.DB) return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Вход через Telegram не настроен." }), 503);
+    const tg = await tgVerify(url.searchParams, env.TG_BOT_TOKEN);
+    if (!tg) return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Подпись Telegram не сошлась или устарела. Попробуйте ещё раз." }), 403);
+    const tgId = Number(tg.id);
+    const fullName = [tg.first_name, tg.last_name].filter(Boolean).join(" ").slice(0, 80);
+    let row = await env.DB.prepare("SELECT login, role, active FROM users WHERE tg_id = ?").bind(tgId).first();
+    if (!row) {
+      // заявка: пользователь создаётся без доступа, администратор подтверждает и назначает роль
+      let login = String(tg.username || "").toLowerCase().replace(/[^a-z0-9._-]/g, "");
+      if (login.length < 3) login = "tg" + tgId;
+      const taken = await env.DB.prepare("SELECT login FROM users WHERE login = ?").bind(login).first();
+      if (taken) login = login + "-" + String(tgId).slice(-4);
+      await env.DB.prepare(
+        "INSERT INTO users (login, pass_hash, salt, name, role, sections, active, must_change, created_at, tg_id, tg_username, photo) VALUES (?,?,?,?,?,?,0,0,?,?,?,?)")
+        .bind(login, "", "", fullName, "pending", "", now(), tgId, tg.username || "", tg.photo_url || "").run();
+      await audit(env, login, "tg.request", login, fullName + (tg.username ? " @" + tg.username : ""));
+      await tgSend(env, env.TG_ADMIN_CHAT, "Штаб: заявка на доступ — " + fullName + (tg.username ? " (@" + tg.username + ")" : "") + ". Подтвердить: https://okk-dashboard.pages.dev/users");
+      await tgSend(env, tgId, "Заявка на доступ в Штаб отправлена. Когда администратор подтвердит, придёт сообщение.");
+      return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка отправлена. Администратор подтвердит доступ, и вы сможете войти этой же кнопкой." }), 202);
+    }
+    if (!row.active || row.role === "pending") {
+      return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка ещё не подтверждена. Мы напишем в Telegram, когда доступ откроют." }), 403);
+    }
+    await env.DB.prepare("UPDATE users SET tg_username = ?, photo = ? WHERE login = ?").bind(tg.username || "", tg.photo_url || "", row.login).run();
+    const s = await createSession(env, row.login);
+    await audit(env, row.login, "login.tg");
+    return new Response(null, { status: 303, headers: { Location: "/shtab", "Set-Cookie": s.cookie, "Cache-Control": "no-store" } });
+  }
+
   // именной пользователь: логин не «admin» — ищем в базе, сессия в cookie shtab_s
   if (posted && url.pathname === "/__login" && login && login !== LOGIN) {
     const row = env.DB ? await env.DB.prepare("SELECT login, pass_hash, salt, active FROM users WHERE login = ?").bind(login).first() : null;
     if (!row || !row.active || !(await verifyPassword(value, row.salt, row.pass_hash))) {
       await audit(env, login, "login.fail");
-      return html(page({ setup: false, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
+      return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
     }
     const s = await createSession(env, row.login);
     await audit(env, row.login, "login");
@@ -165,30 +201,30 @@ export async function onRequest(context) {
   if (!stored) {
     if (posted && url.pathname === "/__setup") {
       if (!same(login, LOGIN)) {
-        return html(page({ setup: true, message: "Логин должен быть " + LOGIN + "." }), 400);
+        return html(page({ tgBot: env.TG_BOT_NAME, setup: true, message: "Логин должен быть " + LOGIN + "." }), 400);
       }
       if (value.length < MIN_LEN) {
-        return html(page({ setup: true, message: `Пароль короче ${MIN_LEN} символов — так не пойдёт.` }), 400);
+        return html(page({ tgBot: env.TG_BOT_NAME, setup: true, message: `Пароль короче ${MIN_LEN} символов — так не пойдёт.` }), 400);
       }
       // если кто-то успел раньше, его пароль остаётся в силе
       const again = await env.OKK_KV.get(KEY);
-      if (again) return html(page({ setup: false, message: "Пароль уже задан. Введите его." }), 409);
+      if (again) return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Пароль уже задан. Введите его." }), 409);
       await env.OKK_KV.put(KEY, value);
       return letIn(await sign(value));
     }
-    return html(page({ setup: true, message: "" }), 401);
+    return html(page({ tgBot: env.TG_BOT_NAME, setup: true, message: "" }), 401);
   }
 
   // пароль задан — обычный вход
   if (posted && url.pathname === "/__login") {
     if (!same(login, LOGIN) || !same(value, stored)) {
-      return html(page({ setup: false, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
+      return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
     }
     return letIn(await sign(stored));
   }
 
   if (!same(cookieValue(request, COOKIE) || "", await sign(stored))) {
-    return html(page({ setup: false, message: "" }), 401);
+    return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "" }), 401);
   }
 
   const response = await next();

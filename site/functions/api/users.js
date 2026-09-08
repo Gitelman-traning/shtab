@@ -2,7 +2,7 @@
 //   GET   /api/users                      — список
 //   POST  /api/users {login,name,role,sections}            — создать, вернёт временный пароль
 //   PATCH /api/users {login, action, ...}  — reset (новый временный пароль) / disable / enable / update {name,role,sections}
-import { json, bad, canRead, isAdmin, hasIngestToken, hashPassword, randomId, audit, now } from "./_lib.js";
+import { json, bad, canRead, isAdmin, hasIngestToken, hashPassword, randomId, audit, now, tgSend } from "./_lib.js";
 
 const ROLES = ["admin", "head", "member", "viewer"];
 const RE_LOGIN = /^[a-z0-9._-]{3,32}$/;
@@ -24,7 +24,7 @@ export async function onRequestGet({ request, env }) {
   const me = await gate(request, env);
   if (!me) return bad("только для администратора", 403);
   const rows = await env.DB.prepare(
-    "SELECT login, name, role, sections, active, created_at, last_login, must_change FROM users ORDER BY role, login").all();
+    "SELECT login, name, role, sections, active, created_at, last_login, must_change, tg_id, tg_username, photo FROM users ORDER BY role, login").all();
   return json({ ok: true, users: rows.results || [] });
 }
 
@@ -71,6 +71,22 @@ export async function onRequestPatch({ request, env }) {
     await env.DB.prepare("UPDATE users SET active = ? WHERE login = ?").bind(action === "enable" ? 1 : 0, login).run();
     if (action === "disable") await env.DB.prepare("DELETE FROM sessions WHERE login = ?").bind(login).run();
     await audit(env, me.login, "user." + action, login);
+    return json({ ok: true });
+  }
+  if (action === "approve") {
+    if (row.role !== "pending") return bad("это не заявка");
+    const role = ROLES.includes(b.role) ? b.role : "member";
+    const sections = String(b.sections || "").split(",").map((s) => s.trim()).filter(Boolean).join(",");
+    await env.DB.prepare("UPDATE users SET role = ?, sections = ?, active = 1 WHERE login = ?").bind(role, sections, login).run();
+    await audit(env, me.login, "user.approve", login, role + (sections ? " " + sections : ""));
+    const u = await env.DB.prepare("SELECT tg_id FROM users WHERE login = ?").bind(login).first();
+    if (u && u.tg_id) await tgSend(env, u.tg_id, "Доступ в Штаб открыт. Войти: https://okk-dashboard.pages.dev/ — кнопка «Войти через Telegram».");
+    return json({ ok: true });
+  }
+  if (action === "reject") {
+    if (row.role !== "pending") return bad("это не заявка");
+    await env.DB.prepare("DELETE FROM users WHERE login = ? AND role = 'pending'").bind(login).run();
+    await audit(env, me.login, "user.reject", login);
     return json({ ok: true });
   }
   if (action === "update") {

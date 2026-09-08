@@ -91,6 +91,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font-size:12.5px
   <div class="card" id="me-card" hidden><h2>Мой пароль</h2>
     <div class="row"><input id="p-old" type="password" placeholder="Текущий пароль" autocomplete="current-password"><input id="p-new" type="password" placeholder="Новый пароль, от 8 символов" autocomplete="new-password"><button id="p-save">Сменить</button><span id="p-msg" class="sub"></span></div>
   </div>
+  <div class="card" id="pending-card" hidden><h2>Заявки на доступ <small class="sub">вошли через Telegram, ждут подтверждения</small></h2><div id="pending"></div></div>
   <div class="card" id="list-card" hidden><h2>Пользователи <small class="sub" id="cnt"></small></h2><div id="list"></div><div id="u-out"></div></div>
   <div class="card" id="add-card" hidden><h2>Добавить пользователя</h2>
     <div class="row">
@@ -146,9 +147,18 @@ api("/api/me").then(function(m){
 function loadUsers(){
   api("/api/users").then(function(r){
     if(!r.ok){document.getElementById("list").innerHTML='<p class="err">'+esc(r.error)+'</p>';return}
+    var pend=r.users.filter(function(u){return u.role==="pending"}); r.users=r.users.filter(function(u){return u.role!=="pending"});
+    document.getElementById("pending-card").hidden=!pend.length;
+    document.getElementById("pending").innerHTML=pend.map(function(u){return '<div class="row" style="padding:8px 0;border-bottom:1px solid var(--line)">'
+      +(u.photo?'<img src="'+esc(u.photo)+'" alt="" style="width:32px;height:32px;border-radius:50%">':'')
+      +'<b>'+esc(u.name||u.login)+'</b><span class="sub">'+(u.tg_username?'@'+esc(u.tg_username)+' · ':'')+dt(u.created_at)+'</span>'
+      +'<select id="a-role-'+esc(u.login)+'"><option value="head">руководитель раздела</option><option value="member" selected>сотрудник</option><option value="viewer">только смотрит</option><option value="admin">администратор</option></select>'
+      +'<div class="pick" id="a-sec-'+esc(u.login)+'" data-value=""></div>'
+      +'<button data-a="approve" data-l="'+esc(u.login)+'">Подтвердить</button><button class="danger" data-a="reject" data-l="'+esc(u.login)+'">Отклонить</button></div>'}).join("");
+    document.querySelectorAll('#pending .pick').forEach(function(el){ picker(el, ''); });
     document.getElementById("cnt").textContent=r.users.length+" чел.";
     document.getElementById("list").innerHTML='<table><thead><tr><th>Логин</th><th>Имя</th><th>Роль</th><th>Разделы</th><th>Создан</th><th>Последний вход</th><th></th></tr></thead><tbody>'
-      +r.users.map(function(u){return '<tr'+(u.active?'':' style="opacity:.55"')+'><td><b>'+esc(u.login)+'</b>'+(u.must_change?' <span class="pill">временный пароль</span>':'')+(u.active?'':' <span class="pill off">отключён</span>')+'</td><td>'+esc(u.name)+'</td><td><span class="pill '+esc(u.role)+'">'+esc(ROLE[u.role]||u.role)+'</span></td><td>'+esc(u.sections||"—")+'</td><td>'+dt(u.created_at)+'</td><td>'+dt(u.last_login)+'</td>'
+      +r.users.map(function(u){return '<tr'+(u.active?'':' style="opacity:.55"')+'><td><b>'+esc(u.login)+'</b>'+(u.must_change?' <span class="pill">временный пароль</span>':'')+(u.active?'':' <span class="pill off">отключён</span>')+(u.tg_id?' <span class="pill">Telegram'+(u.tg_username?' @'+esc(u.tg_username):'')+'</span>':'')+'</td><td>'+esc(u.name)+'</td><td><span class="pill '+esc(u.role)+'">'+esc(ROLE[u.role]||u.role)+'</span></td><td>'+esc(u.sections||"—")+'</td><td>'+dt(u.created_at)+'</td><td>'+dt(u.last_login)+'</td>'
         +'<td class="actions"><button class="ghost" data-a="edit" data-l="'+esc(u.login)+'">изменить</button><button class="ghost" data-a="reset" data-l="'+esc(u.login)+'">сбросить пароль</button>'
         +(u.active?'<button class="danger" data-a="disable" data-l="'+esc(u.login)+'">отключить</button>':'<button data-a="enable" data-l="'+esc(u.login)+'">включить</button>')+'</td></tr>'
         +'<tr hidden id="edit-'+esc(u.login)+'"><td colspan="7"><div class="row"><input value="'+esc(u.name)+'" id="e-name-'+esc(u.login)+'" placeholder="Имя"><select id="e-role-'+esc(u.login)+'">'+Object.keys(ROLE).map(function(k){return '<option value="'+k+'"'+(k===u.role?' selected':'')+'>'+ROLE[k]+'</option>'}).join("")+'</select><div class="pick" id="e-sec-'+esc(u.login)+'" data-value="'+esc(u.sections)+'"></div><button data-a="save" data-l="'+esc(u.login)+'">Сохранить</button></div></td></tr>'}).join("")
@@ -167,6 +177,12 @@ document.getElementById("list").addEventListener("click",function(e){
     out.innerHTML=r.password?'<div class="temp">Новый временный пароль для <b>'+esc(l)+'</b>: <code>'+esc(r.password)+'</code> — передайте лично, повторно показать нельзя.</div>':'<p class="ok">Готово</p>';
     loadUsers();loadLog();
   });
+});
+document.getElementById("pending").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-a]");if(!b)return;var a=b.getAttribute("data-a"),l=b.getAttribute("data-l");
+  if(a==="reject"&&!confirm("Отклонить заявку "+l+"?"))return;
+  var body={login:l,action:a};if(a==="approve"){body.role=document.getElementById("a-role-"+l).value;body.sections=pickValue(document.getElementById("a-sec-"+l))}
+  api("/api/users",{method:"PATCH",body:body}).then(function(r){var out=document.getElementById("u-out");out.innerHTML=r.ok?'<p class="ok">'+(a==="approve"?"Доступ открыт, человеку ушло сообщение в Telegram":"Заявка отклонена")+'</p>':'<p class="err">'+esc(r.error)+'</p>';loadUsers();loadLog()});
 });
 document.getElementById("n-add").addEventListener("click",function(){
   var body={login:document.getElementById("n-login").value,name:document.getElementById("n-name").value,role:document.getElementById("n-role").value,sections:pickValue(document.getElementById("n-sections"))};
