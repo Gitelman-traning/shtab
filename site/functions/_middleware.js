@@ -11,7 +11,30 @@
  * После сброса первый вошедший задаёт новый.
  */
 
-import { currentUser, createSession, dropSession, verifyPassword, audit, tgVerify, tgSend, now } from "./api/_lib.js";
+import { currentUser, createSession, dropSession, verifyPassword, hashPassword, randomId, audit, tgVerify, tgSend, now } from "./api/_lib.js";
+
+const RE_LOGIN = /^[a-z0-9._-]{3,32}$/;
+
+function registerPage(message, values = {}, tgBot = "") {
+  const v = (k) => String(values[k] || "").replace(/"/g, "&quot;");
+  const note = message ? `<p class="err">${message}</p>` : `<p class="hint">Заявка уйдёт администратору. После подтверждения войдёте с этим логином и паролем.</p>`;
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Регистрация</title>
+${STYLE}</head><body>
+<form method="POST" action="/__register">
+  <div class="mark">12</div>
+  <h1>Штаб · Регистрация</h1>
+  ${note}
+  <input type="text" name="login" placeholder="Логин: латиница, цифры, точка, дефис" value="${v("login")}" required autocomplete="username" minlength="3" maxlength="32" aria-label="Логин">
+  <input type="text" name="name" placeholder="Имя и фамилия" value="${v("name")}" required maxlength="80" autocomplete="name" aria-label="Имя">
+  <input type="password" name="password" placeholder="Пароль, от 8 символов" required minlength="8" autocomplete="new-password" aria-label="Пароль">
+  <input type="password" name="password2" placeholder="Пароль ещё раз" required minlength="8" autocomplete="new-password" aria-label="Повтор пароля">
+  <button type="submit">Отправить заявку</button>
+  <p class="hint"><a href="/">Уже есть доступ? Войти</a></p>
+</form></body></html>`;
+}
 
 const COOKIE = "okk_auth";
 const LOGIN = "admin";          // единый логин к общему паролю (решение 04.09.2026)
@@ -45,20 +68,7 @@ function cookieValue(request, name) {
   return null;
 }
 
-function page({ setup, message, tgBot }) {
-  const title = setup ? "Придумайте пароль" : "Вход";
-  const hint = setup
-    ? "Пароль ещё не задан. Тот, что вы введёте, станет общим для всех, кто открывает дашборд."
-    : "Страница закрыта: внутри данные компании. Логин один на всех, пароль общий.";
-  const action = setup ? "/__setup" : "/__login";
-  const button = setup ? "Сохранить пароль" : "Войти";
-  const autocomplete = setup ? "new-password" : "current-password";
-  const note = message ? `<p class="err">${message}</p>` : `<p class="hint">${hint}</p>`;
-  return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<title>Штаб · Вход</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+const STYLE = `<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=TikTok+Sans:opsz,wght@12..36,300..900&display=swap">
 <style>
@@ -75,6 +85,7 @@ function page({ setup, message, tgBot }) {
     background:linear-gradient(135deg,var(--gold-a),var(--gold-b));letter-spacing:-.04em}
   h1{margin:0;font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:-.01em}
   .hint,.err{margin:0;font-size:12.5px;color:var(--muted);line-height:1.45}
+  .hint a{color:var(--accent)}
   .err{color:var(--bad);background:var(--bad-bg);padding:8px 10px}
   input{font-family:inherit;font-size:15px;padding:10px 12px;border:1px solid var(--line);
     background:var(--ground);color:var(--text);width:100%}
@@ -84,7 +95,22 @@ function page({ setup, message, tgBot }) {
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
   .tg{display:flex;justify-content:center;min-height:40px}
-</style></head><body>
+</style>`;
+
+function page({ setup, message, tgBot }) {
+  const title = setup ? "Придумайте пароль" : "Вход";
+  const hint = setup
+    ? "Пароль ещё не задан. Тот, что вы введёте, станет общим для всех, кто открывает дашборд."
+    : "Страница закрыта: внутри данные компании. Логин один на всех, пароль общий.";
+  const action = setup ? "/__setup" : "/__login";
+  const button = setup ? "Сохранить пароль" : "Войти";
+  const autocomplete = setup ? "new-password" : "current-password";
+  const note = message ? `<p class="err">${message}</p>` : `<p class="hint">${hint}</p>`;
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Вход</title>
+${STYLE}</head><body>
 <form method="POST" action="${action}">
   <div class="mark">12</div>
   <h1>Штаб · ${title}</h1>
@@ -96,6 +122,7 @@ function page({ setup, message, tgBot }) {
   ${tgBot && !setup ? `<div class="or"><span>или</span></div>
   <div class="tg"><script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="${tgBot}" data-size="large" data-userpic="false" data-radius="6" data-auth-url="/__tg" data-request-access="write"></script></div>
   <p class="hint">Через Telegram: первый вход создаёт заявку, администратор подтверждает доступ.</p>` : ""}
+  ${setup ? "" : `<p class="hint" style="text-align:center">Нет доступа? <a href="/__register" style="color:var(--accent)">Зарегистрироваться</a></p>`}
 </form></body></html>`;
 }
 
@@ -132,13 +159,35 @@ export async function onRequest(context) {
   const stored = await env.OKK_KV.get(KEY);
   // тело читаем только у форм входа: иначе запрос уйдёт дальше уже «пустым»
   const isForm = request.method === "POST" &&
-    (url.pathname === "/__login" || url.pathname === "/__setup");
+    (url.pathname === "/__login" || url.pathname === "/__setup" || url.pathname === "/__register");
   const posted = isForm;
-  let value = "", login = "";
+  let value = "", login = "", reg = null;
   if (isForm) {
     const form = await request.formData();
     value = String(form.get("password") || "");
     login = String(form.get("login") || "").trim().toLowerCase();
+    if (url.pathname === "/__register") reg = { name: String(form.get("name") || "").trim().slice(0, 80), password2: String(form.get("password2") || "") };
+  }
+
+  // самостоятельная регистрация: заявка ждёт подтверждения администратора
+  if (url.pathname === "/__register") {
+    if (request.method !== "POST") return html(registerPage("", {}, env.TG_BOT_NAME), 200);
+    if (!env.DB) return html(registerPage("База пользователей не подключена."), 500);
+    const vals = { login, name: reg.name };
+    if (!RE_LOGIN.test(login)) return html(registerPage("Логин: 3–32 символа, латиница, цифры, точка, дефис.", vals), 400);
+    if (login === "admin") return html(registerPage("Этот логин занят.", vals), 400);
+    if (reg.name.length < 2) return html(registerPage("Укажите имя и фамилию.", vals), 400);
+    if (value.length < 8) return html(registerPage("Пароль короче 8 символов.", vals), 400);
+    if (value !== reg.password2) return html(registerPage("Пароли не совпадают.", vals), 400);
+    const taken = await env.DB.prepare("SELECT login FROM users WHERE login = ?").bind(login).first();
+    if (taken) return html(registerPage("Такой логин уже есть. Если это вы — войдите или попросите администратора сбросить пароль.", vals), 409);
+    const salt = randomId(16);
+    await env.DB.prepare(
+      "INSERT INTO users (login, pass_hash, salt, name, role, sections, active, must_change, created_at) VALUES (?,?,?,?,'pending','',0,0,?)")
+      .bind(login, await hashPassword(value, salt), salt, reg.name, now()).run();
+    await audit(env, login, "register", login, reg.name);
+    await tgSend(env, env.TG_ADMIN_CHAT, "Штаб: заявка на доступ — " + reg.name + " (" + login + "). Подтвердить: https://okk-dashboard.pages.dev/users");
+    return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка отправлена. Когда администратор подтвердит доступ, входите с этим логином и паролем." }), 202);
   }
 
   // выход: снимаем и общую cookie, и именную сессию
@@ -180,7 +229,10 @@ export async function onRequest(context) {
 
   // именной пользователь: логин не «admin» — ищем в базе, сессия в cookie shtab_s
   if (posted && url.pathname === "/__login" && login && login !== LOGIN) {
-    const row = env.DB ? await env.DB.prepare("SELECT login, pass_hash, salt, active FROM users WHERE login = ?").bind(login).first() : null;
+    const row = env.DB ? await env.DB.prepare("SELECT login, pass_hash, salt, active, role FROM users WHERE login = ?").bind(login).first() : null;
+    if (row && row.role === "pending" && await verifyPassword(value, row.salt, row.pass_hash)) {
+      return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка ещё не подтверждена администратором. Попробуйте позже." }), 403);
+    }
     if (!row || !row.active || !(await verifyPassword(value, row.salt, row.pass_hash))) {
       await audit(env, login, "login.fail");
       return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
