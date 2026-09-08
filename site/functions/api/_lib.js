@@ -141,19 +141,49 @@ export async function llmChat(env, messages, opts = {}) {
   const models = opts.model ? [opts.model]
     : paid ? [env.EDIT_MODEL || env.ASK_MODEL || "anthropic/claude-sonnet-5"]
     : [env.EDIT_MODEL || "anthropic/claude-sonnet-5", ...FREE_MODELS];
+  // каждую модель пробуем дважды: провайдеры за Cloudflare отвечают 524/502 на долгие ответы
+  const attempts = [];
+  for (const m of models) { attempts.push(m); attempts.push(m); }
   let last = "";
-  for (const model of models) {
+  for (const model of attempts) {
     try {
       const r = await fetch(base + "/chat/completions", {
         method: "POST",
-        headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json",
+        headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json", "Accept": "text/event-stream",
                    "HTTP-Referer": "https://okk-dashboard.pages.dev", "X-Title": "Shtab edit" },
-        body: JSON.stringify({ model, temperature: opts.temperature ?? 0.2, max_tokens: opts.max_tokens || 16000, messages }),
+        body: JSON.stringify({ model, temperature: opts.temperature ?? 0.2, max_tokens: opts.max_tokens || 16000, messages, stream: true }),
       });
       if (!r.ok) { last = "ответ " + r.status; continue; }
-      const data = await r.json();
-      const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
-      const text = (msg.content || "").trim();
+      const ctype = r.headers.get("content-type") || "";
+      let text = "";
+      if (/event-stream/.test(ctype)) {
+        // SSE: строки "data: {...}" с choices[0].delta.content
+        const reader = r.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf("\n")) >= 0) {
+            const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+            if (!line.startsWith("data:")) continue;
+            const payload = line.slice(5).trim();
+            if (payload === "[DONE]") continue;
+            try {
+              const j = JSON.parse(payload);
+              const d = j.choices && j.choices[0] && (j.choices[0].delta || j.choices[0].message);
+              if (d && d.content) text += d.content;
+            } catch (e) { /* неполная строка — подождём следующий кусок */ }
+          }
+        }
+      } else {
+        const data = await r.json();
+        const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
+        text = msg.content || "";
+      }
+      text = text.trim();
       if (!text) { last = "пустой ответ"; continue; }
       return { text, model };
     } catch (e) {

@@ -22,7 +22,7 @@ const SYSTEM = `Ты делаешь ОДНУ самодостаточную HTML
    @media (prefers-color-scheme:dark){:root{--page:#161718;--card:#1e2021;--soft:#232526;--line:#282a2b;--ink:#eceae5;--dim:#9a958d;--faint:#75716a;--gold:#c9b487;--gold-soft:#2a2721;--gold-b:#b59f76;--ok:#7cc396;--ok-bg:#1b2b23;--bad:#e58975;--bad-bg:#2f1e1a;--blue:#8fa8c4}}
    Шрифт: Inter, Arial, sans-serif. Фон body — var(--page), карточки var(--card) с радиусом 16px. Без боковых меню и шапок сайта: только содержимое раздела.
 5. Русский язык, аккуратные подписи, числа с разрядами. Если данных нет — честно написать «данных нет».
-6. Размер страницы — до 40 000 символов. Без localStorage, без запросов куда-либо, кроме DATA_URL.
+6. Размер страницы — до 30 000 символов, без длинных комментариев и повторов кода: чем компактнее, тем быстрее ответ. Без localStorage, без запросов куда-либо, кроме DATA_URL.
 7. Если дана текущая версия страницы — измени её по просьбе, сохранив всё остальное, а не переписывай с нуля.`;
 
 function stripFences(t) {
@@ -61,9 +61,9 @@ export async function onRequestPost({ request, env, params }) {
   ];
   let out;
   try {
-    out = await llmChat(env, messages, { max_tokens: 20000, temperature: 0.2 });
+    out = await llmChat(env, messages, { max_tokens: 14000, temperature: 0.2 });
   } catch (e) {
-    return bad("модель не справилась: " + e.message, 502);
+    return bad("модель не успела: " + e.message + ". Нажмите «Сделать вариант» ещё раз или сократите просьбу.", 502);
   }
   const html = stripFences(out.text);
   if (!/<!doctype html/i.test(html) || html.length < 500) return bad("модель вернула не страницу, попробуйте переформулировать", 502);
