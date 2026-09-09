@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Первая линия</title>
+<link rel="stylesheet" href="/ui.css">
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Отдел продаж · <b>Первая линия</b></div><h1>Первая линия · квалификация</h1><p class="sub">От нового лида до проведённой диагностики: сколько пришло, сколько назначили, сколько дошло до встречи</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<div id="section-editor" data-section="sales.l1"></div>
+<main id="section-standard">
+  <div class="kpis" id="kpis"></div>
+  <div class="card"><h2>Путь лида <small id="funnel-sub"></small></h2><div class="funnel funnel3" id="funnel"></div><p class="note" id="bottleneck"></p></div>
+  <div class="grid2">
+    <div class="card"><h2>По неделям <small>8 полных недель + текущая</small></h2><div id="weeks"></div></div>
+    <div class="card"><h2>По квалификаторам <small>месяц</small></h2><div id="mgr"><p class="empty">Разбивка по менеджерам Первой линии появится после сопоставления ответственных из amoCRM: в выгрузке они записаны кодами, сопоставление с именами в работе.</p></div></div>
+  </div>
+  <footer>Лид — сделка Первой линии по дате «вступил в чат», назначено — по дате «встреча назначена», проведено — по дате «диагностика проведена» у сделок, переданных на Вторую линию.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var HEADERS = {};
+function api(q){ return fetch("/api/points?" + q, { headers: HEADERS, credentials: "same-origin" }).then(function(r){ return r.json(); }); }
+var today = new Date(); today.setHours(0,0,0,0);
+var yesterday = addDays(today, -1);
+var wkStart = monday(yesterday), wkPrevStart = addDays(wkStart,-7), wkPrevEnd = addDays(yesterday,-7);
+var monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+var pmStart = new Date(today.getFullYear(), today.getMonth()-1, 1);
+var pmEnd = new Date(pmStart.getFullYear(), pmStart.getMonth(), Math.min(yesterday.getDate(), new Date(pmStart.getFullYear(), pmStart.getMonth()+1, 0).getDate()));
+var histStart = addDays(wkStart, -7*8);
+var from = pmStart < histStart ? pmStart : histStart;
+
+api("metric=l1.leads,l1.booked,l2.held&ptype=day&dim=&from=" + iso(from) + "&to=" + iso(yesterday)).then(function(res){
+  if (!res.ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span></div>'; return; }
+  var day = {}; res.rows.forEach(function(r){ (day[r.metric] = day[r.metric] || {})[r.period] = r.value; });
+  render(day);
+});
+function sum(tbl, metric, a, b){ var s = 0, d = new Date(a); while (d <= b) { s += (tbl[metric] && tbl[metric][iso(d)]) || 0; d = addDays(d,1); } return s; }
+function render(day){
+  var last = Object.keys(day["l1.leads"]||{}).sort().pop();
+  document.getElementById("stamp").textContent = last ? "данные по " + last.split("-").reverse().join(".") : "данных нет";
+  var M = [["l1.leads","Новые лиды","вступили в чат"],["l1.booked","Назначено диагностик","встреча назначена"],["l2.held","Проведено диагностик","дошли до встречи"]];
+  document.getElementById("kpis").innerHTML = M.map(function(m){
+    var y = (day[m[0]] && day[m[0]][iso(yesterday)]) || 0;
+    var w = sum(day, m[0], wkStart, yesterday), wp = sum(day, m[0], wkPrevStart, wkPrevEnd), mt = sum(day, m[0], monthStart, yesterday), mp = sum(day, m[0], pmStart, pmEnd);
+    return '<div class="kpi"><span class="nm">' + m[1] + ' <span class="plan">· ' + m[2] + '</span></span><span class="v">' + y + ' <span class="plan">вчера</span></span>'
+      + '<span class="row"><span>неделя ' + dmy(wkStart) + '—' + dmy(yesterday) + '</span><b>' + w + delta(w, wp) + '</b></span>'
+      + '<span class="row"><span>месяц по ' + dmy(yesterday) + '</span><b>' + mt + delta(mt, mp) + '</b></span><span class="plan">план не задан</span></div>';
+  }).join("");
+  var L = sum(day,"l1.leads",monthStart,yesterday), B = sum(day,"l1.booked",monthStart,yesterday), H = sum(day,"l2.held",monthStart,yesterday);
+  var cr1 = pct(B, L), cr2 = pct(H, B);
+  var h1 = [], h2 = [];
+  for (var i = 1; i <= 8; i++) { var s = addDays(wkStart,-7*i), e = addDays(s,6); var l = sum(day,"l1.leads",s,e), b = sum(day,"l1.booked",s,e), hh = sum(day,"l2.held",s,e); if (l) h1.push(100*b/l); if (b) h2.push(100*hh/b); }
+  var n1 = avg(h1), n2 = avg(h2);
+  var w1 = pct(sum(day,"l1.booked",wkStart,yesterday), sum(day,"l1.leads",wkStart,yesterday)), w2 = pct(sum(day,"l2.held",wkStart,yesterday), sum(day,"l1.booked",wkStart,yesterday));
+  var drop1 = (n1 && w1 != null) ? (w1-n1)/n1 : 0, drop2 = (n2 && w2 != null) ? (w2-n2)/n2 : 0;
+  var worst = (drop1 < -0.15 || drop2 < -0.15) ? (drop1 <= drop2 ? 1 : 2) : 0;
+  document.getElementById("funnel-sub").textContent = "месяц, с " + dmy(monthStart) + " по " + dmy(yesterday);
+  document.getElementById("funnel").innerHTML =
+    '<div class="step"><div class="nm">Новые лиды</div><div class="v">' + L + '</div><div class="cr">все воронки Первой линии</div></div>'
+    + '<div class="step ' + (worst===1?"bad":"") + '"><div class="nm">Назначено</div><div class="v">' + B + '</div><div class="cr">лид → встреча <b>' + fmtPct(cr1) + '</b>' + (n1?' · норма 8 нед. ' + Math.round(n1) + '%':'') + '</div></div>'
+    + '<div class="step ' + (worst===2?"bad":"") + '"><div class="nm">Проведено</div><div class="v">' + H + '</div><div class="cr">назначено → проведено <b>' + fmtPct(cr2) + '</b>' + (n2?' · норма 8 нед. ' + Math.round(n2) + '%':'') + '</div></div>';
+  var bn = document.getElementById("bottleneck");
+  bn.innerHTML = worst===1 ? '<b>Узкое место — назначение.</b> На этой неделе лид → встреча ' + fmtPct(w1) + ' против обычных ' + Math.round(n1) + '%.'
+    : worst===2 ? '<b>Узкое место — доходимость.</b> На этой неделе назначено → проведено ' + fmtPct(w2) + ' против обычных ' + Math.round(n2) + '%.'
+    : 'На этой неделе обе конверсии в норме: лид → встреча ' + fmtPct(w1) + (n1?' (норма ' + Math.round(n1) + '%)':'') + ', назначено → проведено ' + fmtPct(w2) + (n2?' (норма ' + Math.round(n2) + '%)':'') + '. Доходимость больше 100% бывает, когда проводятся встречи, назначенные раньше.';
+  var weeks = [];
+  for (var k = 8; k >= 1; k--) { var s2 = addDays(wkStart,-7*k); weeks.push({ s: s2, e: addDays(s2,6), partial: false }); }
+  weeks.push({ s: wkStart, e: yesterday, partial: true });
+  document.getElementById("weeks").innerHTML = '<table><thead><tr><th>Неделя</th><th class="num">Лиды</th><th class="num">Назнач.</th><th class="num">CR</th><th class="num">Провед.</th><th class="num">CR</th></tr></thead><tbody>'
+    + weeks.map(function(w){ var l=sum(day,"l1.leads",w.s,w.e), b=sum(day,"l1.booked",w.s,w.e), hh=sum(day,"l2.held",w.s,w.e);
+      return '<tr' + (w.partial?' style="color:var(--gold)"':'') + '><td class="k">' + dmy(w.s) + (w.partial?' · идёт':'') + '</td><td class="num">' + l + '</td><td class="num">' + b + '</td><td class="num">' + fmtPct(pct(b,l)) + '</td><td class="num">' + hh + '</td><td class="num">' + fmtPct(pct(hh,b)) + '</td></tr>'; }).join("")
+    + '</tbody></table>';
+}
+</script>
+<script src="/section-editor.js"></script>
+<script src="/nav.js"></script>
+</body>
+</html>

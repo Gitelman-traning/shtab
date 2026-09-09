@@ -1,0 +1,18 @@
+# Старые адреса → новая структура (09.09.2026). Cloudflare Pages читает этот файл при деплое.
+/shtab            /                     301
+/shtab.html       /                     301
+/shtab-status     /status               301
+/shtab-status.html /status              301
+/managers         /sales/l2/managers    301
+/managers.html    /sales/l2/managers    301
+/compare          /sales/l2/compare     301
+/compare.html     /sales/l2/compare     301
+/stats            /sales/l2/            301
+/stats.html       /sales/l2/            301
+/charts           /sales/l2/            301
+/charts.html      /sales/l2/            301
+/sales            /sales/               301
+/sales.html       /sales/               301
+/marketing        /marketing/           301
+/marketing.html   /marketing/           301
+/index.html       /                     301

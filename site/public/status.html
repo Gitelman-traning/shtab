@@ -44,26 +44,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}.sub{color:var(--dim);
 </head>
 <body>
 <div class="layout">
-<aside class="side">
-  <div class="brand"><div class="mark">12</div><div class="txt"><b>Штаб</b><span>центр компании</span></div></div>
-  <nav>
-    <div class="grp">Штаб</div>
-    <a href="shtab.html" title="Общий экран"><svg viewBox="0 0 20 20"><path d="M3 3h6v6H3V3zM11 3h6v4h-6V3zM11 9h6v8h-6V9zM3 11h6v6H3v-6z" stroke-linejoin="round"/></svg><span>Общий экран</span></a>
-    <a href="sales.html" title="Отдел продаж"><svg viewBox="0 0 20 20"><path d="M3 16l4-6 3 3 3-5 4 2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 4v12h14" stroke-linecap="round"/></svg><span>Отдел продаж</span></a>
-    <a href="marketing.html" title="Маркетинг"><svg viewBox="0 0 20 20"><path d="M3 8v4h3l6 4V4L6 8H3z" stroke-linejoin="round"/><path d="M15 7a4 4 0 010 6" stroke-linecap="round"/></svg><span>Маркетинг</span></a>
-    <a href="shtab-status.html" class="on" title="Витрина"><svg viewBox="0 0 20 20"><ellipse cx="10" cy="5" rx="6" ry="2.4"/><path d="M4 5v10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4V5M4 10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4"/></svg><span>Витрина</span></a>
-    <div class="grp">Продажи · 2 линия · ОКК</div>
-    <a href="./" title="Встречи"><svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h9" stroke-linecap="round"/></svg><span>Встречи</span></a>
-    <a href="managers.html" title="Менеджеры"><svg viewBox="0 0 20 20"><circle cx="7" cy="7" r="3"/><circle cx="14" cy="8" r="2.4"/><path d="M2.5 16c.6-3 2.6-4.5 4.5-4.5S11 13 11.5 16M11.5 15.5c.4-2 1.4-3.2 2.7-3.2s2.4 1 3 3.2" stroke-linecap="round"/></svg><span>Менеджеры</span></a>
-    <a href="compare.html" title="Сверка"><svg viewBox="0 0 20 20"><path d="M4 4v12M16 4v12M4 8h4M12 8h4M4 12h4M12 12h4" stroke-linecap="round"/></svg><span>Сверка</span></a>
-    <a href="stats.html" title="Статистика"><svg viewBox="0 0 20 20"><path d="M4 16V9M10 16V4M16 16v-5" stroke-linecap="round"/></svg><span>Статистика</span></a>
-    <a href="charts.html" title="Дашборд ОКК"><svg viewBox="0 0 20 20"><path d="M3 15l4-5 4 3 6-8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Дашборд ОКК</span></a>
-    <a href="guide.html" title="Гайд"><svg viewBox="0 0 20 20"><path d="M4 4h5a2 2 0 012 2v10a2 2 0 00-2-2H4V4zM16 4h-5a2 2 0 00-2 2v10a2 2 0 012-2h5V4z" stroke-linejoin="round"/></svg><span>Гайд</span></a>
-    <a href="users.html" id="nav-users" hidden title="Пользователи"><svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2"/><path d="M4 17c.8-3.2 3.2-4.8 6-4.8s5.2 1.6 6 4.8" stroke-linecap="round"/></svg><span>Пользователи</span></a>
-  </nav>
-  <div class="grow"></div>
-  <button type="button" class="collapse" id="menu-toggle"><svg viewBox="0 0 20 20"><path d="M12 5l-5 5 5 5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Свернуть меню</span></button>
-</aside>
+<aside class="side" id="side"></aside>
 <div class="pane">
 <header><div><h1>Штаб · Витрина показателей</h1><p class="sub">что собрано и когда: прогоны сборщиков и покрытие по показателям</p></div><div class="spacer"></div></header>
 <main>
@@ -100,6 +81,6 @@ api("/api/status").then(function(s){
   document.getElementById("week-t").innerHTML=table(rows,[["день","period"],["лиды (маркетинг)","mkt.leads"],["лиды 1-я линия","l1.leads"],["назначено","l1.booked"],["проведено","l2.held"],["продажи","l2.sales"]]);
 }).catch(function(e){document.getElementById("runs-t").innerHTML='<span class="err">'+esc(e.message)+'</span>'});
 </script>
-<script>(function(){function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}fetch("/api/me",{credentials:"same-origin"}).then(function(r){return r.json()}).then(function(m){var a=document.getElementById("nav-users");var u=m&&m.ok&&m.user;if(a&&u&&u.role==="admin")a.hidden=false;var h=document.querySelector("header");if(!h||document.querySelector(".acct"))return;var s=document.createElement("style");s.textContent=".acct{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim,#7b766f);margin-left:8px;white-space:nowrap}.acct b{color:var(--ink,#2b2721);font-weight:600}.acct a{color:var(--gold,#8a6f3d);text-decoration:none;padding:4px 9px;border-radius:7px;background:var(--gold-soft,#efe7d6);font-weight:600}";document.head.appendChild(s);var R={admin:"администратор",head:"руководитель",member:"сотрудник",viewer:"смотрит"};var d=document.createElement("div");d.className="acct";if(u&&u.personal){d.innerHTML="<span><b>"+esc(u.name||u.login)+"</b> · "+esc(R[u.role]||u.role)+"</span><a href=\"/__logout\">Выйти</a>"}else{d.innerHTML="<span>общий вход</span><a href=\"/__logout\">Войти под своим именем</a>"}h.appendChild(d)}).catch(function(){});})();</script>
+<script src="/nav.js"></script>
 </body>
 </html>

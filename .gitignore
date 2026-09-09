@@ -4,10 +4,7 @@ node_modules/
 __pycache__/
 *.pyc
 .env
-# страницы ОКК собираются из закрытых данных — только shtab.html в git
-site/public/*.html
-!site/public/shtab*.html
-!site/public/404.html
-!site/public/sales.html
-!site/public/marketing.html
-!site/public/users.html
+# страницы с данными клиентов (сборка ОКК) и макеты — только на сервере
+site/public/sales/l2/
+site/public/guide.html
+site/public/mockups*.html
