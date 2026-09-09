@@ -2,7 +2,7 @@
 //   GET   /api/users                      — список
 //   POST  /api/users {login,name,role,sections}            — создать, вернёт временный пароль
 //   PATCH /api/users {login, action, ...}  — reset (новый временный пароль) / disable / enable / update {name,role,sections}
-import { json, bad, canRead, isAdmin, hasIngestToken, hashPassword, randomId, audit, now, tgSend } from "./_lib.js";
+import { json, bad, canRead, isAdmin, hasIngestToken, hashPassword, randomId, audit, now, tgSend, SECTIONS } from "./_lib.js";
 
 const ROLES = ["admin", "head", "member", "viewer"];
 const RE_LOGIN = /^[a-z0-9._-]{3,32}$/;
@@ -25,7 +25,11 @@ export async function onRequestGet({ request, env }) {
   if (!me) return bad("только для администратора", 403);
   const rows = await env.DB.prepare(
     "SELECT login, name, role, sections, active, created_at, last_login, must_change, tg_id, tg_username, photo FROM users ORDER BY role, login").all();
-  return json({ ok: true, users: rows.results || [] });
+  const pr = await env.DB.prepare("SELECT login, section, level FROM perms").all();
+  const byLogin = {};
+  for (const r of (pr.results || [])) (byLogin[r.login] = byLogin[r.login] || {})[r.section] = Number(r.level);
+  const users = (rows.results || []).map((u) => Object.assign(u, { perms: byLogin[u.login] || null }));
+  return json({ ok: true, users, sections: SECTIONS });
 }
 
 export async function onRequestPost({ request, env }) {
@@ -87,6 +91,25 @@ export async function onRequestPatch({ request, env }) {
     if (row.role !== "pending") return bad("это не заявка");
     await env.DB.prepare("DELETE FROM users WHERE login = ? AND role = 'pending'").bind(login).run();
     await audit(env, me.login, "user.reject", login);
+    return json({ ok: true });
+  }
+  if (action === "perms") {
+    // полный набор прав: {section: 0|1|2}; отсутствующие разделы наследуют отдел
+    const perms = (b.perms && typeof b.perms === "object") ? b.perms : {};
+    const stmts = [env.DB.prepare("DELETE FROM perms WHERE login = ?").bind(login)];
+    const note = [];
+    for (const s of Object.keys(perms)) {
+      if (!SECTIONS.includes(s)) continue;
+      const lv = Math.max(0, Math.min(2, parseInt(perms[s], 10) || 0));
+      stmts.push(env.DB.prepare("INSERT INTO perms (login, section, level) VALUES (?,?,?)").bind(login, s, lv));
+      note.push(s + "=" + lv);
+    }
+    if (b.role && ROLES.includes(b.role) && !(login === me.login && b.role !== "admin")) {
+      stmts.push(env.DB.prepare("UPDATE users SET role = ? WHERE login = ?").bind(b.role, login));
+    }
+    if (typeof b.name === "string") stmts.push(env.DB.prepare("UPDATE users SET name = ? WHERE login = ?").bind(b.name.slice(0, 80), login));
+    await env.DB.batch(stmts);
+    await audit(env, me.login, "user.perms", login, note.join(" "));
     return json({ ok: true });
   }
   if (action === "update") {

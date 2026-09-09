@@ -60,6 +60,14 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font-size:12.5px
 .pick label{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:7px;cursor:pointer;font-size:13px}
 .pick label:hover{background:var(--soft)}.pick label small{color:var(--faint);margin-left:auto}
 .pick input[type=checkbox]{width:15px;height:15px;margin:0;accent-color:var(--gold)}
+.rights{display:flex;flex-direction:column;gap:8px;padding:6px 0 2px}
+.presets{display:flex;gap:6px;flex-wrap:wrap}.presets span{font-size:12px;padding:5px 10px;border-radius:8px;background:var(--soft);color:var(--dim);cursor:pointer}.presets span:hover{color:var(--ink)}
+.dept{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.dept .hd{display:flex;align-items:center;gap:10px;font-weight:600;font-size:13.5px}.dept .hd .seg{margin-left:auto}
+.dept .rw{display:flex;align-items:center;gap:10px;padding:5px 0 5px 14px;font-size:13px;color:var(--dim)}.dept .rw.rw2{padding-left:30px}.dept .rw .seg{margin-left:auto}
+.seg{display:inline-flex;background:var(--soft);border-radius:8px;padding:2px}.seg span{font-size:11.5px;padding:4px 10px;border-radius:6px;color:var(--dim);cursor:pointer;user-select:none}
+.seg span.on0{background:var(--card);color:var(--ink)}.seg span.on1{background:var(--gold-soft);color:var(--gold);font-weight:600}.seg span.on2{background:var(--ok-bg);color:var(--ok);font-weight:600}
+.seg span.inh{opacity:.55}
 </style>
 </head>
 <body>
@@ -79,7 +87,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font-size:12.5px
       <input id="n-login" placeholder="логин, латиницей" style="width:170px" autocomplete="off" name="new-user-login">
       <input id="n-name" placeholder="Имя Фамилия" style="width:200px" autocomplete="off" name="new-user-name">
       <select id="n-role"><option value="head">руководитель раздела</option><option value="member">сотрудник</option><option value="viewer">только смотрит</option><option value="admin">администратор</option></select>
-      <div class="pick" id="n-sections"></div>
+      <span class="sub">права по разделам настраиваются после создания, кнопкой «изменить»</span><div class="pick" id="n-sections" hidden></div>
       <button id="n-add">Создать</button>
     </div>
     <p class="sub" style="margin:8px 0 0">Роли: администратор видит всё и управляет пользователями; руководитель и сотрудник видят всё, но менять вид могут только в своих разделах; «только смотрит» — как общий пароль, но под своим именем. Временный пароль показывается один раз, при первом входе его нужно сменить.</p>
@@ -111,6 +119,42 @@ function api(path,opt){opt=opt||{};opt.credentials="same-origin";if(opt.body){op
 function dt(s){return s?String(s).replace("T"," ").slice(0,16):"—"}
 var ROLE={admin:"администратор",head:"руководитель",member:"сотрудник",viewer:"смотрит"};
 var SECTIONS=[];   // [{id,name}] — из /api/sections
+/* дерево разделов для прав: отдел → подразделы (наследуют уровень отдела, если не задано своё) */
+var RTREE=[
+  {id:"hub",name:"Общий экран"},
+  {id:"sales",name:"Отдел продаж",children:[{id:"sales.l1",name:"Первая линия"},{id:"sales.l2",name:"Вторая линия",children:[{id:"sales.l2.okk",name:"Встречи · Менеджеры · Сверка (ОКК)"}]}]},
+  {id:"marketing",name:"Маркетинг"},
+  {id:"guide",name:"Гайд и вопросы"},
+  {id:"status",name:"Витрина"}
+];
+var PARENT={"sales.l1":"sales","sales.l2":"sales","sales.l2.okk":"sales.l2"};
+var PRESETS=[
+  ["Смотрит всё",{"hub":1,"sales":1,"marketing":1,"guide":1,"status":1}],
+  ["Руководитель Первой линии",{"hub":1,"sales":1,"sales.l1":2,"marketing":1,"guide":1,"status":1}],
+  ["Руководитель Второй линии",{"hub":1,"sales":1,"sales.l2":2,"marketing":1,"guide":1,"status":1}],
+  ["Маркетинг",{"hub":1,"sales":1,"marketing":2,"guide":1,"status":1}],
+  ["Только своя линия (1-я)",{"hub":1,"sales":0,"sales.l1":2,"marketing":0,"guide":1,"status":0}],
+  ["Всё закрыть",{"hub":0,"sales":0,"marketing":0,"guide":0,"status":0}]
+];
+var LV=["закрыт","просмотр","правка"];
+function rightsEditor(el, perms, sectionsCsv){
+  if(!el) return;
+  var val=Object.assign({}, perms||{});
+  if(!perms&&sectionsCsv){ String(sectionsCsv).split(",").forEach(function(s){ s=s.trim(); if(s) val[s]=2; }); }
+  el.__val=val;
+  function eff(id){ var s=id; while(s){ if(val[s]!=null) return {v:val[s],own:s===id}; s=PARENT[s]||null; } return {v:1,own:false}; }
+  function seg(id){ var e=eff(id); return '<span class="seg" data-sec="'+id+'">'+LV.map(function(n,i){return '<span data-lv="'+i+'" class="'+(e.v===i?('on'+i+(e.own?'':' inh')):'')+'">'+n+'</span>'}).join("")+'</span>'; }
+  function node(n,depth){ var h=depth===0?'<div class="dept"><div class="hd">'+esc(n.name)+seg(n.id)+'</div>':'<div class="rw'+(depth>1?' rw2':'')+'">'+esc(n.name)+seg(n.id)+'</div>';
+    (n.children||[]).forEach(function(c){ h+=node(c,depth+1); }); if(depth===0) h+='</div>'; return h; }
+  el.innerHTML='<div class="presets">'+PRESETS.map(function(p,i){return '<span data-preset="'+i+'">'+p[0]+'</span>'}).join("")+'</div>'+RTREE.map(function(n){return node(n,0)}).join("")
+    +'<p class="sub" style="margin:0">Подраздел без своей настройки наследует уровень отдела (показано полупрозрачно). «Закрыт» убирает раздел из меню и по ссылке, «правка» открывает «Изменить через Claude», версии и планы.</p>';
+  el.onclick=function(e){
+    var ps=e.target.closest("[data-preset]"); if(ps){ val=Object.assign({},PRESETS[+ps.getAttribute("data-preset")][1]); el.__val=val; rightsEditor.rerender(el); return; }
+    var lv=e.target.closest("[data-lv]"); if(!lv) return; var sec=lv.closest("[data-sec]").getAttribute("data-sec"); val[sec]=+lv.getAttribute("data-lv"); el.__val=val; rightsEditor.rerender(el);
+  };
+  rightsEditor.rerender=function(target){ var v=target.__val; rightsEditor(target, v, ""); };
+}
+function rightsValue(el){ return (el&&el.__val)||{}; }
 function pickValue(el){ return el ? [].map.call(el.querySelectorAll('input:checked'), function(c){ return c.value; }).join(',') : ''; }
 function picker(el, csv){
   var sel = String(csv||'').split(',').map(function(s){return s.trim()}).filter(Boolean);
@@ -152,15 +196,16 @@ function loadUsers(){
       +r.users.map(function(u){return '<tr'+(u.active?'':' style="opacity:.55"')+'><td><b>'+esc(u.login)+'</b>'+(u.must_change?' <span class="pill">временный пароль</span>':'')+(u.active?'':' <span class="pill off">отключён</span>')+(u.tg_id?' <span class="pill">Telegram'+(u.tg_username?' @'+esc(u.tg_username):'')+'</span>':'')+'</td><td>'+esc(u.name)+'</td><td><span class="pill '+esc(u.role)+'">'+esc(ROLE[u.role]||u.role)+'</span></td><td>'+esc(u.sections||"—")+'</td><td>'+dt(u.created_at)+'</td><td>'+dt(u.last_login)+'</td>'
         +'<td class="actions"><button class="ghost" data-a="edit" data-l="'+esc(u.login)+'">изменить</button><button class="ghost" data-a="reset" data-l="'+esc(u.login)+'">сбросить пароль</button>'
         +(u.active?'<button class="danger" data-a="disable" data-l="'+esc(u.login)+'">отключить</button>':'<button data-a="enable" data-l="'+esc(u.login)+'">включить</button>')+'</td></tr>'
-        +'<tr hidden id="edit-'+esc(u.login)+'"><td colspan="7"><div class="row"><input value="'+esc(u.name)+'" id="e-name-'+esc(u.login)+'" placeholder="Имя"><select id="e-role-'+esc(u.login)+'">'+Object.keys(ROLE).map(function(k){return '<option value="'+k+'"'+(k===u.role?' selected':'')+'>'+ROLE[k]+'</option>'}).join("")+'</select><div class="pick" id="e-sec-'+esc(u.login)+'" data-value="'+esc(u.sections)+'"></div><button data-a="save" data-l="'+esc(u.login)+'">Сохранить</button></div></td></tr>'}).join("")
+        +'<tr hidden id="edit-'+esc(u.login)+'"><td colspan="7"><div class="row"><input value="'+esc(u.name)+'" id="e-name-'+esc(u.login)+'" placeholder="Имя"><select id="e-role-'+esc(u.login)+'">'+Object.keys(ROLE).map(function(k){return '<option value="'+k+'"'+(k===u.role?' selected':'')+'>'+ROLE[k]+'</option>'}).join("")+'</select><span class="sub">администратор видит и меняет всё, права ниже для остальных ролей</span></div>'
+        +'<div class="rights" id="e-rights-'+esc(u.login)+'"></div><div class="row"><button data-a="save" data-l="'+esc(u.login)+'">Сохранить</button></div></td></tr>'}).join("")
       +'</tbody></table>';
-    document.querySelectorAll('#list .pick').forEach(function(el){ picker(el, el.getAttribute('data-value')||''); });
+    r.users.forEach(function(u){ rightsEditor(document.getElementById("e-rights-"+u.login), u.perms, u.sections); });
   });
 }
 document.getElementById("list").addEventListener("click",function(e){
   var b=e.target.closest("button[data-a]");if(!b)return;var a=b.getAttribute("data-a"),l=b.getAttribute("data-l"),out=document.getElementById("u-out");
   if(a==="edit"){var r=document.getElementById("edit-"+l);r.hidden=!r.hidden;return}
-  if(a==="save"){api("/api/users",{method:"PATCH",body:{login:l,action:"update",name:document.getElementById("e-name-"+l).value,role:document.getElementById("e-role-"+l).value,sections:pickValue(document.getElementById("e-sec-"+l))}}).then(function(r){out.innerHTML=r.ok?'<p class="ok">Сохранено</p>':'<p class="err">'+esc(r.error)+'</p>';loadUsers();loadLog()});return}
+  if(a==="save"){api("/api/users",{method:"PATCH",body:{login:l,action:"perms",name:document.getElementById("e-name-"+l).value,role:document.getElementById("e-role-"+l).value,perms:rightsValue(document.getElementById("e-rights-"+l))}}).then(function(r){out.innerHTML=r.ok?'<p class="ok">Сохранено</p>':'<p class="err">'+esc(r.error)+'</p>';loadUsers();loadLog()});return}
   if(a==="reset"&&!confirm(l===(ME&&ME.login)?"Сбросить свой пароль? Новый временный пароль появится ниже, текущий вход сохранится — смените пароль в блоке «Мой пароль».":"Сбросить пароль пользователю "+l+"? Его текущие сессии закроются."))return;
   if(a==="disable"&&!confirm("Отключить "+l+"?"))return;
   api("/api/users",{method:"PATCH",body:{login:l,action:a}}).then(function(r){

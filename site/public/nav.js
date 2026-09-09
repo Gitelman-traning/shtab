@@ -12,23 +12,23 @@
   };
   // дерево разделов; href — чистые адреса (Cloudflare Pages убирает .html)
   var TREE = [
-    { name: "Общий экран", href: "/", icon: I.hub },
-    { id: "sales", name: "Отдел продаж", icon: I.sales, href: "/sales/", children: [
-      { name: "Сводка отдела", href: "/sales/" },
-      { name: "Первая линия", href: "/sales/l1/" },
-      { name: "Вторая линия", href: "/sales/l2/", children: [
-        { name: "Встречи", href: "/sales/l2/meetings" },
-        { name: "Менеджеры", href: "/sales/l2/managers" },
-        { name: "Сверка", href: "/sales/l2/compare" }
+    { name: "Общий экран", href: "/", icon: I.hub, sec: "hub" },
+    { id: "sales", name: "Отдел продаж", icon: I.sales, href: "/sales/", sec: "sales", children: [
+      { name: "Сводка отдела", href: "/sales/", sec: "sales" },
+      { name: "Первая линия", href: "/sales/l1/", sec: "sales.l1" },
+      { name: "Вторая линия", href: "/sales/l2/", sec: "sales.l2", children: [
+        { name: "Встречи", href: "/sales/l2/meetings", sec: "sales.l2.okk" },
+        { name: "Менеджеры", href: "/sales/l2/managers", sec: "sales.l2.okk" },
+        { name: "Сверка", href: "/sales/l2/compare", sec: "sales.l2.okk" }
       ] }
     ] },
-    { id: "mkt", name: "Маркетинг", icon: I.mkt, href: "/marketing/", children: [
-      { name: "Лиды и источники", href: "/marketing/" }
+    { id: "mkt", name: "Маркетинг", icon: I.mkt, href: "/marketing/", sec: "marketing", children: [
+      { name: "Лиды и источники", href: "/marketing/", sec: "marketing" }
     ] },
     { id: "help", name: "Справка", icon: I.help, children: [
-      { name: "Гайд и вопросы", href: "/guide", icon: I.help },
-      { name: "Витрина", href: "/status", icon: I.db },
-      { name: "Пользователи", href: "/users", icon: I.users, admin: true }
+      { name: "Гайд и вопросы", href: "/guide", icon: I.help, sec: "guide" },
+      { name: "Витрина", href: "/status", icon: I.db, sec: "status" },
+      { name: "Пользователи", href: "/users", icon: I.users, admin: true, sec: "users" }
     ] }
   ];
 
@@ -68,14 +68,14 @@
   function item(node, level) {
     var cls = "it" + (level === 1 ? " l1" : level === 2 ? " l2" : "") + (isHere(node.href) ? " on" : "");
     var ic = level ? "<i></i>" : (node.icon || "");
-    var h = '<a class="' + cls + '" href="' + esc(node.href) + '"' + (node.admin ? ' data-admin hidden' : '') + '>' + ic + '<span>' + esc(node.name) + '</span></a>';
+    var h = '<a class="' + cls + '" href="' + esc(node.href) + '"' + (node.admin ? ' data-admin hidden' : '') + (node.sec ? ' data-sec="' + node.sec + '"' : '') + '>' + ic + '<span>' + esc(node.name) + '</span></a>';
     if (node.children) h += '<div class="sub">' + node.children.map(function (c) { return item(c, level + 1); }).join("") + '</div>';
     return h;
   }
   function group(node) {
     // аккордеон: раскрыт текущий отдел или тот, что открыли руками
     var open = contains(node) || stored()[node.id] === true;
-    var h = '<button type="button" class="it grp' + (contains(node) ? " cur" : "") + '" data-grp="' + node.id + '" aria-expanded="' + open + '">' + (node.icon || "") + '<span>' + esc(node.name) + '</span>' + I.chev + '</button>';
+    var h = '<button type="button" class="it grp' + (contains(node) ? " cur" : "") + '" data-grp="' + node.id + '"' + (node.sec ? ' data-sec="' + node.sec + '"' : '') + ' aria-expanded="' + open + '">' + (node.icon || "") + '<span>' + esc(node.name) + '</span>' + I.chev + '</button>';
     h += '<div class="sub" data-sub="' + node.id + '"' + (open ? "" : " hidden") + '>' + node.children.map(function (c) { return item(c, 1); }).join("") + '</div>';
     return h;
   }
@@ -104,6 +104,10 @@
   fetch("/api/me", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (m) {
     var u = m && m.ok && m.user;
     if (u && u.role === "admin") document.querySelectorAll("[data-admin]").forEach(function (a) { a.hidden = false; });
+    // закрытые разделы убираем из меню (уровень 0); группа без единого открытого пункта тоже прячется
+    var P = (u && u.perms) || {};
+    document.querySelectorAll("[data-sec]").forEach(function (el) { var s = el.getAttribute("data-sec"); if (P[s] === 0) el.hidden = true; });
+    document.querySelectorAll("button[data-grp]").forEach(function (g) { var sub = side.querySelector('[data-sub="' + g.getAttribute("data-grp") + '"]'); if (sub && ![].some.call(sub.querySelectorAll("a"), function (a) { return !a.hidden; })) { g.hidden = true; sub.hidden = true; } });
     var h = document.querySelector("header"); if (!h || document.querySelector(".acct")) return;
     var R = { admin: "администратор", head: "руководитель", member: "сотрудник", viewer: "смотрит" };
     var d = document.createElement("div"); d.className = "acct";

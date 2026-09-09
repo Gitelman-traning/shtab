@@ -82,7 +82,60 @@ export async function currentUser(request, env) {
     "SELECT u.login, u.name, u.role, u.sections, u.must_change FROM sessions s JOIN users u ON u.login = s.login " +
     "WHERE s.id = ? AND s.expires > ? AND u.active = 1"
   ).bind(sid, now()).first();
-  return row || null;
+  if (!row) return null;
+  row.perms = await loadPerms(env, row.login, row.sections);
+  return row;
+}
+
+// ---------- права по разделам ----------
+// дерево разделов: подраздел наследует уровень отдела, если своей строки нет
+export const SECTIONS = ["hub", "sales", "sales.l1", "sales.l2", "sales.l2.okk", "marketing", "guide", "status", "users"];
+const PARENT = { "sales.l1": "sales", "sales.l2": "sales", "sales.l2.okk": "sales.l2" };
+
+export async function loadPerms(env, login, sectionsCsv) {
+  const rows = await env.DB.prepare("SELECT section, level FROM perms WHERE login = ?").bind(login).all();
+  const p = {};
+  for (const r of (rows.results || [])) p[r.section] = Number(r.level);
+  // старое поле sections (через запятую) = право редактирования, пока не задано явно
+  if (!Object.keys(p).length && sectionsCsv) {
+    for (const s of String(sectionsCsv).split(",").map((x) => x.trim()).filter(Boolean)) p[s] = 2;
+  }
+  return p;
+}
+
+// 0 закрыт · 1 просмотр · 2 редактирование
+export function level(user, section) {
+  if (!user) return 0;
+  if (user.role === "admin" || user.login === "collector") return 2;
+  if (user.role === "pending" || user.active === 0) return 0;
+  if (user.login === "shared") return section === "users" ? 0 : 1;   // общий пароль: смотрит всё
+  if (section === "users") return 0;
+  const p = user.perms || {};
+  let s = section;
+  while (s) { if (p[s] != null) return p[s]; s = PARENT[s] || null; }
+  if (p["*"] != null) return p["*"];
+  return 1;   // по умолчанию именной пользователь видит всё, менять не может
+}
+
+export function effectivePerms(user) {
+  const out = {};
+  for (const s of SECTIONS) out[s] = level(user, s);
+  return out;
+}
+
+// какой раздел отвечает за адрес страницы
+export function sectionOf(pathname) {
+  const p = pathname.replace(/\.html$/, "").replace(/\/index$/, "/");
+  if (p === "/" || p === "") return "hub";
+  if (/^\/sales\/l2\/(meetings|managers|compare)/.test(p)) return "sales.l2.okk";
+  if (p.startsWith("/sales/l2")) return "sales.l2";
+  if (p.startsWith("/sales/l1")) return "sales.l1";
+  if (p.startsWith("/sales")) return "sales";
+  if (p.startsWith("/marketing")) return "marketing";
+  if (p === "/guide") return "guide";
+  if (p === "/status") return "status";
+  if (p === "/users") return "users";
+  return null;
 }
 
 // ---------- общий пароль (cookie okk_auth = HMAC пароля из KV, как в _middleware) ----------
@@ -114,12 +167,12 @@ export function isAdmin(user) {
   return !!user && user.role === "admin";
 }
 
-// Менять раздел может админ или руководитель/сотрудник, у кого раздел в списке
+// Менять раздел может тот, у кого уровень «редактирование»
 export function canEdit(user, section) {
-  if (!user) return false;
-  if (user.role === "admin") return true;
-  if (user.role !== "head" && user.role !== "member") return false;
-  return String(user.sections || "").split(",").map((s) => s.trim()).includes(section);
+  return level(user, section) >= 2;
+}
+export function canView(user, section) {
+  return level(user, section) >= 1;
 }
 
 export async function audit(env, login, action, target = "", note = "") {

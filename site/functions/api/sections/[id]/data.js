@@ -1,10 +1,11 @@
 // GET /api/sections/<id>/data?days=90 — данные раздела для его страницы (стандартной или собственного вида).
 // Раздел видит только свои показатели (config.metrics). Ответ компактный: дни × показатель × срез.
-import { json, bad, canRead } from "../../_lib.js";
+import { json, bad, canRead, canView } from "../../_lib.js";
 
 export async function onRequestGet({ request, env, params }) {
   const user = await canRead(request, env);
   if (!user) return bad("нет доступа", 401);
+  if (!canView(user, params.id)) return bad("раздел закрыт для вашего аккаунта", 403);
   const sec = await env.DB.prepare("SELECT id, name, config FROM sections WHERE id = ?").bind(params.id).first();
   if (!sec) return bad("раздела нет", 404);
   let cfg = {};

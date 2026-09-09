@@ -1,11 +1,11 @@
 // GET /api/me — кто вошёл; PUT /api/me {password, new_password} — сменить свой пароль (только именные)
-import { json, bad, canRead, currentUser, hashPassword, verifyPassword, randomId, audit, now } from "./_lib.js";
+import { json, bad, canRead, currentUser, hashPassword, verifyPassword, randomId, audit, now, effectivePerms } from "./_lib.js";
 
 export async function onRequestGet({ request, env }) {
   const user = await canRead(request, env);
   if (!user) return bad("нет доступа", 401);
   return json({ ok: true, user: { login: user.login, name: user.name || "", role: user.role, sections: user.sections || "",
-    personal: user.login !== "shared" && user.login !== "collector", must_change: !!user.must_change } });
+    personal: user.login !== "shared" && user.login !== "collector", must_change: !!user.must_change, perms: effectivePerms(user) } });
 }
 
 export async function onRequestPut({ request, env }) {

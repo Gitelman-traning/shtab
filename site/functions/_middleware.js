@@ -11,7 +11,7 @@
  * После сброса первый вошедший задаёт новый.
  */
 
-import { currentUser, createSession, dropSession, verifyPassword, hashPassword, randomId, audit, tgVerify, tgSend, now } from "./api/_lib.js";
+import { currentUser, createSession, dropSession, verifyPassword, hashPassword, randomId, audit, tgVerify, tgSend, now, level, sectionOf } from "./api/_lib.js";
 
 const RE_LOGIN = /^[a-z0-9._-]{3,32}$/;
 
@@ -241,7 +241,13 @@ export async function onRequest(context) {
     await audit(env, row.login, "login");
     return new Response(null, { status: 303, headers: { Location: "/shtab", "Set-Cookie": s.cookie, "Cache-Control": "no-store" } });
   }
-  if (env.DB && await currentUser(request, env)) {
+  const personal = env.DB ? await currentUser(request, env) : null;
+  if (personal) {
+    const sec = sectionOf(url.pathname);
+    if (sec && level(personal, sec) === 0) {
+      return html(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>Штаб · Раздел закрыт</title>${STYLE}</head><body>
+<form onsubmit="return false"><div class="mark">12</div><h1>Раздел закрыт</h1><p class="hint">У вашего аккаунта нет доступа к этому разделу. Если он нужен по работе — напишите администратору.</p><p class="hint"><a href="/" style="color:var(--accent)">На общий экран</a> · <a href="/__logout" style="color:var(--accent)">Выйти</a></p></form></body></html>`, 403);
+    }
     const response = await next();
     const out = new Response(response.body, response);
     out.headers.set("Cache-Control", "no-store");
