@@ -15,7 +15,9 @@
     { name: "Общий экран", href: "/", icon: I.hub, sec: "hub" },
     { id: "sales", name: "Отдел продаж", icon: I.sales, href: "/sales/", sec: "sales", children: [
       { name: "Сводка отдела", href: "/sales/", sec: "sales" },
-      { name: "Первая линия", href: "/sales/l1/", sec: "sales.l1" },
+      { name: "Первая линия", href: "/sales/l1/", sec: "sales.l1", children: [
+        { name: "Менеджеры", href: "/sales/l1/managers", sec: "sales.l1" }
+      ] },
       { name: "Вторая линия", href: "/sales/l2/", sec: "sales.l2", children: [
         { name: "Встречи", href: "/sales/l2/meetings", sec: "sales.l2.okk" },
         { name: "Менеджеры", href: "/sales/l2/managers", sec: "sales.l2.okk" },

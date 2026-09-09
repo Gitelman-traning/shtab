@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Первая линия · Менеджеры</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.mg td.num b{font-weight:600}
+.q{display:inline-block;min-width:40px;text-align:center;font-size:12px;font-weight:600;padding:2px 7px;border-radius:7px}
+.q.ok{background:var(--ok-bg);color:var(--ok)}.q.mid{background:var(--mid-bg);color:var(--mid)}.q.bad{background:var(--bad-bg);color:var(--bad)}
+.lead{font-size:10.5px;padding:1px 6px;border-radius:6px;background:var(--gold-soft);color:var(--gold);margin-left:6px}
+.bar{margin-top:4px}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Отдел продаж · Первая линия · <b>Менеджеры</b></div><h1>Менеджеры Первой линии</h1><p class="sub">Главная метрика — конверсия из лида в проведённую встречу. Рядом активность в amoCRM и звонки из АТС</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<div id="section-editor" data-section="sales.l1"></div>
+<main id="section-standard">
+  <div class="kpis" id="kpis"></div>
+  <div class="card"><h2>По менеджерам <small id="mg-sub"></small></h2><div class="wide"><table class="mg" id="mg"><thead><tr>
+    <th>Менеджер</th><th class="num">Лиды · мес.</th><th class="num">Назначено</th><th class="num">Проведено</th><th class="num">Лид → встреча</th><th></th><th class="num">Лид → назначено</th><th class="num">Лид → встреча · 8 нед.</th><th class="num">Действий в amo / день</th><th class="num">Звонков / день</th>
+  </tr></thead><tbody><tr><td colspan="10" class="empty">загрузка…</td></tr></tbody></table></div>
+  <p class="note" id="mg-note"></p></div>
+  <div class="card"><h2>По неделям <small>лид → проведённая встреча по каждому менеджеру, 8 недель + текущая</small></h2><div class="wide" id="weeks"></div></div>
+  <footer>Лид — сделка Первой линии по дате «вступил в чат», назначено — «встреча назначена», проведено — «встреча проведена» в той же сделке; менеджер — ответственный по сделке Первой линии. Действия — записи из журнала событий amoCRM, авторство которых закреплено за менеджером, за день. Звонки — из выгрузки АТС по ответственному, только состоявшиеся.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+function api(q){ return fetch("/api/points?" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
+var today = new Date(); today.setHours(0,0,0,0);
+var yesterday = addDays(today, -1);
+var wkStart = monday(yesterday);
+var monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+var histStart = addDays(wkStart, -7*8);
+var from = monthStart < histStart ? monthStart : histStart;
+var HEAD = /тамахина|илона/i;
+
+api("metric=l1m.leads,l1m.booked,l1m.held,l1m.events,l1m.calls&ptype=day&from=" + iso(from) + "&to=" + iso(yesterday)).then(function(res){
+  if (!res.ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span></div>'; return; }
+  var mgr = {};   // manager → metric → date → value
+  res.rows.forEach(function(r){ if (!r.dim) return; ((mgr[r.dim] = mgr[r.dim] || {})[r.metric] = mgr[r.dim][r.metric] || {})[r.period] = r.value; });
+  render(mgr);
+});
+function sum(t, m, a, b){ var s = 0, d = new Date(a); while (d <= b) { s += (t[m] && t[m][iso(d)]) || 0; d = addDays(d,1); } return s; }
+function days(a, b){ return Math.round((b - a) / 864e5) + 1; }
+function cls(p, norm){ if (p == null) return ""; if (norm == null) return ""; return p >= norm * 1.1 ? "ok" : p < norm * 0.85 ? "bad" : "mid"; }
+
+function render(mgr){
+  var names = Object.keys(mgr).filter(function(n){ return sum(mgr[n],"l1m.leads",histStart,yesterday) > 0 || sum(mgr[n],"l1m.held",histStart,yesterday) > 0; });
+  var last = ""; names.forEach(function(n){ Object.keys(mgr[n]["l1m.leads"]||{}).forEach(function(d){ if (d > last) last = d; }); });
+  document.getElementById("stamp").textContent = last ? "данные по " + last.split("-").reverse().join(".") : "данных нет";
+  var rows = names.map(function(n){ var t = mgr[n];
+    var L = sum(t,"l1m.leads",monthStart,yesterday), B = sum(t,"l1m.booked",monthStart,yesterday), H = sum(t,"l1m.held",monthStart,yesterday);
+    var L8 = sum(t,"l1m.leads",histStart,yesterday), H8 = sum(t,"l1m.held",histStart,yesterday);
+    var ev = sum(t,"l1m.events",monthStart,yesterday), ca = sum(t,"l1m.calls",monthStart,yesterday);
+    return { n: n, L: L, B: B, H: H, cr: pct(H, L), crB: pct(B, L), cr8: pct(H8, L8), L8: L8, H8: H8, ev: ev, ca: ca, head: HEAD.test(n) };
+  }).sort(function(a,b){ return (b.cr||0) - (a.cr||0) || b.L - a.L; });
+  var TL = rows.reduce(function(s,r){ return s + r.L; }, 0), TB = rows.reduce(function(s,r){ return s + r.B; }, 0), TH = rows.reduce(function(s,r){ return s + r.H; }, 0);
+  var TL8 = rows.reduce(function(s,r){ return s + r.L8; }, 0), TH8 = rows.reduce(function(s,r){ return s + r.H8; }, 0);
+  var norm = pct(TH8, TL8), dcount = days(monthStart, yesterday);
+  document.getElementById("kpis").innerHTML =
+    '<div class="kpi"><span class="nm">Лиды Первой линии</span><span class="v">' + TL + ' <span class="plan">месяц</span></span><span class="row"><span>менеджеров с лидами</span><b>' + rows.length + '</b></span></div>'
+    + '<div class="kpi"><span class="nm">Проведено встреч</span><span class="v">' + TH + ' <span class="plan">месяц</span></span><span class="row"><span>назначено</span><b>' + TB + '</b></span></div>'
+    + '<div class="kpi"><span class="nm">Лид → проведённая встреча</span><span class="v">' + fmtPct(pct(TH, TL)) + ' <span class="plan">месяц</span></span><span class="row"><span>норма 8 недель</span><b>' + fmtPct(norm) + '</b></span></div>'
+    + '<div class="kpi"><span class="nm">Активность отдела</span><span class="v">' + Math.round(rows.reduce(function(s,r){ return s + r.ev; }, 0) / dcount) + ' <span class="plan">действий в день</span></span><span class="row"><span>звонков в день</span><b>' + Math.round(rows.reduce(function(s,r){ return s + r.ca; }, 0) / dcount) + '</b></span></div>';
+  document.getElementById("mg-sub").textContent = "месяц с " + dmy(monthStart) + " по " + dmy(yesterday) + " · норма 8 недель по отделу " + fmtPct(norm);
+  var maxCr = Math.max.apply(null, rows.map(function(r){ return r.cr || 0; }).concat([1]));
+  document.querySelector("#mg tbody").innerHTML = rows.length ? rows.map(function(r){
+    return '<tr><td>' + esc(r.n) + (r.head ? '<span class="lead">руководитель</span>' : '') + '</td><td class="num">' + r.L + '</td><td class="num">' + r.B + '</td><td class="num">' + r.H + '</td>'
+      + '<td class="num"><span class="q ' + cls(r.cr, norm) + '">' + fmtPct(r.cr) + '</span></td><td><div class="bar"><i style="width:' + Math.round(100 * (r.cr || 0) / maxCr) + '%"></i></div></td>'
+      + '<td class="num">' + fmtPct(r.crB) + '</td><td class="num">' + fmtPct(r.cr8) + '</td>'
+      + '<td class="num">' + (r.ev ? (r.ev / dcount).toFixed(1) : "—") + '</td><td class="num">' + (r.ca ? (r.ca / dcount).toFixed(1) : "—") + '</td></tr>';
+  }).join("") + '<tr class="tot"><td>Первая линия</td><td class="num">' + TL + '</td><td class="num">' + TB + '</td><td class="num">' + TH + '</td><td class="num">' + fmtPct(pct(TH, TL)) + '</td><td></td><td class="num">' + fmtPct(pct(TB, TL)) + '</td><td class="num">' + fmtPct(norm) + '</td><td></td><td></td></tr>'
+    : '<tr><td colspan="10" class="empty">данных по менеджерам ещё нет — появятся после ближайшего сбора</td></tr>';
+  document.getElementById("mg-note").innerHTML = 'Зелёным — конверсия выше нормы отдела на 10% и больше, красным — ниже нормы на 15% и больше. Активность и звонки показываются, когда выгрузки событий и АТС есть за период' + (rows.some(function(r){ return r.ev || r.ca; }) ? '.' : ': пока пусто.');
+  // недели
+  var weeks = [];
+  for (var k = 8; k >= 1; k--) { var s = addDays(wkStart,-7*k); weeks.push({ s: s, e: addDays(s,6), partial: false }); }
+  weeks.push({ s: wkStart, e: yesterday, partial: true });
+  document.getElementById("weeks").innerHTML = '<table><thead><tr><th>Менеджер</th>' + weeks.map(function(w){ return '<th class="num"' + (w.partial ? ' style="color:var(--gold)"' : '') + '>' + dmy(w.s) + '</th>'; }).join("") + '</tr></thead><tbody>'
+    + rows.map(function(r){ var t = mgr[r.n]; return '<tr><td>' + esc(r.n) + '</td>' + weeks.map(function(w){ var l = sum(t,"l1m.leads",w.s,w.e), h = sum(t,"l1m.held",w.s,w.e); return '<td class="num" title="' + h + ' из ' + l + '">' + (l ? fmtPct(pct(h,l)) : "—") + '</td>'; }).join("") + '</tr>'; }).join("")
+    + '</tbody></table>';
+}
+</script>
+<script src="/section-editor.js"></script>
+<script src="/nav.js"></script>
+</body>
+</html>

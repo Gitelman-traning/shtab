@@ -1,22 +1,137 @@
 [
-  {"id": "mkt.leads", "name": "Лиды", "section": "mkt", "unit": "шт", "kind": "flow", "better": "up",
-   "definition": "Сделки воронки продаж тренинга по дате «вступил в чат». Срез: источник сделки."},
-  {"id": "l1.leads", "name": "Лиды Первой линии", "section": "sales.l1", "unit": "шт", "kind": "flow", "better": "up",
-   "definition": "Сделки всех воронок Первой линии по дате «вступил в чат»."},
-  {"id": "l1.booked", "name": "Назначенные диагностики", "section": "sales.l1", "unit": "шт", "kind": "flow", "better": "up",
-   "definition": "Сделки воронки продаж тренинга по дате «встреча назначена»."},
-  {"id": "l2.held", "name": "Проведённые диагностики", "section": "sales.l2", "unit": "шт", "kind": "flow", "better": "up",
-   "definition": "Сделки вне Первой линии по дате «диагностика проведена». Срез: ответственный."},
-  {"id": "l2.sales", "name": "Продажи", "section": "sales.l2", "unit": "шт", "kind": "flow", "better": "up",
-   "definition": "Сделки вне Первой линии по дате «клиент прислал чек». Срез: ответственный."},
-  {"id": "pay.full", "name": "Полные оплаты", "section": "participants", "unit": "шт", "kind": "stock", "better": "up",
-   "definition": "Снимок по месяцу потока из таблицы клиентов."},
-  {"id": "pay.prepaid", "name": "Предоплаты", "section": "participants", "unit": "шт", "kind": "stock", "better": "up",
-   "definition": "Снимок по месяцу потока из таблицы клиентов."},
-  {"id": "pay.bloggers", "name": "Блогеры", "section": "participants", "unit": "шт", "kind": "stock", "better": "none",
-   "definition": "Снимок по месяцу потока из таблицы клиентов."},
-  {"id": "pay.participants", "name": "Участники", "section": "participants", "unit": "шт", "kind": "stock", "better": "up",
-   "definition": "Полные оплаты + предоплаты, как в ежедневном отчёте."},
-  {"id": "pay.receipts", "name": "Прислали чек", "section": "participants", "unit": "шт", "kind": "stock", "better": "up",
-   "definition": "Снимок по месяцу потока из таблицы клиентов."}
+ {
+  "id": "mkt.leads",
+  "name": "Лиды",
+  "section": "mkt",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Сделки воронки продаж тренинга по дате «вступил в чат». Срез: источник сделки."
+ },
+ {
+  "id": "l1.leads",
+  "name": "Лиды Первой линии",
+  "section": "sales.l1",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Сделки всех воронок Первой линии по дате «вступил в чат»."
+ },
+ {
+  "id": "l1.booked",
+  "name": "Назначенные диагностики",
+  "section": "sales.l1",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Сделки воронки продаж тренинга по дате «встреча назначена»."
+ },
+ {
+  "id": "l2.held",
+  "name": "Проведённые диагностики",
+  "section": "sales.l2",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Сделки вне Первой линии по дате «диагностика проведена». Срез: ответственный."
+ },
+ {
+  "id": "l2.sales",
+  "name": "Продажи",
+  "section": "sales.l2",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Сделки вне Первой линии по дате «клиент прислал чек». Срез: ответственный."
+ },
+ {
+  "id": "pay.full",
+  "name": "Полные оплаты",
+  "section": "participants",
+  "unit": "шт",
+  "kind": "stock",
+  "better": "up",
+  "definition": "Снимок по месяцу потока из таблицы клиентов."
+ },
+ {
+  "id": "pay.prepaid",
+  "name": "Предоплаты",
+  "section": "participants",
+  "unit": "шт",
+  "kind": "stock",
+  "better": "up",
+  "definition": "Снимок по месяцу потока из таблицы клиентов."
+ },
+ {
+  "id": "pay.bloggers",
+  "name": "Блогеры",
+  "section": "participants",
+  "unit": "шт",
+  "kind": "stock",
+  "better": "none",
+  "definition": "Снимок по месяцу потока из таблицы клиентов."
+ },
+ {
+  "id": "pay.participants",
+  "name": "Участники",
+  "section": "participants",
+  "unit": "шт",
+  "kind": "stock",
+  "better": "up",
+  "definition": "Полные оплаты + предоплаты, как в ежедневном отчёте."
+ },
+ {
+  "id": "pay.receipts",
+  "name": "Прислали чек",
+  "section": "participants",
+  "unit": "шт",
+  "kind": "stock",
+  "better": "up",
+  "definition": "Снимок по месяцу потока из таблицы клиентов."
+ },
+ {
+  "id": "l1m.leads",
+  "name": "Лиды по менеджеру Первой линии",
+  "section": "sales.l1",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Сделки Первой линии по дате «вступил в чат», срез — ответственный по сделке."
+ },
+ {
+  "id": "l1m.booked",
+  "name": "Назначено по менеджеру Первой линии",
+  "section": "sales.l1",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Сделки Первой линии по дате «встреча назначена», срез — ответственный."
+ },
+ {
+  "id": "l1m.held",
+  "name": "Проведено по менеджеру Первой линии",
+  "section": "sales.l1",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Сделки Первой линии по дате «встреча проведена» (поле самой сделки), срез — ответственный."
+ },
+ {
+  "id": "l1m.events",
+  "name": "Действия в amoCRM",
+  "section": "sales.l1",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Записи журнала событий amoCRM за день, срез — автор."
+ },
+ {
+  "id": "l1m.calls",
+  "name": "Звонки АТС",
+  "section": "sales.l1",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Состоявшиеся звонки из выгрузки АТС за день, срез — ответственный менеджер."
+ }
 ]

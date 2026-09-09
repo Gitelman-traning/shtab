@@ -114,11 +114,22 @@ def deal_points(values, day_from, day_to):
             continue
         first_line = funnel.startswith(prefix)
         lead_d = parse_date(cell(r, c["lead_date"]))
+        manager1 = cell(r, c["manager"]) or "без ответственного"
         if first_line and in_range(lead_d):
             add("l1.leads", lead_d)
+            add("l1m.leads", lead_d, manager1)
             if funnel == lead_funnel:
                 add("mkt.leads", lead_d)
                 add("mkt.leads", lead_d, cell(r, c["source"]) or "без источника")
+        if first_line:
+            # по менеджеру Первой линии: назначено и проведено в той же сделке (колонка «встреча проведена»)
+            b1 = parse_date(cell(r, c["booked_date"]))
+            if in_range(b1):
+                add("l1m.booked", b1, manager1)
+            if "held1_date" in c:
+                h1 = parse_date(cell(r, c["held1_date"]))
+                if in_range(h1):
+                    add("l1m.held", h1, manager1)
         source = cell(r, c["source"]) or "без источника"
         if funnel == lead_funnel:
             booked_d = parse_date(cell(r, c["booked_date"]))
@@ -147,6 +158,60 @@ def deal_points(values, day_from, day_to):
         day += dt.timedelta(days=1)
     for (metric, period, dim), n in counts.items():
         points.append({"metric": metric, "ptype": "day", "period": period, "dim": dim, "value": n})
+    return points
+
+
+# ---------- активность менеджеров: события amoCRM и звонки АТС ----------
+
+def parse_any_date(s):
+    """'08.09.2026 19:31' или '2026-04-10T07:15:23Z' (UTC → МСК) → date."""
+    s = (s or "").strip()
+    d = parse_date(s)
+    if d:
+        return d
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})", s)
+    if m:
+        try:
+            utc = dt.datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5)))
+            return (utc + dt.timedelta(hours=3)).date()
+        except ValueError:
+            return None
+    return None
+
+
+def activity_points(values, day_from, day_to):
+    points = []
+    ev = LAYOUT.get("events")
+    if ev:
+        c = {k: col_index(v) for k, v in ev["cols"].items()}
+        rows = read(values, LAYOUT["sheet_id"], "'%s'!A%d:%s" % (ev["tab"], ev.get("first_row", 2), ev.get("last_col", "K")))
+        counts = {}
+        for r in rows:
+            d = parse_any_date(cell(r, c["date"]))
+            who = cell(r, c["author"])
+            if not who or d is None or not (day_from <= d <= day_to):
+                continue
+            key = (d.isoformat(), who)
+            counts[key] = counts.get(key, 0) + 1
+        for (period, who), n in counts.items():
+            points.append({"metric": "l1m.events", "ptype": "day", "period": period, "dim": who, "value": n})
+        log("событий amo по менеджерам: %d точек" % len(counts))
+    ca = LAYOUT.get("calls")
+    if ca:
+        c = {k: col_index(v) for k, v in ca["cols"].items()}
+        rows = read(values, LAYOUT["sheet_id"], "'%s'!A%d:%s" % (ca["tab"], ca.get("first_row", 2), ca.get("last_col", "K")))
+        counts = {}
+        for r in rows:
+            d = parse_any_date(cell(r, c["date"]))
+            who = cell(r, c["manager"])
+            made = cell(r, c["made"]).lower() if "made" in c else "да"
+            if not who or d is None or not (day_from <= d <= day_to) or made not in ("да", "yes", "1", "true"):
+                continue
+            key = (d.isoformat(), who)
+            counts[key] = counts.get(key, 0) + 1
+        for (period, who), n in counts.items():
+            points.append({"metric": "l1m.calls", "ptype": "day", "period": period, "dim": who, "value": n})
+        log("звонков по менеджерам: %d точек" % len(counts))
     return points
 
 
@@ -229,7 +294,8 @@ def main():
     log("точек по сделкам: %d" % len(pts))
     pp = participants_points(values, today)
     log("точек по участникам: %d" % len(pp))
-    send(pts + pp, "период %s—%s" % (day_from, day_to))
+    ap = activity_points(values, day_from, day_to)
+    send(pts + pp + ap, "период %s—%s" % (day_from, day_to))
     log("ГОТОВО")
 
 
