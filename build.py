@@ -92,7 +92,7 @@ def compose_l2(stats_tpl, charts_tpl):
     # графики — перед заметкой в конце main
     mm = re.search(r'<main>\s*(<div class="grid">.*?</div>)\s*<footer id="foot">', charts_tpl, re.S)
     charts_main = mm.group(1) if mm else ""
-    t = t.replace('  <div class="note" id="note">—</div>\n</main>', '  <h2 class="charts-title">Графики ОКК</h2>\n  ' + charts_main + '\n  <div class="note" id="note">—</div>\n</main>', 1)
+    t = t.replace('  <div class="note" id="note">—</div>\n</main>', '  <h2 class="charts-title">Графики ОКК</h2>\n  ' + charts_main + '\n  <div class="note" id="foot">—</div>\n  <div class="note" id="note">—</div>\n</main>', 1)
     # скрипт графиков: от var PAYLOAD до </script>, без повторного PAYLOAD, в своей области видимости
     cm = re.search(r"var PAYLOAD = /\*__DATA__\*/;\n(.*?)</script>", charts_tpl, re.S)
     charts_js = cm.group(1) if cm else ""
