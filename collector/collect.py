@@ -198,7 +198,7 @@ def activity_points(values, day_from, day_to):
         log("событий amo по менеджерам: %d точек" % len(counts))
     ca = LAYOUT.get("calls")
     if ca:
-        # выгрузка АТС: «Кто» = внутренний номер, дата «[hh:mm:ss] YYYY-MM-DD», «Время разговора» в секундах
+        # выгрузка АТС: у исходящих внутренний номер в «Кто», у входящих — в «Кому»; дата «[hh:mm:ss] YYYY-MM-DD», «Время разговора» в секундах
         c = {k: col_index(v) for k, v in ca["cols"].items()}
         ext_map = ca.get("ext_map") or {}
         rows = read(values, ca.get("sheet_id") or LAYOUT["sheet_id"], "'%s'!A%d:%s" % (ca["tab"], ca.get("first_row", 2), ca.get("last_col", "I")))
@@ -212,8 +212,10 @@ def activity_points(values, day_from, day_to):
             if not (day_from <= d <= day_to):
                 continue
             who = cell(r, c["who"])
-            name = ext_map.get(who) or ("ext:" + who if who else "")
+            to = cell(r, c["to"]) if "to" in c else ""
+            name = ext_map.get(who) or ext_map.get(to)
             if not name:
+                # ни один из номеров не менеджер: служебные очереди (11, 6100) и незнакомые номера пропускаем
                 continue
             try:
                 sec = float(cell(r, c["talk"]).replace(",", ".") or 0)
