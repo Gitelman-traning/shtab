@@ -104,6 +104,16 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font-size:12.5px
     <p class="sub" style="margin:8px 0 0">Роли: администратор видит всё и управляет пользователями; руководитель и сотрудник видят всё, но менять вид могут только в своих разделах; «только смотрит» — как общий пароль, но под своим именем. Временный пароль показывается один раз, при первом входе его нужно сменить.</p>
     <div id="n-out"></div>
   </div>
+  <div class="card" id="rights-card" hidden><h2>Что дают роли и разделы</h2>
+    <table><thead><tr><th>Роль</th><th>Видит</th><th>Меняет вид разделов</th><th>Пользователи и заявки</th><th>Кому подходит</th></tr></thead><tbody>
+      <tr><td><span class="pill admin">администратор</span></td><td>всё</td><td>любой раздел, включая общий экран</td><td>создаёт, подтверждает, сбрасывает пароли, отключает</td><td>Никита, собственники, операционный директор</td></tr>
+      <tr><td><span class="pill head">руководитель</span></td><td>всё</td><td>только разделы, отмеченные галочками</td><td>нет</td><td>руководитель линии или отдела: Илона, Татьяна, инфлюенс</td></tr>
+      <tr><td><span class="pill">сотрудник</span></td><td>всё</td><td>только разделы, отмеченные галочками</td><td>нет</td><td>сотрудник, которому доверили менять вид своего раздела</td></tr>
+      <tr><td><span class="pill">смотрит</span></td><td>всё</td><td>ничего</td><td>нет</td><td>все остальные: как общий пароль, но под своим именем</td></tr>
+    </tbody></table>
+    <p class="sub" style="margin:10px 0 0">Галочки разделов: <b>Общий экран</b>, <b>Отдел продаж</b>, <b>Маркетинг</b> и те, что появятся. Галочка открывает «Изменить через Claude», «Версии», публикацию и откат в этом разделе. Просмотр данных от галочек не зависит: пока все, кто вошёл, видят все цифры. Если понадобится скрыть раздел от кого-то, например деньги, скажите — добавим отдельное право «видит только свои разделы».</p>
+    <p class="sub" style="margin:6px 0 0">Заявки: человек регистрируется сам, попадает в «Заявки на доступ» без прав; вы выбираете роль и разделы и подтверждаете. Временные пароли показываются один раз.</p>
+  </div>
   <div class="card" id="log-card" hidden><h2>Журнал действий <small class="sub">последние 100</small></h2><div id="log"></div></div>
 </main>
 </div>
@@ -140,7 +150,7 @@ api("/api/me").then(function(m){
   ME=m.user;document.getElementById("who").textContent=(m.user.name||m.user.login)+" · "+(ROLE[m.user.role]||m.user.role);
   if(m.user.personal)document.getElementById("me-card").hidden=false;
   if(m.user.role!=="admin"){document.getElementById("denied").hidden=false;return}
-  ["list-card","add-card","log-card"].forEach(function(id){document.getElementById(id).hidden=false});
+  ["list-card","add-card","rights-card","log-card"].forEach(function(id){document.getElementById(id).hidden=false});
   api("/api/sections").then(function(r){ SECTIONS = (r.ok && r.sections) || []; picker(document.getElementById("n-sections"), ""); loadUsers(); });
   loadLog();
 });
