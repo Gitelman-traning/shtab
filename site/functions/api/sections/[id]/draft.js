@@ -98,9 +98,13 @@ export async function onRequestPost({ request, env, params }) {
       html += add;
     }
   } catch (e) {
+    await audit(env, user.login, "section.draft.fail", sec.id, e.message.slice(0, 120) + " · " + prompt.slice(0, 120));
     return bad("модель не успела: " + e.message + ". Нажмите «Сделать вариант» ещё раз или сократите просьбу.", 502);
   }
-  if (!/<\/html>\s*$/i.test(html)) return bad("модель не дописала страницу до конца, попробуйте ещё раз или сократите просьбу", 502);
+  if (!/<\/html>\s*$/i.test(html)) {
+    await audit(env, user.login, "section.draft.fail", sec.id, "страница не дописана · " + prompt.slice(0, 120));
+    return bad("модель не дописала страницу до конца, попробуйте ещё раз или сократите просьбу", 502);
+  }
   if (!/<!doctype html/i.test(html) || html.length < 500) return bad("модель вернула не страницу, попробуйте переформулировать", 502);
   if (/<script[^>]+src=|<link[^>]+href=|@import/i.test(html)) return bad("модель подключила внешние файлы — это запрещено, попробуйте ещё раз", 502);
   const last = await env.DB.prepare("SELECT MAX(version) AS v FROM section_versions WHERE section = ?").bind(sec.id).first();
