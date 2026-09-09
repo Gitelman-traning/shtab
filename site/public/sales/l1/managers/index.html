@@ -32,11 +32,11 @@
 <main id="section-standard">
   <div class="kpis" id="kpis"></div>
   <div class="card"><h2>По менеджерам <small id="mg-sub"></small></h2><div class="wide"><table class="mg" id="mg"><thead><tr>
-    <th>Менеджер</th><th class="num">Лиды · мес.</th><th class="num">Назначено</th><th class="num">Проведено</th><th class="num">Лид → встреча</th><th></th><th class="num">Лид → назначено</th><th class="num">Лид → встреча · 8 нед.</th><th class="num">Действий в amo / день</th><th class="num">Звонков / день</th>
-  </tr></thead><tbody><tr><td colspan="10" class="empty">загрузка…</td></tr></tbody></table></div>
+    <th>Менеджер</th><th class="num">Лиды · мес.</th><th class="num">Назначено</th><th class="num">Проведено</th><th class="num">Лид → встреча</th><th></th><th class="num">Лид → назначено</th><th class="num">Лид → встреча · 8 нед.</th><th class="num">Касаний базы / день</th><th class="num">Звонков / день</th><th class="num">Разговор, мин / день</th>
+  </tr></thead><tbody><tr><td colspan="11" class="empty">загрузка…</td></tr></tbody></table></div>
   <p class="note" id="mg-note"></p></div>
   <div class="card"><h2>По неделям <small>лид → проведённая встреча по каждому менеджеру, 8 недель + текущая</small></h2><div class="wide" id="weeks"></div></div>
-  <footer>Лид — сделка Первой линии по дате «вступил в чат», назначено — «встреча назначена», проведено — «встреча проведена» в той же сделке; менеджер — ответственный по сделке Первой линии. Действия — записи из журнала событий amoCRM, авторство которых закреплено за менеджером, за день. Звонки — из выгрузки АТС по ответственному, только состоявшиеся.</footer>
+  <footer>Лид — сделка Первой линии по дате «вступил в чат», назначено — «встреча назначена», проведено — «встреча проведена» в той же сделке; менеджер — ответственный по сделке Первой линии. Касания — контакты, у которых последнее касание менеджером пришлось на день (таблица «Работа с базой»). Звонки — из выгрузки АТС по внутреннему номеру, только с разговором.</footer>
 </main>
 </div>
 </div>
@@ -51,7 +51,7 @@ var histStart = addDays(wkStart, -7*8);
 var from = monthStart < histStart ? monthStart : histStart;
 var HEAD = /тамахина|илона/i;
 
-api("metric=l1m.leads,l1m.booked,l1m.held,l1m.events,l1m.calls&ptype=day&from=" + iso(from) + "&to=" + iso(yesterday)).then(function(res){
+api("metric=l1m.leads,l1m.booked,l1m.held,l1m.touches,l1m.calls,l1m.talk&ptype=day&from=" + iso(from) + "&to=" + iso(yesterday)).then(function(res){
   if (!res.ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span></div>'; return; }
   var mgr = {};   // manager → metric → date → value
   res.rows.forEach(function(r){ if (!r.dim) return; ((mgr[r.dim] = mgr[r.dim] || {})[r.metric] = mgr[r.dim][r.metric] || {})[r.period] = r.value; });
@@ -68,8 +68,8 @@ function render(mgr){
   var rows = names.map(function(n){ var t = mgr[n];
     var L = sum(t,"l1m.leads",monthStart,yesterday), B = sum(t,"l1m.booked",monthStart,yesterday), H = sum(t,"l1m.held",monthStart,yesterday);
     var L8 = sum(t,"l1m.leads",histStart,yesterday), H8 = sum(t,"l1m.held",histStart,yesterday);
-    var ev = sum(t,"l1m.events",monthStart,yesterday), ca = sum(t,"l1m.calls",monthStart,yesterday);
-    return { n: n, L: L, B: B, H: H, cr: pct(H, L), crB: pct(B, L), cr8: pct(H8, L8), L8: L8, H8: H8, ev: ev, ca: ca, head: HEAD.test(n) };
+    var ev = sum(t,"l1m.touches",monthStart,yesterday), ca = sum(t,"l1m.calls",monthStart,yesterday), tk = sum(t,"l1m.talk",monthStart,yesterday);
+    return { n: n, L: L, B: B, H: H, cr: pct(H, L), crB: pct(B, L), cr8: pct(H8, L8), L8: L8, H8: H8, ev: ev, ca: ca, tk: tk, head: HEAD.test(n) };
   }).sort(function(a,b){ return (b.cr||0) - (a.cr||0) || b.L - a.L; });
   var TL = rows.reduce(function(s,r){ return s + r.L; }, 0), TB = rows.reduce(function(s,r){ return s + r.B; }, 0), TH = rows.reduce(function(s,r){ return s + r.H; }, 0);
   var TL8 = rows.reduce(function(s,r){ return s + r.L8; }, 0), TH8 = rows.reduce(function(s,r){ return s + r.H8; }, 0);
@@ -78,17 +78,17 @@ function render(mgr){
     '<div class="kpi"><span class="nm">Лиды Первой линии</span><span class="v">' + TL + ' <span class="plan">месяц</span></span><span class="row"><span>менеджеров с лидами</span><b>' + rows.length + '</b></span></div>'
     + '<div class="kpi"><span class="nm">Проведено встреч</span><span class="v">' + TH + ' <span class="plan">месяц</span></span><span class="row"><span>назначено</span><b>' + TB + '</b></span></div>'
     + '<div class="kpi"><span class="nm">Лид → проведённая встреча</span><span class="v">' + fmtPct(pct(TH, TL)) + ' <span class="plan">месяц</span></span><span class="row"><span>норма 8 недель</span><b>' + fmtPct(norm) + '</b></span></div>'
-    + '<div class="kpi"><span class="nm">Активность отдела</span><span class="v">' + Math.round(rows.reduce(function(s,r){ return s + r.ev; }, 0) / dcount) + ' <span class="plan">действий в день</span></span><span class="row"><span>звонков в день</span><b>' + Math.round(rows.reduce(function(s,r){ return s + r.ca; }, 0) / dcount) + '</b></span></div>';
+    + '<div class="kpi"><span class="nm">Активность отдела</span><span class="v">' + Math.round(rows.reduce(function(s,r){ return s + r.ev; }, 0) / dcount) + ' <span class="plan">касаний базы в день</span></span><span class="row"><span>звонков в день</span><b>' + Math.round(rows.reduce(function(s,r){ return s + r.ca; }, 0) / dcount) + '</b></span><span class="row"><span>разговоров, мин в день</span><b>' + Math.round(rows.reduce(function(s,r){ return s + r.tk; }, 0) / dcount) + '</b></span></div>';
   document.getElementById("mg-sub").textContent = "месяц с " + dmy(monthStart) + " по " + dmy(yesterday) + " · норма 8 недель по отделу " + fmtPct(norm);
   var maxCr = Math.max.apply(null, rows.map(function(r){ return r.cr || 0; }).concat([1]));
   document.querySelector("#mg tbody").innerHTML = rows.length ? rows.map(function(r){
     return '<tr><td>' + esc(r.n) + (r.head ? '<span class="lead">руководитель</span>' : '') + '</td><td class="num">' + r.L + '</td><td class="num">' + r.B + '</td><td class="num">' + r.H + '</td>'
       + '<td class="num"><span class="q ' + cls(r.cr, norm) + '">' + fmtPct(r.cr) + '</span></td><td><div class="bar"><i style="width:' + Math.round(100 * (r.cr || 0) / maxCr) + '%"></i></div></td>'
       + '<td class="num">' + fmtPct(r.crB) + '</td><td class="num">' + fmtPct(r.cr8) + '</td>'
-      + '<td class="num">' + (r.ev ? (r.ev / dcount).toFixed(1) : "—") + '</td><td class="num">' + (r.ca ? (r.ca / dcount).toFixed(1) : "—") + '</td></tr>';
-  }).join("") + '<tr class="tot"><td>Первая линия</td><td class="num">' + TL + '</td><td class="num">' + TB + '</td><td class="num">' + TH + '</td><td class="num">' + fmtPct(pct(TH, TL)) + '</td><td></td><td class="num">' + fmtPct(pct(TB, TL)) + '</td><td class="num">' + fmtPct(norm) + '</td><td></td><td></td></tr>'
-    : '<tr><td colspan="10" class="empty">данных по менеджерам ещё нет — появятся после ближайшего сбора</td></tr>';
-  document.getElementById("mg-note").innerHTML = 'Зелёным — конверсия выше нормы отдела на 10% и больше, красным — ниже нормы на 15% и больше. Активность и звонки показываются, когда выгрузки событий и АТС есть за период' + (rows.some(function(r){ return r.ev || r.ca; }) ? '.' : ': пока пусто.');
+      + '<td class="num">' + (r.ev ? (r.ev / dcount).toFixed(1) : "—") + '</td><td class="num">' + (r.ca ? (r.ca / dcount).toFixed(1) : "—") + '</td><td class="num">' + (r.tk ? (r.tk / dcount).toFixed(0) : "—") + '</td></tr>';
+  }).join("") + '<tr class="tot"><td>Первая линия</td><td class="num">' + TL + '</td><td class="num">' + TB + '</td><td class="num">' + TH + '</td><td class="num">' + fmtPct(pct(TH, TL)) + '</td><td></td><td class="num">' + fmtPct(pct(TB, TL)) + '</td><td class="num">' + fmtPct(norm) + '</td><td></td><td></td><td></td></tr>'
+    : '<tr><td colspan="11" class="empty">данных по менеджерам ещё нет — появятся после ближайшего сбора</td></tr>';
+  document.getElementById("mg-note").innerHTML = 'Зелёным — конверсия выше нормы отдела на 10% и больше, красным — ниже нормы на 15% и больше. Касания базы берутся из таблицы «Работа с базой» по дате последнего касания, звонки — из выгрузки АТС по внутреннему номеру менеджера' + (rows.some(function(r){ return r.ev || r.ca; }) ? '.' : ': пока пусто.');
   // недели
   var weeks = [];
   for (var k = 8; k >= 1; k--) { var s = addDays(wkStart,-7*k); weeks.push({ s: s, e: addDays(s,6), partial: false }); }

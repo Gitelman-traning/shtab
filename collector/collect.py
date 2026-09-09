@@ -198,20 +198,52 @@ def activity_points(values, day_from, day_to):
         log("событий amo по менеджерам: %d точек" % len(counts))
     ca = LAYOUT.get("calls")
     if ca:
+        # выгрузка АТС: «Кто» = внутренний номер, дата «[hh:mm:ss] YYYY-MM-DD», «Время разговора» в секундах
         c = {k: col_index(v) for k, v in ca["cols"].items()}
-        rows = read(values, LAYOUT["sheet_id"], "'%s'!A%d:%s" % (ca["tab"], ca.get("first_row", 2), ca.get("last_col", "K")))
+        ext_map = ca.get("ext_map") or {}
+        rows = read(values, ca.get("sheet_id") or LAYOUT["sheet_id"], "'%s'!A%d:%s" % (ca["tab"], ca.get("first_row", 2), ca.get("last_col", "I")))
+        calls, talk = {}, {}
+        for r in rows:
+            raw = cell(r, c["date"])
+            m = re.search(r"(\d{4})-(\d{2})-(\d{2})", raw)
+            if not m:
+                continue
+            d = dt.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            if not (day_from <= d <= day_to):
+                continue
+            who = cell(r, c["who"])
+            name = ext_map.get(who) or ("ext:" + who if who else "")
+            if not name:
+                continue
+            try:
+                sec = float(cell(r, c["talk"]).replace(",", ".") or 0)
+            except ValueError:
+                sec = 0
+            if sec <= 0:
+                continue        # неотвеченные не считаем
+            key = (d.isoformat(), name)
+            calls[key] = calls.get(key, 0) + 1
+            talk[key] = talk.get(key, 0) + sec / 60.0
+        for (period, who), n in calls.items():
+            points.append({"metric": "l1m.calls", "ptype": "day", "period": period, "dim": who, "value": n})
+            points.append({"metric": "l1m.talk", "ptype": "day", "period": period, "dim": who, "value": round(talk[(period, who)], 1)})
+        log("звонков по менеджерам: %d точек" % len(calls))
+    tc = LAYOUT.get("touches")
+    if tc:
+        # «Работа с базой» → «активность 1 линия»: контакт, менеджер, дата последнего касания
+        c = {k: col_index(v) for k, v in tc["cols"].items()}
+        rows = read(values, tc.get("sheet_id") or LAYOUT["sheet_id"], "'%s'!A%d:%s" % (tc["tab"], tc.get("first_row", 2), tc.get("last_col", "E")))
         counts = {}
         for r in rows:
-            d = parse_any_date(cell(r, c["date"]))
+            d = parse_date(cell(r, c["date"]))
             who = cell(r, c["manager"])
-            made = cell(r, c["made"]).lower() if "made" in c else "да"
-            if not who or d is None or not (day_from <= d <= day_to) or made not in ("да", "yes", "1", "true"):
+            if not who or d is None or not (day_from <= d <= day_to):
                 continue
             key = (d.isoformat(), who)
             counts[key] = counts.get(key, 0) + 1
         for (period, who), n in counts.items():
-            points.append({"metric": "l1m.calls", "ptype": "day", "period": period, "dim": who, "value": n})
-        log("звонков по менеджерам: %d точек" % len(counts))
+            points.append({"metric": "l1m.touches", "ptype": "day", "period": period, "dim": who, "value": n})
+        log("касаний базы по менеджерам: %d точек" % len(counts))
     return points
 
 
