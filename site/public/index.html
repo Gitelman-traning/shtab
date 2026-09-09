@@ -73,7 +73,7 @@ main{padding:22px 24px 70px;display:flex;flex-direction:column;gap:20px}
 .d.up{background:var(--ok-bg);color:var(--ok)} .d.down{background:var(--bad-bg);color:var(--bad)} .d.flat{background:var(--soft);color:var(--dim)}
 .plan{font-size:11.5px;color:var(--faint)}
 .grid2{display:grid;grid-template-columns:1.2fr .8fr;gap:20px}
-@media (max-width:1100px){.grid2{grid-template-columns:1fr}}
+@media (max-width:1100px){.grid2,.grid2.eq{grid-template-columns:1fr}}
 table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-size:11.5px;font-weight:500;color:var(--faint);white-space:nowrap}
@@ -81,15 +81,16 @@ tbody tr:last-child td{border-bottom:0} td.num,th.num{text-align:right;font-vari
 td.k{color:var(--dim)} tr.tot td{font-weight:600;background:var(--zebra)}
 .tag{font-size:10.5px;padding:2px 7px;border-radius:7px;background:var(--soft);color:var(--dim);margin-left:6px}
 .tag.paid{background:var(--gold-soft);color:var(--gold)} .tag.org{background:var(--ok-bg);color:var(--ok)}
-.grid2.eq{grid-template-columns:1fr 1fr}
-.ladder{display:grid;grid-template-columns:minmax(140px,1fr) 2fr auto;gap:2px 12px;align-items:center;font-size:12.5px}
-.ladder .tr{position:relative;height:10px;border-radius:5px;background:var(--soft);overflow:hidden}
+@media (min-width:1101px){.grid2.eq{grid-template-columns:1fr 1fr}}
+.ladder{display:flex;flex-direction:column;font-size:12.5px}
+.ladder .st{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:8px}
+.ladder .tr{position:relative;height:10px;border-radius:5px;background:var(--soft);overflow:hidden;margin-top:5px}
 .ladder .tr .fx{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--gold-a);opacity:.55}
 .ladder .tr .fx.ok{background:var(--ok-bar)} .ladder .tr .fx.bad{background:var(--bad-bar)}
 .ladder .tr .fc{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--gold-b)}
-.ladder .r{text-align:right;white-space:nowrap;color:var(--dim);font-variant-numeric:tabular-nums} .ladder .r b{color:var(--ink)}
-.ladder .r .fx{display:block;font-size:11px} .ladder .r .fx.ok{color:var(--ok)} .ladder .r .fx.bad{color:var(--bad)}
-.ladder .cv{grid-column:1/-1;font-size:11px;color:var(--faint);margin:0 0 4px} .ladder .cv b{color:var(--dim);font-weight:500}
+.ladder .r{text-align:right;color:var(--dim);font-variant-numeric:tabular-nums} .ladder .r b{color:var(--ink)}
+.ladder .r .fx{font-size:11.5px;margin-left:6px} .ladder .r .fx.ok b{color:var(--ok)} .ladder .r .fx.bad b{color:var(--bad)}
+.ladder .cv{font-size:11px;color:var(--faint);margin-top:3px} .ladder .cv b{color:var(--dim);font-weight:500}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:2px 0 12px}
 .legend i{display:inline-block;width:12px;height:8px;border-radius:4px;margin-right:5px;vertical-align:1px}
 .legend .lp{background:var(--soft);border:1px solid var(--line-2)} .legend .lf{background:var(--gold-b)} .legend .lx{background:var(--ok-bar);opacity:.55} .legend .lxb{background:var(--bad-bar);opacity:.55}
@@ -192,7 +193,7 @@ Promise.all([
   api("metric=mkt.leads,l1.leads,l1.booked,l2.held,l2.sales&ptype=day&dim=&from=" + iso(from < prevMonthStart ? from : prevMonthStart) + "&to=" + iso(yesterday)),
   api("metric=mkt.leads&ptype=day&from=" + iso(monthStart) + "&to=" + iso(yesterday)),
   api("metric=pay.full,pay.prepaid,pay.bloggers,pay.participants,pay.receipts&ptype=potok"),
-  api("metric=" + FUN.map(function(s){ return s[0]; }).join(",") + "&ptype=month&dim=&plans=1")
+  api("metric=fun.l1.leads,fun.l1.reached,fun.l1.q3,fun.l1.qual,fun.l1.booked,fun.l1.confirmed,fun.l1.held,fun.l2.booked,fun.l2.held,fun.l2.committee,fun.l2.selected,fun.l2.invoiced,fun.l2.paid&ptype=month&dim=&plans=1")
 ]).then(function(res){
   if (!res[0].ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span><span class="empty">Откройте страницу после входа по паролю.</span></div>'; return; }
   var day = {};      // metric → {date → value}
@@ -223,8 +224,8 @@ function renderPlan(res){
       var scale = Math.max(p, fx, 1), pw = 100 * p / scale, fw = 100 * f / scale, xw = 100 * fx / scale;
       var k = p ? (fx >= p ? "ok" : "bad") : "";
       // серый трек = масштаб (план или прогноз, что больше); поверх — прогноз и факт, риска = план
-      var h = '<div>' + s[1] + '</div><div class="tr"><div class="fx ' + k + '" style="width:' + xw.toFixed(1) + '%"></div><div class="fc" style="width:' + fw.toFixed(1) + '%"></div>' + (p && pw < 100 ? '<div style="position:absolute;left:' + pw.toFixed(1) + '%;top:0;bottom:0;border-left:2px solid var(--ink);opacity:.5"></div>' : '') + '</div>'
-        + '<div class="r"><b>' + f + '</b> / ' + (p || "—") + '<span class="fx ' + k + '">прогноз ' + fx + (p ? ' · ' + Math.round(100 * fx / p) + '% плана' : '') + '</span></div>';
+      var h = '<div class="st"><div>' + s[1] + '</div><div class="r"><b>' + f + '</b> / ' + (p || "—") + '<span class="fx ' + k + '">прогноз <b>' + fx + '</b>' + (p ? ' · ' + Math.round(100 * fx / p) + '% плана' : '') + '</span></div></div>'
+        + '<div class="tr"><div class="fx ' + k + '" style="width:' + xw.toFixed(1) + '%"></div><div class="fc" style="width:' + fw.toFixed(1) + '%"></div>' + (p && pw < 100 ? '<div style="position:absolute;left:' + pw.toFixed(1) + '%;top:0;bottom:0;border-left:2px solid var(--ink);opacity:.5"></div>' : '') + '</div>';
       if (i < rows.length - 1) { var n = rows[i + 1], nf = fact[n[0]] || 0, np = plan[n[0]] || 0; h += '<div class="cv">↓ конверсия факт <b>' + (f ? Math.round(100 * nf / f) + '%' : '—') + '</b> · план <b>' + (p ? Math.round(100 * np / p) + '%' : '—') + '</b></div>'; }
       return h;
     }).join("") || '<p class="empty">нет данных</p>';
