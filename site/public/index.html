@@ -95,7 +95,7 @@ td.k{color:var(--dim)} tr.tot td{font-weight:600;background:var(--zebra)}
 .ladder .tr .mk.pace i{bottom:auto;top:-21px;border-color:var(--line-2);color:var(--ink);opacity:1}
 .ladder .tr .mk.pace i b{color:var(--ink)}
 .ladder .tr .mk.pace.near i{transform:none;left:6px}
-.ladder .cv{font-size:11px;color:var(--faint);margin-top:0} .ladder .cv b{color:var(--dim);font-weight:500}
+.ladder .cv{font-size:11px;color:var(--faint);margin-top:0} .ladder .cv b{color:var(--dim);font-weight:500} .ladder .cv b.ok{color:var(--ok);font-weight:600} .ladder .cv b.bad{color:var(--bad);font-weight:600}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:2px 0 12px}
 .legend i{display:inline-block;width:12px;height:8px;border-radius:4px;margin-right:5px;vertical-align:1px}
 .legend .lp{background:var(--soft);border:1px solid var(--line-2)} .legend .lf{background:var(--gold-b)}
@@ -234,7 +234,8 @@ function renderPlan(res){
         + '<div class="tr"><span class="cap l">факт <b>' + f + '</b></span><span class="cap e">план ' + (p || "—") + '</span><div class="fc" style="width:' + fw.toFixed(1) + '%"></div>'
         + (p ? '<div class="mk pace' + (tw < 14 ? ' near' : '') + '" style="left:' + tw.toFixed(1) + '%"><i>план на сегодня <b>' + Math.round(p * done / dim) + '</b></i></div>' : '')
         + '<div class="mk" style="left:' + Math.min(xw, 100).toFixed(1) + '%"><i>прогноз <b>' + fx + '</b>' + (p ? ' · ' + Math.round(100 * fx / p) + '% плана' : '') + '</i></div></div>';
-      if (i < rows.length - 1) { var n = rows[i + 1], nf = fact[n[0]] || 0, np = plan[n[0]] || 0; h += '<div class="cv">↓ конверсия факт <b>' + (f ? Math.round(100 * nf / f) + '%' : '—') + '</b> · план <b>' + (p ? Math.round(100 * np / p) + '%' : '—') + '</b></div>'; }
+      if (i < rows.length - 1) { var n = rows[i + 1], nf = fact[n[0]] || 0, np = plan[n[0]] || 0; var cf = f ? 100 * nf / f : null, cp = p ? 100 * np / p : null, ck = (cf != null && cp != null) ? (cf >= cp ? ' ok' : ' bad') : '';
+        h += '<div class="cv">↓ конверсия факт <b class="' + ck + '">' + (cf != null ? Math.round(cf) + '%' : '—') + '</b> · план <b>' + (cp != null ? Math.round(cp) + '%' : '—') + '</b></div>'; }
       return h;
     }).join("") || '<p class="empty">нет данных</p>';
   });
