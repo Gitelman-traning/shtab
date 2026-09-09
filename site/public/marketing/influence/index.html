@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Маркетинг · Инфлюенс (интеграции)</title>
+<link rel="stylesheet" href="/ui.css">
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · <b>Инфлюенс (интеграции)</b></div><h1>Инфлюенс (интеграции)</h1><p class="sub">Лиды источника «Интеграции» и что с ними дальше: назначено, проведено, продажи. Назначено, проведено и продажи считаются по своим датам, поэтому за месяц могут относиться к лидам прошлых недель.</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<div id="section-editor" data-section="marketing.influence"></div>
+<main id="section-standard">
+  <div class="kpis" id="kpis"></div>
+  <div class="card"><h2>Воронка источника <small id="funnel-sub"></small></h2><div class="funnel" id="funnel"></div><p class="note" id="fnote"></p></div>
+  <div class="grid2">
+    <div class="card"><h2>По неделям <small>8 полных недель + текущая</small></h2><div id="weeks"></div></div>
+    <div class="card"><h2>Тренд <small>лидов источника в неделю · доля от всех лидов</small></h2><div id="trend"></div></div>
+  </div>
+  <footer>Источник — поле сделки в amoCRM «Интеграции». Лид — сделка воронки продаж тренинга по дате «вступил в чат». Расход и цена лида появятся с подключением рекламных кабинетов.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var SRC = "Интеграции";
+function api(q){ return fetch("/api/points?" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
+var today = new Date(); today.setHours(0,0,0,0);
+var yesterday = addDays(today, -1);
+var wkStart = monday(yesterday), wkPrevStart = addDays(wkStart,-7), wkPrevEnd = addDays(yesterday,-7);
+var monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+var pmStart = new Date(today.getFullYear(), today.getMonth()-1, 1);
+var pmEnd = new Date(pmStart.getFullYear(), pmStart.getMonth(), Math.min(yesterday.getDate(), new Date(pmStart.getFullYear(), pmStart.getMonth()+1, 0).getDate()));
+var histStart = addDays(wkStart, -7*8);
+var from = pmStart < histStart ? pmStart : histStart;
+
+Promise.all([
+  api("metric=mkt.leads&ptype=day&dim=" + encodeURIComponent(SRC) + "&from=" + iso(from) + "&to=" + iso(yesterday)),
+  api("metric=l1.booked,l2.held,l2.sales&ptype=day&dim=" + encodeURIComponent("src:" + SRC) + "&from=" + iso(from) + "&to=" + iso(yesterday)),
+  api("metric=mkt.leads&ptype=day&dim=&from=" + iso(from) + "&to=" + iso(yesterday))
+]).then(function(res){
+  if (!res[0].ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span></div>'; return; }
+  var day = { "mkt.leads": {}, "all": {} };
+  res[0].rows.forEach(function(r){ day["mkt.leads"][r.period] = r.value; });
+  res[1].rows.forEach(function(r){ (day[r.metric] = day[r.metric] || {})[r.period] = r.value; });
+  res[2].rows.forEach(function(r){ day["all"][r.period] = r.value; });
+  render(day);
+});
+function sum(tbl, metric, a, b){ var s = 0, d = new Date(a); while (d <= b) { s += (tbl[metric] && tbl[metric][iso(d)]) || 0; d = addDays(d,1); } return s; }
+
+function render(day){
+  var last = Object.keys(day["all"]||{}).sort().pop();
+  document.getElementById("stamp").textContent = last ? "данные по " + last.split("-").reverse().join(".") : "данных нет";
+  var y = day["mkt.leads"][iso(yesterday)] || 0;
+  var w = sum(day,"mkt.leads",wkStart,yesterday), wp = sum(day,"mkt.leads",wkPrevStart,wkPrevEnd);
+  var mt = sum(day,"mkt.leads",monthStart,yesterday), mp = sum(day,"mkt.leads",pmStart,pmEnd);
+  var allM = sum(day,"all",monthStart,yesterday), allP = sum(day,"all",pmStart,pmEnd);
+  var share = pct(mt, allM), shareP = pct(mp, allP);
+  document.getElementById("kpis").innerHTML =
+    '<div class="kpi"><span class="nm">Лиды источника</span><span class="v">' + y + ' <span class="plan">вчера</span></span>'
+    + '<span class="row"><span>неделя ' + dmy(wkStart) + '—' + dmy(yesterday) + '</span><b>' + w + delta(w, wp) + '</b></span>'
+    + '<span class="row"><span>месяц по ' + dmy(yesterday) + '</span><b>' + mt + delta(mt, mp) + '</b></span><span class="plan">план не задан</span></div>'
+    + '<div class="kpi"><span class="nm">Доля от всех лидов</span><span class="v">' + fmtPct(share) + ' <span class="plan">месяц</span></span>'
+    + '<span class="row"><span>прошлый месяц</span><b>' + fmtPct(shareP) + '</b></span><span class="row"><span>всего лидов за месяц</span><b>' + allM + '</b></span></div>'
+    + kpi3("l1.booked","Назначено диагностик","встреча назначена",day) + kpi3("l2.sales","Продажи","прислали чек",day);
+  var L = mt, B = sum(day,"l1.booked",monthStart,yesterday), H = sum(day,"l2.held",monthStart,yesterday), S = sum(day,"l2.sales",monthStart,yesterday);
+  document.getElementById("funnel-sub").textContent = "месяц, с " + dmy(monthStart) + " по " + dmy(yesterday);
+  document.getElementById("funnel").innerHTML =
+    '<div class="step"><div class="nm">Лиды</div><div class="v">' + L + '</div><div class="cr">источник «' + esc(SRC) + '»</div></div>'
+    + '<div class="step"><div class="nm">Назначено</div><div class="v">' + B + '</div><div class="cr">лид → встреча <b>' + fmtPct(pct(B,L)) + '</b></div></div>'
+    + '<div class="step"><div class="nm">Проведено</div><div class="v">' + H + '</div><div class="cr">назначено → проведено <b>' + fmtPct(pct(H,B)) + '</b></div></div>'
+    + '<div class="step"><div class="nm">Продажи</div><div class="v">' + S + '</div><div class="cr">проведено → продажа <b>' + fmtPct(pct(S,H)) + '</b></div></div>';
+  var hasDown = Object.keys(day["l1.booked"]||{}).length || Object.keys(day["l2.held"]||{}).length;
+  document.getElementById("fnote").innerHTML = hasDown ? 'Конверсии по источнику считаются по датам событий за месяц, а не по когорте лидов: это грубая оценка, для точной когортной воронки нужна привязка каждой сделки к дате лида.' : 'Назначенные, проведённые и продажи в разрезе источника появятся после ближайшего ночного сбора.';
+  var weeks = [];
+  for (var k = 8; k >= 1; k--) { var s = addDays(wkStart,-7*k); weeks.push({ s: s, e: addDays(s,6), partial: false }); }
+  weeks.push({ s: wkStart, e: yesterday, partial: true });
+  document.getElementById("weeks").innerHTML = '<table><thead><tr><th>Неделя</th><th class="num">Лиды</th><th class="num">Доля</th><th class="num">Назнач.</th><th class="num">Провед.</th><th class="num">Продажи</th></tr></thead><tbody>'
+    + weeks.map(function(wk){ var l = sum(day,"mkt.leads",wk.s,wk.e), a = sum(day,"all",wk.s,wk.e);
+      return '<tr' + (wk.partial?' style="color:var(--gold)"':'') + '><td class="k">' + dmy(wk.s) + (wk.partial?' · идёт':'') + '</td><td class="num">' + l + '</td><td class="num">' + fmtPct(pct(l,a)) + '</td><td class="num">' + sum(day,"l1.booked",wk.s,wk.e) + '</td><td class="num">' + sum(day,"l2.held",wk.s,wk.e) + '</td><td class="num">' + sum(day,"l2.sales",wk.s,wk.e) + '</td></tr>'; }).join("")
+    + '</tbody></table>';
+  var series = [["mkt.leads","Лиды","var(--gold-b)"],["share","Доля, %","var(--blue-bar)"]];
+  weeks.forEach(function(wk){ wk["mkt.leads"] = sum(day,"mkt.leads",wk.s,wk.e); wk["share"] = pct(wk["mkt.leads"], sum(day,"all",wk.s,wk.e)) || 0; });
+  document.getElementById("trend").innerHTML = trendSvg(weeks, series);
+}
+function kpi3(id, name, sub, day){
+  var y = (day[id] && day[id][iso(yesterday)]) || 0, w = sum(day,id,wkStart,yesterday), wp = sum(day,id,wkPrevStart,wkPrevEnd), mt = sum(day,id,monthStart,yesterday), mp = sum(day,id,pmStart,pmEnd);
+  return '<div class="kpi"><span class="nm">' + name + ' <span class="plan">· ' + sub + '</span></span><span class="v">' + y + ' <span class="plan">вчера</span></span>'
+    + '<span class="row"><span>неделя</span><b>' + w + delta(w, wp) + '</b></span><span class="row"><span>месяц</span><b>' + mt + delta(mt, mp) + '</b></span></div>';
+}
+function trendSvg(weeks, series){
+  var W = 640, rowH = 64, padL = 96, padR = 14, padB = 22, H = rowH * series.length + padB;
+  var x = function(i){ return padL + (W - padL - padR) * (i + 0.5) / weeks.length; };
+  var out = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" role="img" aria-label="Тренд">';
+  series.forEach(function(sr, si){
+    var top = si * rowH, max = 1; weeks.forEach(function(w){ max = Math.max(max, w[sr[0]]); });
+    var y = function(v){ return top + 18 + (rowH - 30) * (1 - v / max); };
+    out += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + (top + rowH - 8) + '" y2="' + (top + rowH - 8) + '" stroke="var(--line-2)"/>'
+      + '<text x="' + (padL - 10) + '" y="' + (top + rowH/2 + 2) + '" font-size="12" fill="var(--dim)" text-anchor="end">' + sr[1] + '</text>'
+      + '<polyline points="' + weeks.map(function(w,i){ return x(i) + "," + y(w[sr[0]]); }).join(" ") + '" fill="none" stroke="' + sr[2] + '" stroke-width="2" stroke-linejoin="round"/>';
+    weeks.forEach(function(w,i){ out += '<circle cx="' + x(i) + '" cy="' + y(w[sr[0]]) + '" r="3" fill="' + sr[2] + '"' + (w.partial?' opacity=".5"':'') + '/><text x="' + x(i) + '" y="' + (y(w[sr[0]]) - 6) + '" font-size="10" fill="var(--dim)" text-anchor="middle">' + w[sr[0]] + (sr[0]==="share"?"%":"") + '</text>'; });
+  });
+  weeks.forEach(function(w,i){ out += '<text x="' + x(i) + '" y="' + (H - 6) + '" font-size="10.5" fill="' + (w.partial?'var(--gold)':'var(--faint)') + '" text-anchor="middle">' + dmy(w.s) + '</text>'; });
+  return out + '</svg>';
+}
+</script>
+<script src="/section-editor.js"></script>
+<script src="/nav.js"></script>
+</body>
+</html>

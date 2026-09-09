@@ -89,8 +89,8 @@ export async function currentUser(request, env) {
 
 // ---------- права по разделам ----------
 // дерево разделов: подраздел наследует уровень отдела, если своей строки нет
-export const SECTIONS = ["hub", "sales", "sales.l1", "sales.l2", "sales.l2.okk", "marketing", "guide", "status", "users"];
-const PARENT = { "sales.l1": "sales", "sales.l2": "sales", "sales.l2.okk": "sales.l2" };
+export const SECTIONS = ["hub", "sales", "sales.l1", "sales.l2", "sales.l2.okk", "marketing", "marketing.instagram", "marketing.telegram", "marketing.influence", "marketing.youtube", "marketing.fb", "marketing.sitechat", "marketing.site", "guide", "status", "users"];
+const PARENT = { "sales.l1": "sales", "sales.l2": "sales", "sales.l2.okk": "sales.l2", "marketing.instagram": "marketing", "marketing.telegram": "marketing", "marketing.influence": "marketing", "marketing.youtube": "marketing", "marketing.fb": "marketing", "marketing.sitechat": "marketing", "marketing.site": "marketing" };
 
 export async function loadPerms(env, login, sectionsCsv) {
   const rows = await env.DB.prepare("SELECT section, level FROM perms WHERE login = ?").bind(login).all();
@@ -131,6 +131,8 @@ export function sectionOf(pathname) {
   if (p.startsWith("/sales/l2")) return "sales.l2";
   if (p.startsWith("/sales/l1")) return "sales.l1";
   if (p.startsWith("/sales")) return "sales";
+  const mk = /^\/marketing\/([a-z]+)/.exec(p);
+  if (mk) return "marketing." + mk[1];
   if (p.startsWith("/marketing")) return "marketing";
   if (p === "/guide") return "guide";
   if (p === "/status") return "status";

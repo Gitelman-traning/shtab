@@ -168,7 +168,7 @@ Promise.all([
   if (!res[0].ok) { document.getElementById("l1").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span></div>'; return; }
   var day = {}; res[0].rows.forEach(function(r){ (day[r.metric] = day[r.metric] || {})[r.period] = r.value; });
   var mgr = {};  // manager → {metric → {date → value}}
-  res[1].rows.forEach(function(r){ if (!r.dim) return; ((mgr[r.dim] = mgr[r.dim] || {})[r.metric] = mgr[r.dim][r.metric] || {})[r.period] = r.value; });
+  res[1].rows.forEach(function(r){ if (!r.dim || r.dim.indexOf("src:") === 0) return; ((mgr[r.dim] = mgr[r.dim] || {})[r.metric] = mgr[r.dim][r.metric] || {})[r.period] = r.value; });
   render(day, mgr);
 });
 

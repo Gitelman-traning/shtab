@@ -119,20 +119,24 @@ def deal_points(values, day_from, day_to):
             if funnel == lead_funnel:
                 add("mkt.leads", lead_d)
                 add("mkt.leads", lead_d, cell(r, c["source"]) or "без источника")
+        source = cell(r, c["source"]) or "без источника"
         if funnel == lead_funnel:
             booked_d = parse_date(cell(r, c["booked_date"]))
             if in_range(booked_d):
                 add("l1.booked", booked_d)
+                add("l1.booked", booked_d, "src:" + source)
         if not first_line:
             manager = cell(r, c["manager"]) or "без ответственного"
             held_d = parse_date(cell(r, c["held_date"]))
             if in_range(held_d):
                 add("l2.held", held_d)
                 add("l2.held", held_d, manager)
+                add("l2.held", held_d, "src:" + source)
             sale_d = parse_date(cell(r, c["sale_date"]))
             if in_range(sale_d):
                 add("l2.sales", sale_d)
                 add("l2.sales", sale_d, manager)
+                add("l2.sales", sale_d, "src:" + source)
 
     # дни без событий тоже пишем нулём — иначе на графике дыра выглядит как «нет данных»
     points = []

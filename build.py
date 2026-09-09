@@ -120,7 +120,7 @@ VIT_JS = r"""
   Promise.all([api("metric=l2.held,l2.sales&ptype=day&dim=&from="+iso(from)+"&to="+iso(y)),api("metric=l2.held,l2.sales&ptype=day&from="+iso(h8)+"&to="+iso(y))]).then(function(res){
     if(!res[0].ok){document.getElementById("vit-kpis").innerHTML='<div class="kpi"><span class="k">Витрина недоступна</span></div>';return}
     var day={};res[0].rows.forEach(function(r){(day[r.metric]=day[r.metric]||{})[r.period]=r.value});
-    var mgr={};res[1].rows.forEach(function(r){if(!r.dim)return;((mgr[r.dim]=mgr[r.dim]||{})[r.metric]=mgr[r.dim][r.metric]||{})[r.period]=r.value});
+    var mgr={};res[1].rows.forEach(function(r){if(!r.dim||r.dim.indexOf("src:")===0)return;((mgr[r.dim]=mgr[r.dim]||{})[r.metric]=mgr[r.dim][r.metric]||{})[r.period]=r.value});
     var H=sum(day,"l2.held",ms,y),S=sum(day,"l2.sales",ms,y),Hw=sum(day,"l2.held",wk,y),Sw=sum(day,"l2.sales",wk,y);
     var hist=[];for(var i=1;i<=8;i++){var s=addDays(wk,-7*i),e=addDays(s,6);var hh=sum(day,"l2.held",s,e),ss=sum(day,"l2.sales",s,e);if(hh)hist.push(100*ss/hh)}
     var norm=hist.length?Math.round(hist.reduce(function(a,b){return a+b},0)/hist.length):null;
@@ -159,7 +159,20 @@ def build_okk():
     return tmp
 
 
+SOURCES = [('instagram', 'Инстаграм smm', 'Instagram SMM'), ('telegram', 'Телеграм канал', 'Телеграм-канал'), ('influence', 'Интеграции', 'Инфлюенс (интеграции)'), ('youtube', 'YouTube', 'YouTube'), ('fb', 'Реклама FB', 'Реклама FB'), ('sitechat', 'GitelmanSiteChat', 'Чат на сайте'), ('site', 'Сайт', 'Сайт')]
+
+
+def build_sources():
+    """Страницы источников маркетинга из одного шаблона."""
+    tpl = rd(os.path.join(HERE, "site", "src", "source.tpl.html"))
+    for slug, src, title in SOURCES:
+        page = tpl.replace("{{SRC}}", src).replace("{{TITLE}}", title).replace("{{SLUG}}", slug).replace("{{SECTION}}", "marketing." + slug)
+        wr(os.path.join(PUB, "marketing", slug, "index.html"), page)
+    print("источники маркетинга: %d страниц" % len(SOURCES))
+
+
 def main():
+    build_sources()
     tmp = build_okk()
     moves = {  # файл сборки ОКК → адрес на сайте
         "meetings.html": "sales/l2/meetings.html",

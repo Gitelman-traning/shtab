@@ -23,7 +23,14 @@
       ] }
     ] },
     { id: "mkt", name: "Маркетинг", icon: I.mkt, href: "/marketing/", sec: "marketing", children: [
-      { name: "Лиды и источники", href: "/marketing/", sec: "marketing" }
+      { name: "Сводка по источникам", href: "/marketing/", sec: "marketing" },
+      { name: "Instagram SMM", href: "/marketing/instagram/", sec: "marketing.instagram" },
+      { name: "Телеграм-канал", href: "/marketing/telegram/", sec: "marketing.telegram" },
+      { name: "Инфлюенс (интеграции)", href: "/marketing/influence/", sec: "marketing.influence" },
+      { name: "YouTube", href: "/marketing/youtube/", sec: "marketing.youtube" },
+      { name: "Реклама FB", href: "/marketing/fb/", sec: "marketing.fb" },
+      { name: "Чат на сайте", href: "/marketing/sitechat/", sec: "marketing.sitechat" },
+      { name: "Сайт", href: "/marketing/site/", sec: "marketing.site" }
     ] },
     { id: "help", name: "Справка", icon: I.help, children: [
       { name: "Гайд и вопросы", href: "/guide", icon: I.help, sec: "guide" },

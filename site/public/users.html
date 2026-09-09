@@ -123,16 +123,17 @@ var SECTIONS=[];   // [{id,name}] — из /api/sections
 var RTREE=[
   {id:"hub",name:"Общий экран"},
   {id:"sales",name:"Отдел продаж",children:[{id:"sales.l1",name:"Первая линия"},{id:"sales.l2",name:"Вторая линия",children:[{id:"sales.l2.okk",name:"Встречи · Менеджеры · Сверка (ОКК)"}]}]},
-  {id:"marketing",name:"Маркетинг"},
+  {id:"marketing",name:"Маркетинг",children:[{id:"marketing.instagram",name:"Instagram SMM"},{id:"marketing.telegram",name:"Телеграм-канал"},{id:"marketing.influence",name:"Инфлюенс (интеграции)"},{id:"marketing.youtube",name:"YouTube"},{id:"marketing.fb",name:"Реклама FB"},{id:"marketing.sitechat",name:"Чат на сайте"},{id:"marketing.site",name:"Сайт"}]},
   {id:"guide",name:"Гайд и вопросы"},
   {id:"status",name:"Витрина"}
 ];
-var PARENT={"sales.l1":"sales","sales.l2":"sales","sales.l2.okk":"sales.l2"};
+var PARENT={"sales.l1":"sales","sales.l2":"sales","sales.l2.okk":"sales.l2","marketing.instagram":"marketing","marketing.telegram":"marketing","marketing.influence":"marketing","marketing.youtube":"marketing","marketing.fb":"marketing","marketing.sitechat":"marketing","marketing.site":"marketing"};
 var PRESETS=[
   ["Смотрит всё",{"hub":1,"sales":1,"marketing":1,"guide":1,"status":1}],
   ["Руководитель Первой линии",{"hub":1,"sales":1,"sales.l1":2,"marketing":1,"guide":1,"status":1}],
   ["Руководитель Второй линии",{"hub":1,"sales":1,"sales.l2":2,"marketing":1,"guide":1,"status":1}],
   ["Маркетинг",{"hub":1,"sales":1,"marketing":2,"guide":1,"status":1}],
+  ["Инфлюенс",{"hub":1,"sales":1,"marketing":1,"marketing.influence":2,"guide":1,"status":1}],
   ["Только своя линия (1-я)",{"hub":1,"sales":0,"sales.l1":2,"marketing":0,"guide":1,"status":0}],
   ["Всё закрыть",{"hub":0,"sales":0,"marketing":0,"guide":0,"status":0}]
 ];
