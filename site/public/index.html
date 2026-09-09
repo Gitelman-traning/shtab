@@ -83,17 +83,23 @@ td.k{color:var(--dim)} tr.tot td{font-weight:600;background:var(--zebra)}
 .tag.paid{background:var(--gold-soft);color:var(--gold)} .tag.org{background:var(--ok-bg);color:var(--ok)}
 @media (min-width:1101px){.grid2.eq{grid-template-columns:1fr 1fr}}
 .ladder{display:flex;flex-direction:column;font-size:12.5px}
-.ladder .st{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:8px}
-.ladder .tr{position:relative;height:10px;border-radius:5px;background:var(--soft);overflow:hidden;margin-top:5px}
-.ladder .tr .fx{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--gold-a);opacity:.55}
-.ladder .tr .fx.ok{background:var(--ok-bar)} .ladder .tr .fx.bad{background:var(--bad-bar)}
-.ladder .tr .fc{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--gold-b)}
-.ladder .r{text-align:right;color:var(--dim);font-variant-numeric:tabular-nums} .ladder .r b{color:var(--ink)}
-.ladder .r .fx{font-size:11.5px;margin-left:6px} .ladder .r .fx.ok b{color:var(--ok)} .ladder .r .fx.bad b{color:var(--bad)}
-.ladder .cv{font-size:11px;color:var(--faint);margin-top:3px} .ladder .cv b{color:var(--dim);font-weight:500}
+.ladder .st{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:10px}
+.ladder .tr{position:relative;height:12px;border-radius:6px;background:var(--soft);margin:22px 0 26px}
+.ladder .tr .fc{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--gold-b)}
+.ladder .tr .cap{position:absolute;top:-16px;font-size:10.5px;color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ladder .tr .cap b{color:var(--ink);font-weight:600} .ladder .tr .cap.l{left:0} .ladder .tr .cap.e{right:0}
+.ladder .tr .mk{position:absolute;top:-4px;bottom:-4px;width:0;border-left:2px solid var(--gold-b)}
+.ladder .tr .mk.pace{border-left-style:dashed;border-left-color:var(--ink);opacity:.55}
+.ladder .tr .mk i{position:absolute;left:-1px;transform:translateX(-50%);bottom:-21px;font-size:10.5px;font-style:normal;white-space:nowrap;font-variant-numeric:tabular-nums;background:var(--soft);border:1px solid var(--gold-b);border-radius:9px;padding:1px 7px;color:var(--gold)}
+.ladder .tr .mk i b{color:var(--gold);font-weight:600}
+.ladder .tr .mk.pace i{bottom:auto;top:-21px;border-color:var(--line-2);color:var(--ink);opacity:1}
+.ladder .tr .mk.pace i b{color:var(--ink)}
+.ladder .tr .mk.pace.near i{transform:none;left:6px}
+.ladder .cv{font-size:11px;color:var(--faint);margin-top:0} .ladder .cv b{color:var(--dim);font-weight:500}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:2px 0 12px}
 .legend i{display:inline-block;width:12px;height:8px;border-radius:4px;margin-right:5px;vertical-align:1px}
-.legend .lp{background:var(--soft);border:1px solid var(--line-2)} .legend .lf{background:var(--gold-b)} .legend .lx{background:var(--ok-bar);opacity:.55} .legend .lxb{background:var(--bad-bar);opacity:.55}
+.legend .lp{background:var(--soft);border:1px solid var(--line-2)} .legend .lf{background:var(--gold-b)}
+.legend .lm{width:0;height:12px;border-radius:0;border-left:2px solid var(--gold-b);vertical-align:-2px} .legend .lm.pace{border-left-style:dashed;border-left-color:var(--ink);opacity:.55}
 .funnel{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:stretch}
 .step{background:var(--soft);border-radius:12px;padding:12px 14px;position:relative}
 .step .nm{font-size:12px;color:var(--dim)} .step .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
@@ -133,7 +139,7 @@ footer{padding:8px 24px 30px;font-size:12px;color:var(--faint)}
     <div class="card"><h2>Участники по потокам <small id="pay-sub"></small></h2><div id="pay"></div></div>
   </div>
   <div class="grid2 eq" id="plan-ladder">
-    <div class="card"><h2>Воронка план / факт · Первая линия <small id="pl1-sub"></small></h2><div class="legend"><span><i class="lp"></i>план на месяц</span><span><i class="lf"></i>факт</span><span><i class="lx"></i>прогноз на конец месяца при текущем темпе</span><span><i class="lxb"></i>прогноз ниже плана</span></div><div class="ladder" id="pl1"></div></div>
+    <div class="card"><h2>Воронка план / факт · Первая линия <small id="pl1-sub"></small></h2><div class="legend"><span><i class="lp"></i>план на месяц</span><span><i class="lf"></i>факт</span><span><i class="lm pace"></i>план на сегодня</span><span><i class="lm"></i>прогноз на конец месяца при текущем темпе (факт в день × дней в месяце)</span></div><div class="ladder" id="pl1"></div></div>
     <div class="card"><h2>Вторая линия <small id="pl2-sub"></small></h2><div class="legend"><span>от назначения на диагностику до чека</span></div><div class="ladder" id="pl2"></div></div>
   </div>
   <div class="grid2">
@@ -221,11 +227,13 @@ function renderPlan(res){
     var rows = FUN.filter(function(s){ return s[2] === line && (fact[s[0]] != null || plan[s[0]] != null); });
     document.getElementById("pl" + line).innerHTML = rows.map(function(s, i){
       var f = fact[s[0]] || 0, p = plan[s[0]] || 0, fx = Math.round(f / done * dim);
-      var scale = Math.max(p, fx, 1), pw = 100 * p / scale, fw = 100 * f / scale, xw = 100 * fx / scale;
-      var k = p ? (fx >= p ? "ok" : "bad") : "";
+      var scale = Math.max(p, fx, 1), pw = 100 * p / scale, fw = 100 * f / scale, xw = 100 * fx / scale, tw = 100 * (p * done / dim) / scale;
+      var k = "";
       // серый трек = масштаб (план или прогноз, что больше); поверх — прогноз и факт, риска = план
-      var h = '<div class="st"><div>' + s[1] + '</div><div class="r"><b>' + f + '</b> / ' + (p || "—") + '<span class="fx ' + k + '">прогноз <b>' + fx + '</b>' + (p ? ' · ' + Math.round(100 * fx / p) + '% плана' : '') + '</span></div></div>'
-        + '<div class="tr"><div class="fx ' + k + '" style="width:' + xw.toFixed(1) + '%"></div><div class="fc" style="width:' + fw.toFixed(1) + '%"></div>' + (p && pw < 100 ? '<div style="position:absolute;left:' + pw.toFixed(1) + '%;top:0;bottom:0;border-left:2px solid var(--ink);opacity:.5"></div>' : '') + '</div>';
+      var h = '<div class="st"><div>' + s[1] + '</div></div>'
+        + '<div class="tr"><span class="cap l">факт <b>' + f + '</b></span><span class="cap e">план ' + (p || "—") + '</span><div class="fc" style="width:' + fw.toFixed(1) + '%"></div>'
+        + (p ? '<div class="mk pace' + (tw < 14 ? ' near' : '') + '" style="left:' + tw.toFixed(1) + '%"><i>план на сегодня <b>' + Math.round(p * done / dim) + '</b></i></div>' : '')
+        + '<div class="mk" style="left:' + Math.min(xw, 100).toFixed(1) + '%"><i>прогноз <b>' + fx + '</b>' + (p ? ' · ' + Math.round(100 * fx / p) + '% плана' : '') + '</i></div></div>';
       if (i < rows.length - 1) { var n = rows[i + 1], nf = fact[n[0]] || 0, np = plan[n[0]] || 0; h += '<div class="cv">↓ конверсия факт <b>' + (f ? Math.round(100 * nf / f) + '%' : '—') + '</b> · план <b>' + (p ? Math.round(100 * np / p) + '%' : '—') + '</b></div>'; }
       return h;
     }).join("") || '<p class="empty">нет данных</p>';
