@@ -286,6 +286,59 @@ def participants_points(values, today):
     return points
 
 
+# ---------- воронка план/факт: лист «Общ экран» (план на месяц и факт по ступеням) ----------
+
+def norm_label(s):
+    return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+
+def num(s):
+    s = (s or "").replace("\xa0", "").replace(" ", "").replace(",", ".").rstrip("%")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def plan_points(values, today):
+    """Возвращает (points, plans): факт ступеней воронки как месячный снимок, план — в таблицу планов."""
+    pl = LAYOUT.get("plan")
+    if not pl:
+        return [], []
+    sheet = pl.get("sheet_id") or LAYOUT["sheet_id"]
+    rows = read(values, sheet, "'%s'!A%d:%s" % (pl["tab"], pl.get("first_row", 1), pl.get("last_col", "H")))
+    c_plan, c_fact, c_label = col_index(pl["plan_col"]), col_index(pl["fact_col"]), col_index(pl.get("label_col", "A"))
+    # месяц: ячейка с датой начала (например G2 «01.09.26»)
+    m = None
+    mc = pl.get("month_cell")
+    if mc:
+        mm = re.match(r"([A-Z]+)(\d+)", mc)
+        r_i, c_i = int(mm.group(2)) - pl.get("first_row", 1), col_index(mm.group(1))
+        d = parse_date(cell(rows[r_i], c_i)) if 0 <= r_i < len(rows) else None
+        if d:
+            m = d.strftime("%Y-%m")
+    if not m:
+        m = today.strftime("%Y-%m")
+    wanted = {k: v for k, v in pl["rows"].items()}   # "1|кол-во лидов" → metric
+    line, points, plans, asof = "", [], [], today.isoformat()
+    for r in rows:
+        lab = cell(r, c_label)
+        ml = re.match(r"^(\d)\s*лини", lab.strip().lower())
+        if ml:
+            line = ml.group(1)
+            continue
+        metric = wanted.get(line + "|" + norm_label(lab))
+        if not metric:
+            continue
+        f, pv = num(cell(r, c_fact)), num(cell(r, c_plan))
+        if f is not None:
+            points.append({"metric": metric, "ptype": "month", "period": m, "dim": "", "asof": asof, "value": f})
+        if pv is not None:
+            plans.append({"metric": metric, "ptype": "month", "period": m, "dim": "", "value": pv})
+    log("воронка план/факт за %s: факт %d, план %d ступеней" % (m, len(points), len(plans)))
+    return points, plans
+
+
 # ---------- отправка ----------
 
 def post(path, body):
@@ -295,15 +348,15 @@ def post(path, body):
     return r.json()
 
 
-def send(points, note):
+def send(points, note, plans=None):
     started = dt.datetime.utcnow().isoformat() + "Z"
     total = len(points)
-    for i in range(0, total, 500):
+    for i in range(0, max(total, 1), 500):
         chunk = points[i:i + 500]
         last = i + 500 >= total
         body = {"collector": "amo-sheet", "points": chunk}
         if last:
-            body.update({"finalize": True, "started": started, "total_points": total, "run_note": note})
+            body.update({"finalize": True, "started": started, "total_points": total, "run_note": note, "plans": plans or []})
         res = post("/api/ingest", body)
         log("отправлено %d/%d (записано %s)" % (min(i + 500, total), total, res.get("written")))
 
@@ -329,7 +382,8 @@ def main():
     pp = participants_points(values, today)
     log("точек по участникам: %d" % len(pp))
     ap = activity_points(values, day_from, day_to)
-    send(pts + pp + ap, "период %s—%s" % (day_from, day_to))
+    fp, plans = plan_points(values, today)
+    send(pts + pp + ap + fp, "период %s—%s" % (day_from, day_to), plans)
     log("ГОТОВО")
 
 

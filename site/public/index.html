@@ -81,6 +81,18 @@ tbody tr:last-child td{border-bottom:0} td.num,th.num{text-align:right;font-vari
 td.k{color:var(--dim)} tr.tot td{font-weight:600;background:var(--zebra)}
 .tag{font-size:10.5px;padding:2px 7px;border-radius:7px;background:var(--soft);color:var(--dim);margin-left:6px}
 .tag.paid{background:var(--gold-soft);color:var(--gold)} .tag.org{background:var(--ok-bg);color:var(--ok)}
+.grid2.eq{grid-template-columns:1fr 1fr}
+.ladder{display:grid;grid-template-columns:minmax(140px,1fr) 2fr auto;gap:2px 12px;align-items:center;font-size:12.5px}
+.ladder .tr{position:relative;height:10px;border-radius:5px;background:var(--soft);overflow:hidden}
+.ladder .tr .fx{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--gold-a);opacity:.55}
+.ladder .tr .fx.ok{background:var(--ok-bar)} .ladder .tr .fx.bad{background:var(--bad-bar)}
+.ladder .tr .fc{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--gold-b)}
+.ladder .r{text-align:right;white-space:nowrap;color:var(--dim);font-variant-numeric:tabular-nums} .ladder .r b{color:var(--ink)}
+.ladder .r .fx{display:block;font-size:11px} .ladder .r .fx.ok{color:var(--ok)} .ladder .r .fx.bad{color:var(--bad)}
+.ladder .cv{grid-column:1/-1;font-size:11px;color:var(--faint);margin:0 0 4px} .ladder .cv b{color:var(--dim);font-weight:500}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:2px 0 12px}
+.legend i{display:inline-block;width:12px;height:8px;border-radius:4px;margin-right:5px;vertical-align:1px}
+.legend .lp{background:var(--soft);border:1px solid var(--line-2)} .legend .lf{background:var(--gold-b)} .legend .lx{background:var(--ok-bar);opacity:.55} .legend .lxb{background:var(--bad-bar);opacity:.55}
 .funnel{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:stretch}
 .step{background:var(--soft);border-radius:12px;padding:12px 14px;position:relative}
 .step .nm{font-size:12px;color:var(--dim)} .step .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
@@ -118,6 +130,10 @@ footer{padding:8px 24px 30px;font-size:12px;color:var(--faint)}
   <div class="grid2">
     <div class="card"><h2>Воронка <small id="funnel-sub"></small></h2><div class="funnel" id="funnel"></div><p class="note" id="bottleneck"></p></div>
     <div class="card"><h2>Участники по потокам <small id="pay-sub"></small></h2><div id="pay"></div></div>
+  </div>
+  <div class="grid2 eq" id="plan-ladder">
+    <div class="card"><h2>Воронка план / факт · Первая линия <small id="pl1-sub"></small></h2><div class="legend"><span><i class="lp"></i>план на месяц</span><span><i class="lf"></i>факт</span><span><i class="lx"></i>прогноз на конец месяца при текущем темпе</span><span><i class="lxb"></i>прогноз ниже плана</span></div><div class="ladder" id="pl1"></div></div>
+    <div class="card"><h2>Вторая линия <small id="pl2-sub"></small></h2><div class="legend"><span>от назначения на диагностику до чека</span></div><div class="ladder" id="pl2"></div></div>
   </div>
   <div class="grid2">
     <div class="card"><h2>Тренд по неделям <small>8 полных недель + текущая</small></h2><div id="trend"></div></div>
@@ -175,7 +191,8 @@ var prevMonthStart = new Date(today.getFullYear(), today.getMonth()-1, 1);
 Promise.all([
   api("metric=mkt.leads,l1.leads,l1.booked,l2.held,l2.sales&ptype=day&dim=&from=" + iso(from < prevMonthStart ? from : prevMonthStart) + "&to=" + iso(yesterday)),
   api("metric=mkt.leads&ptype=day&from=" + iso(monthStart) + "&to=" + iso(yesterday)),
-  api("metric=pay.full,pay.prepaid,pay.bloggers,pay.participants,pay.receipts&ptype=potok")
+  api("metric=pay.full,pay.prepaid,pay.bloggers,pay.participants,pay.receipts&ptype=potok"),
+  api("metric=" + FUN.map(function(s){ return s[0]; }).join(",") + "&ptype=month&dim=&plans=1")
 ]).then(function(res){
   if (!res[0].ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span><span class="empty">Откройте страницу после входа по паролю.</span></div>'; return; }
   var day = {};      // metric → {date → value}
@@ -183,7 +200,36 @@ Promise.all([
   var srcRows = (res[1].rows || []).filter(function(r){ return r.dim; });
   var pay = res[2].rows || [];
   render(day, srcRows, pay);
+  renderPlan(res[3] || {});
 }).catch(function(e){ document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Ошибка загрузки</span><span class="empty">' + esc(e.message) + '</span></div>'; });
+
+var FUN = [["fun.l1.leads","Лиды",1],["fun.l1.reached","Дозвон / ответил",1],["fun.l1.q3","Ответили на 3 вопроса",1],["fun.l1.qual","Квалифицированы ЦА / УЦА",1],["fun.l1.booked","Назначено встреч",1],["fun.l1.confirmed","Подтверждено",1],["fun.l1.held","Проведено встреч",1],
+           ["fun.l2.booked","Назначено на диагностику",2],["fun.l2.held","Диагностика проведена",2],["fun.l2.committee","Заявка на комитет",2],["fun.l2.selected","Отбор проведён",2],["fun.l2.invoiced","Счёт отправлен",2],["fun.l2.paid","Прислал чек",2]];
+function renderPlan(res){
+  var fact = {}, plan = {}, period = "";
+  (res.rows || []).forEach(function(r){ if (!period || r.period > period) period = r.period; });
+  (res.rows || []).forEach(function(r){ if (r.period === period) fact[r.metric] = r.value; });
+  (res.plans || []).forEach(function(r){ if (r.period === period) plan[r.metric] = r.value; });
+  if (!period) { document.getElementById("pl1").innerHTML = '<p class="empty">план на месяц ещё не загружен</p>'; document.getElementById("pl2").innerHTML = ""; return; }
+  var y = +period.slice(0,4), mo = +period.slice(5,7) - 1, dim = new Date(y, mo + 1, 0).getDate();
+  var done = (y === today.getFullYear() && mo === today.getMonth()) ? Math.max(1, Math.min(dim, yesterday.getDate())) : dim;
+  var asof = ((res.rows || [])[0] || {}).asof || "";
+  var sub = MONTHS_N[mo] + " · факт по " + (asof ? asof.split("-").reverse().join(".") : "—") + " · прошло " + done + " из " + dim + " дней";
+  document.getElementById("pl1-sub").textContent = sub; document.getElementById("pl2-sub").textContent = sub;
+  [1, 2].forEach(function(line){
+    var rows = FUN.filter(function(s){ return s[2] === line && (fact[s[0]] != null || plan[s[0]] != null); });
+    document.getElementById("pl" + line).innerHTML = rows.map(function(s, i){
+      var f = fact[s[0]] || 0, p = plan[s[0]] || 0, fx = Math.round(f / done * dim);
+      var scale = Math.max(p, fx, 1), pw = 100 * p / scale, fw = 100 * f / scale, xw = 100 * fx / scale;
+      var k = p ? (fx >= p ? "ok" : "bad") : "";
+      // серый трек = масштаб (план или прогноз, что больше); поверх — прогноз и факт, риска = план
+      var h = '<div>' + s[1] + '</div><div class="tr"><div class="fx ' + k + '" style="width:' + xw.toFixed(1) + '%"></div><div class="fc" style="width:' + fw.toFixed(1) + '%"></div>' + (p && pw < 100 ? '<div style="position:absolute;left:' + pw.toFixed(1) + '%;top:0;bottom:0;border-left:2px solid var(--ink);opacity:.5"></div>' : '') + '</div>'
+        + '<div class="r"><b>' + f + '</b> / ' + (p || "—") + '<span class="fx ' + k + '">прогноз ' + fx + (p ? ' · ' + Math.round(100 * fx / p) + '% плана' : '') + '</span></div>';
+      if (i < rows.length - 1) { var n = rows[i + 1], nf = fact[n[0]] || 0, np = plan[n[0]] || 0; h += '<div class="cv">↓ конверсия факт <b>' + (f ? Math.round(100 * nf / f) + '%' : '—') + '</b> · план <b>' + (p ? Math.round(100 * np / p) + '%' : '—') + '</b></div>'; }
+      return h;
+    }).join("") || '<p class="empty">нет данных</p>';
+  });
+}
 
 function sum(metric, day, a, b){ var s = 0, d = new Date(a); while (d <= b) { s += (day[metric] && day[metric][iso(d)]) || 0; d = addDays(d,1); } return s; }
 

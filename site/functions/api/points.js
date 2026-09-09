@@ -1,6 +1,6 @@
 // GET /api/points?metric=mkt.leads,l1.booked&ptype=day&from=2026-08-01&to=2026-08-31&dim=
 // Возвращает сырые точки; недели и месяцы складываются на клиенте из дней.
-// Для stock-показателей (ptype=potok) без asof отдаёт последний снимок.
+// Для stock-показателей (ptype=potok/month) без asof отдаёт последний снимок. С &plans=1 добавляет планы из таблицы plans.
 import { json, bad, canRead } from "./_lib.js";
 
 export async function onRequestGet({ request, env }) {
@@ -31,5 +31,15 @@ export async function onRequestGet({ request, env }) {
     "SELECT metric, ptype, period, dim, asof, value, updated_at FROM points WHERE " + where.join(" AND ") +
     " ORDER BY period, dim LIMIT 20000"
   ).bind(...args).all();
-  return json({ ok: true, rows: rows.results || [] });
+  let plans = [];
+  if (u.searchParams.get("plans")) {
+    const pw = ["metric IN (" + metrics.map(() => "?").join(",") + ")", "ptype = ?"];
+    const pa = [...metrics, ptype];
+    if (from) { pw.push("period >= ?"); pa.push(from); }
+    if (to) { pw.push("period <= ?"); pa.push(to); }
+    if (dim !== null) { pw.push("dim = ?"); pa.push(dim); }
+    const pr = await env.DB.prepare("SELECT metric, ptype, period, dim, value FROM plans WHERE " + pw.join(" AND ") + " ORDER BY period, dim LIMIT 5000").bind(...pa).all();
+    plans = pr.results || [];
+  }
+  return json({ ok: true, rows: rows.results || [], plans });
 }

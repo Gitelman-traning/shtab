@@ -1,0 +1,2 @@
+-- Штаб, миграция 8 (09.09.2026): ступени воронки план/факт в данных общего экрана
+UPDATE sections SET config='{"metrics": ["mkt.leads", "l1.leads", "l1.booked", "l2.held", "l2.sales", "pay.full", "pay.prepaid", "pay.bloggers", "pay.participants", "pay.receipts", "fun.l1.leads", "fun.l1.reached", "fun.l1.q3", "fun.l1.qual", "fun.l1.booked", "fun.l1.confirmed", "fun.l1.held", "fun.l2.booked", "fun.l2.held", "fun.l2.committee", "fun.l2.selected", "fun.l2.invoiced", "fun.l2.paid"]}' WHERE id='hub';

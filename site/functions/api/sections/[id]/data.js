@@ -24,14 +24,16 @@ export async function onRequestGet({ request, env, params }) {
   const reg = await env.DB.prepare("SELECT id, name, unit, kind, definition FROM metrics WHERE id IN (" + metrics.map(() => "?").join(",") + ")").bind(...metrics).all();
   // снимки (участники по потокам): последний срез по каждому показателю
   const stock = await env.DB.prepare(
-    "SELECT metric, period, value, asof FROM points p WHERE ptype = 'potok' AND metric IN (" + metrics.map(() => "?").join(",") + ")" +
-    " AND asof = (SELECT MAX(asof) FROM points p2 WHERE p2.metric = p.metric AND p2.ptype = 'potok') ORDER BY metric, period"
+    "SELECT metric, period, value, asof FROM points p WHERE ptype IN ('potok','month') AND metric IN (" + metrics.map(() => "?").join(",") + ")" +
+    " AND asof = (SELECT MAX(asof) FROM points p2 WHERE p2.metric = p.metric AND p2.ptype = p.ptype) ORDER BY metric, period"
   ).bind(...metrics).all();
+  const plans = await env.DB.prepare("SELECT metric, ptype, period, dim, value FROM plans WHERE metric IN (" + metrics.map(() => "?").join(",") + ") ORDER BY period").bind(...metrics).all();
   // раздел одного источника: только его срез (лиды по dim = источник, воронка по dim = "src:источник") как итог ('' )
   let out = (rows.results || []).map((r) => [r.metric, r.period, r.dim, r.value]);
   if (cfg.dim) out = out.filter((r) => r[2] === cfg.dim || r[2] === "src:" + cfg.dim).map((r) => [r[0], r[1], "", r[3]]);
   return json({ ok: true, section: sec.id, name: sec.name, from: iso(from), to: iso(to), source: cfg.dim || null,
     metrics: reg.results || [], rows: out,
     stock: (stock.results || []).map((r) => [r.metric, r.period, r.value, r.asof]),
-    format: "rows: [metric, day YYYY-MM-DD, dim ('' = всего), value]; stock: [metric, месяц потока YYYY-MM или 'shortlist', value, дата снимка]" });
+    plans: (plans.results || []).map((r) => [r.metric, r.ptype, r.period, r.dim, r.value]),
+    format: "rows: [metric, day YYYY-MM-DD, dim ('' = всего), value]; stock: [metric, месяц YYYY-MM (поток или месяц воронки) или 'shortlist', value, дата снимка]; plans: [metric, ptype, period, dim, план]" });
 }
