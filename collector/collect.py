@@ -289,7 +289,8 @@ def participants_points(values, today):
 # ---------- воронка план/факт: лист «Общ экран» (план на месяц и факт по ступеням) ----------
 
 def norm_label(s):
-    return re.sub(r"\s+", " ", (s or "").strip().lower())
+    s = re.sub(r"\s+", " ", (s or "").strip().lower())
+    return s.replace("\u0441v", "cv").replace("\u0441\u0475", "cv")   # «СV» с кириллической С
 
 
 def num(s):
@@ -308,6 +309,7 @@ def plan_points(values, today):
     sheet = pl.get("sheet_id") or LAYOUT["sheet_id"]
     rows = read(values, sheet, "'%s'!A%d:%s" % (pl["tab"], pl.get("first_row", 1), pl.get("last_col", "H")))
     c_plan, c_fact, c_label = col_index(pl["plan_col"]), col_index(pl["fact_col"]), col_index(pl.get("label_col", "A"))
+    c_fb = col_index(pl["plan_fallback_col"]) if pl.get("plan_fallback_col") else None
     # месяц: ячейка с датой начала (например G2 «01.09.26»)
     m = None
     mc = pl.get("month_cell")
@@ -331,6 +333,8 @@ def plan_points(values, today):
         if not metric:
             continue
         f, pv = num(cell(r, c_fact)), num(cell(r, c_plan))
+        if pv is None and c_fb is not None:
+            pv = num(cell(r, c_fb))      # план не задан → средняя за год
         if f is not None:
             points.append({"metric": metric, "ptype": "month", "period": m, "dim": "", "asof": asof, "value": f})
         if pv is not None:

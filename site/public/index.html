@@ -96,6 +96,9 @@ td.k{color:var(--dim)} tr.tot td{font-weight:600;background:var(--zebra)}
 .ladder .tr .mk.pace i b{color:var(--ink)}
 .ladder .tr .mk.pace.near i{transform:none;left:6px}
 .ladder .cv{font-size:11px;color:var(--faint);margin-top:0} .ladder .cv b{color:var(--dim);font-weight:500} .ladder .cv b.ok{color:var(--ok);font-weight:600} .ladder .cv b.bad{color:var(--bad);font-weight:600}
+.thru{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
+.thru h3{margin:0 0 6px;font-size:12.5px;font-weight:600}.thru h3 small{font-weight:400;color:var(--dim);margin-left:6px}
+.thru svg{display:block;width:100%;height:auto;font-family:inherit}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:2px 0 12px}
 .legend i{display:inline-block;width:12px;height:8px;border-radius:4px;margin-right:5px;vertical-align:1px}
 .legend .lp{background:var(--soft);border:1px solid var(--line-2)} .legend .lf{background:var(--gold-b)}
@@ -199,7 +202,8 @@ Promise.all([
   api("metric=mkt.leads,l1.leads,l1.booked,l2.held,l2.sales&ptype=day&dim=&from=" + iso(from < prevMonthStart ? from : prevMonthStart) + "&to=" + iso(yesterday)),
   api("metric=mkt.leads&ptype=day&from=" + iso(monthStart) + "&to=" + iso(yesterday)),
   api("metric=pay.full,pay.prepaid,pay.bloggers,pay.participants,pay.receipts&ptype=potok"),
-  api("metric=fun.l1.leads,fun.l1.reached,fun.l1.q3,fun.l1.qual,fun.l1.booked,fun.l1.confirmed,fun.l1.held,fun.l2.booked,fun.l2.held,fun.l2.committee,fun.l2.selected,fun.l2.invoiced,fun.l2.paid&ptype=month&dim=&plans=1")
+  api("metric=fun.l1.leads,fun.l1.reached,fun.l1.q3,fun.l1.qual,fun.l1.booked,fun.l1.confirmed,fun.l1.held,fun.l2.booked,fun.l2.held,fun.l2.committee,fun.l2.selected,fun.l2.invoiced,fun.l2.paid,"
+    + "cv.l1.lead.q3,cv.l1.lead.qual,cv.l1.q3.booked,cv.l1.lead.booked,cv.l1.qual.held,cv.l1.booked.held,cv.l1.lead.held,cv.l2.committee.paid,cv.l2.held.paid,cv.l2.lead.paid&ptype=month&dim=&plans=1")
 ]).then(function(res){
   if (!res[0].ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span><span class="empty">Откройте страницу после входа по паролю.</span></div>'; return; }
   var day = {};      // metric → {date → value}
@@ -238,7 +242,33 @@ function renderPlan(res){
         h += '<div class="cv">↓ конверсия факт <b class="' + ck + '">' + (cf != null ? Math.round(cf) + '%' : '—') + '</b> · план <b>' + (cp != null ? Math.round(cp) + '%' : '—') + '</b></div>'; }
       return h;
     }).join("") || '<p class="empty">нет данных</p>';
+    document.getElementById("pl" + line).insertAdjacentHTML("beforeend", renderBrackets(line, fact, plan));
   });
+}
+// сквозная конверсия: скобки между несоседними ступенями (строки «CV … -> …» листа), компактный SVG под лестницей
+var STK = { 1: [["lead","fun.l1.leads","Лид"],["reached","fun.l1.reached","Дозвон / ответил"],["q3","fun.l1.q3","Ответили на 3 вопроса"],["qual","fun.l1.qual","ЦА / УЦА"],["booked","fun.l1.booked","Назначено"],["confirmed","fun.l1.confirmed","Подтверждено"],["held","fun.l1.held","Проведено"]],
+            2: [["lead","fun.l1.leads","Лид"],["booked","fun.l2.booked","Назначено на диагностику"],["held","fun.l2.held","Диагностика проведена"],["committee","fun.l2.committee","Заявка на комитет"],["selected","fun.l2.selected","Отбор проведён"],["invoiced","fun.l2.invoiced","Счёт отправлен"],["paid","fun.l2.paid","Прислал чек"]] };
+var THRU = { 1: [["lead","q3"],["lead","qual"],["q3","booked"],["lead","booked"],["qual","held"],["booked","held"],["lead","held"]], 2: [["committee","paid"],["held","paid"],["lead","paid"]] };
+function renderBrackets(line, fact, plan){
+  var S = STK[line], idx = {}; S.forEach(function(s, i){ idx[s[0]] = i; });
+  var pairs = THRU[line].map(function(q){
+    var id = "cv.l" + line + "." + q[0] + "." + q[1], f = fact[id], p = plan[id];
+    if (f == null) { var a = fact[S[idx[q[0]]][1]], b = fact[S[idx[q[1]]][1]]; f = a ? 100 * b / a : null; }   // нет строки в листе — считаем из ступеней
+    if (p == null) { var pa = plan[S[idx[q[0]]][1]], pb = plan[S[idx[q[1]]][1]]; p = pa ? 100 * pb / pa : null; }
+    return { a: idx[q[0]], b: idx[q[1]], f: f, p: p };
+  }).filter(function(x){ return x.f != null; }).sort(function(x, y){ return (x.b - x.a) - (y.b - y.a) || x.a - y.a; });
+  if (!pairs.length) return "";
+  var H = 24, NW = 150, X0 = NW + 34, STEP = 44, W = X0 + pairs.length * STEP + 8, fp = function(v){ return v == null ? "—" : (v >= 10 ? Math.round(v) : +v.toFixed(1)) + "%"; };
+  var s = '<svg viewBox="0 0 ' + W + ' ' + (S.length * H) + '" role="img" aria-label="Сквозная конверсия">';
+  S.forEach(function(st, i){ var y = i * H + H / 2;
+    s += '<text x="0" y="' + (y + 4) + '" font-size="11" fill="var(--ink)">' + esc(st[2]) + '</text><text x="' + (NW + 20) + '" y="' + (y + 4) + '" font-size="10.5" fill="var(--dim)" text-anchor="end">' + (fact[st[1]] != null ? Math.round(fact[st[1]]) : "—") + '</text>'
+      + '<line x1="' + (NW + 26) + '" x2="' + (W - 4) + '" y1="' + (y + H / 2) + '" y2="' + (y + H / 2) + '" stroke="var(--line)" stroke-width="1"/>'; });
+  pairs.forEach(function(q, k){ var x = X0 + k * STEP, y1 = q.a * H + H / 2, y2 = q.b * H + H / 2, col = (q.p == null) ? "var(--ink)" : (q.f >= q.p ? "var(--ok)" : "var(--bad)");
+    s += '<path d="M' + x + ' ' + y1 + ' h8 v' + (y2 - y1) + ' h-8" fill="none" stroke="var(--gold-b)" stroke-width="1.5"/>'
+      + '<circle cx="' + x + '" cy="' + y1 + '" r="2.3" fill="var(--dim)"/><circle cx="' + x + '" cy="' + y2 + '" r="2.3" fill="var(--dim)"/>'
+      + '<text x="' + (x + 12) + '" y="' + ((y1 + y2) / 2 + 1) + '" font-size="10.5" font-weight="600" fill="' + col + '">' + fp(q.f) + '</text>'
+      + '<text x="' + (x + 12) + '" y="' + ((y1 + y2) / 2 + 11) + '" font-size="8.5" fill="var(--faint)">план ' + fp(q.p) + '</text>'; });
+  return '<div class="thru"><h3>Сквозная конверсия<small>между несоседними ступенями · зелёным выше плана, красным ниже</small></h3>' + s + '</svg></div>';
 }
 
 function sum(metric, day, a, b){ var s = 0, d = new Date(a); while (d <= b) { s += (day[metric] && day[metric][iso(d)]) || 0; d = addDays(d,1); } return s; }
