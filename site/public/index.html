@@ -258,7 +258,7 @@ function renderBrackets(line, fact, plan){
     return { a: idx[q[0]], b: idx[q[1]], f: f, p: p };
   }).filter(function(x){ return x.f != null; }).sort(function(x, y){ return (x.b - x.a) - (y.b - y.a) || x.a - y.a; });
   if (!pairs.length) return "";
-  var H = 24, NW = 150, X0 = NW + 34, STEP = 44, W = X0 + pairs.length * STEP + 8, fp = function(v){ return v == null ? "—" : (v >= 10 ? Math.round(v) : +v.toFixed(1)) + "%"; };
+  var H = 24, NW = 150, X0 = NW + 34, STEP = 44, W = X0 + Math.max(pairs.length, 7) * STEP + 8, fp = function(v){ return v == null ? "—" : (v >= 10 ? Math.round(v) : +v.toFixed(1)) + "%"; };
   var s = '<svg viewBox="0 0 ' + W + ' ' + (S.length * H) + '" role="img" aria-label="Сквозная конверсия">';
   S.forEach(function(st, i){ var y = i * H + H / 2;
     s += '<text x="0" y="' + (y + 4) + '" font-size="11" fill="var(--ink)">' + esc(st[2]) + '</text><text x="' + (NW + 20) + '" y="' + (y + 4) + '" font-size="10.5" fill="var(--dim)" text-anchor="end">' + (fact[st[1]] != null ? Math.round(fact[st[1]]) : "—") + '</text>'
