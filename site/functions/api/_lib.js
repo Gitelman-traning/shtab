@@ -89,7 +89,7 @@ export async function currentUser(request, env) {
 
 // ---------- права по разделам ----------
 // дерево разделов: подраздел наследует уровень отдела, если своей строки нет
-export const SECTIONS = ["hub", "sales", "sales.l1", "sales.l2", "sales.l2.okk", "marketing", "marketing.instagram", "marketing.telegram", "marketing.influence", "marketing.youtube", "marketing.fb", "marketing.sitechat", "marketing.site", "guide", "status", "users"];
+export const SECTIONS = ["hub", "sales", "sales.l1", "sales.l2", "sales.l2.okk", "marketing", "marketing.instagram", "marketing.telegram", "marketing.influence", "marketing.youtube", "marketing.fb", "marketing.sitechat", "marketing.site", "guide", "status", "users", "tags"];
 const PARENT = { "sales.l1": "sales", "sales.l2": "sales", "sales.l2.okk": "sales.l2", "marketing.instagram": "marketing", "marketing.telegram": "marketing", "marketing.influence": "marketing", "marketing.youtube": "marketing", "marketing.fb": "marketing", "marketing.sitechat": "marketing", "marketing.site": "marketing" };
 
 export async function loadPerms(env, login, sectionsCsv) {
@@ -108,8 +108,8 @@ export function level(user, section) {
   if (!user) return 0;
   if (user.role === "admin" || user.login === "collector") return 2;
   if (user.role === "pending" || user.active === 0) return 0;
-  if (user.login === "shared") return section === "users" ? 0 : 1;   // общий пароль: смотрит всё
-  if (section === "users") return 0;
+  if (user.login === "shared") return (section === "users" || section === "tags") ? 0 : 1;   // общий пароль: смотрит всё
+  if (section === "users" || section === "tags") return 0;
   const p = user.perms || {};
   let s = section;
   while (s) { if (p[s] != null) return p[s]; s = PARENT[s] || null; }
@@ -137,6 +137,7 @@ export function sectionOf(pathname) {
   if (p === "/guide") return "guide";
   if (p === "/status") return "status";
   if (p === "/users") return "users";
+  if (p === "/tags") return "tags";
   return null;
 }
 

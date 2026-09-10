@@ -7,6 +7,7 @@
     mkt: '<svg viewBox="0 0 20 20"><path d="M3 8v4h3l6 4V4L6 8H3z" stroke-linejoin="round"/><path d="M15 7a4 4 0 010 6" stroke-linecap="round"/></svg>',
     help: '<svg viewBox="0 0 20 20"><path d="M4 4h5a2 2 0 012 2v10a2 2 0 00-2-2H4V4zM16 4h-5a2 2 0 00-2 2v10a2 2 0 012-2h5V4z" stroke-linejoin="round"/></svg>',
     db: '<svg viewBox="0 0 20 20"><ellipse cx="10" cy="5" rx="6" ry="2.4"/><path d="M4 5v10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4V5M4 10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4"/></svg>',
+    tag: '<svg viewBox="0 0 20 20"><path d="M3 4h6l8 8-6 6-8-8z" stroke-linejoin="round"/><circle cx="7" cy="8" r="1.2"/></svg>',
     users: '<svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2"/><path d="M4 17c.8-3.2 3.2-4.8 6-4.8s5.2 1.6 6 4.8" stroke-linecap="round"/></svg>',
     chev: '<svg class="chev" viewBox="0 0 20 20"><path d="M7 8l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
@@ -37,7 +38,8 @@
     { id: "help", name: "Справка", icon: I.help, children: [
       { name: "Гайд и вопросы", href: "/guide", icon: I.help, sec: "guide" },
       { name: "Витрина", href: "/status", icon: I.db, sec: "status" },
-      { name: "Пользователи", href: "/users", icon: I.users, admin: true, sec: "users" }
+      { name: "Пользователи", href: "/users", icon: I.users, admin: true, sec: "users" },
+      { name: "Теги", href: "/tags", icon: I.tag, admin: true, sec: "tags" }
     ] }
   ];
 

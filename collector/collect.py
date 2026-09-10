@@ -108,6 +108,34 @@ def deal_points(values, day_from, day_to):
         key = (metric, d.isoformat(), dim)
         counts[key] = counts.get(key, 0) + 1
 
+    # срезы источника по тегам и UTM: когорта по месяцу лида, все ступени сделки; последние 4 месяца
+    seg = {}      # (metric, month, dim) → n
+    seg_from = (day_to.replace(day=1) - dt.timedelta(days=95)).replace(day=1)
+    SEG_COLS = [("t", "tags"), ("s", "utm_source"), ("m", "utm_medium"), ("c", "utm_campaign")]
+    have_seg = all(k in c for _, k in SEG_COLS)
+
+    def add_seg(r, source, lead_d):
+        month = lead_d.strftime("%Y-%m")
+        flags = [("seg.leads", True),
+                 ("seg.answered", parse_date(cell(r, c["answered_date"])) is not None if "answered_date" in c else False),
+                 ("seg.q3", parse_date(cell(r, c["q3_date"])) is not None if "q3_date" in c else False),
+                 ("seg.qual", (parse_date(cell(r, c["qual_date"])) is not None if "qual_date" in c else False) or (parse_date(cell(r, c["qual2_date"])) is not None if "qual2_date" in c else False)),
+                 ("seg.booked", parse_date(cell(r, c["booked_date"])) is not None),
+                 ("seg.held", (parse_date(cell(r, c["held1_date"])) is not None if "held1_date" in c else False) or parse_date(cell(r, c["held_date"])) is not None),
+                 ("seg.sales", parse_date(cell(r, c["sale_date"])) is not None)]
+        dims = []
+        tags = [x.strip() for x in cell(r, c["tags"]).split(",") if x.strip()] or ["без тега"]
+        for x in tags:
+            dims.append(source + "|t|" + x)
+        for code, key in SEG_COLS[1:]:
+            dims.append(source + "|" + code + "|" + (cell(r, c[key]) or "не задан"))
+        for metric, ok in flags:
+            if not ok:
+                continue
+            for dim in dims:
+                k = (metric, month, dim)
+                seg[k] = seg.get(k, 0) + 1
+
     for r in rows:
         funnel = cell(r, c["funnel"])
         if not funnel:
@@ -131,6 +159,8 @@ def deal_points(values, day_from, day_to):
                 if in_range(h1):
                     add("l1m.held", h1, manager1)
         source = cell(r, c["source"]) or "без источника"
+        if funnel == lead_funnel and have_seg and lead_d is not None and lead_d >= seg_from and lead_d <= day_to:
+            add_seg(r, source, lead_d)
         if funnel == lead_funnel:
             booked_d = parse_date(cell(r, c["booked_date"]))
             if in_range(booked_d):
@@ -158,6 +188,9 @@ def deal_points(values, day_from, day_to):
         day += dt.timedelta(days=1)
     for (metric, period, dim), n in counts.items():
         points.append({"metric": metric, "ptype": "day", "period": period, "dim": dim, "value": n})
+    for (metric, period, dim), n in seg.items():
+        points.append({"metric": metric, "ptype": "month", "period": period, "dim": dim, "asof": "", "value": n})
+    log("срезов по тегам/UTM: %d точек (с %s)" % (len(seg), seg_from))
     return points
 
 

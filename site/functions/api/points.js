@@ -21,6 +21,8 @@ export async function onRequestGet({ request, env }) {
   if (from) { where.push("period >= ?"); args.push(from); }
   if (to) { where.push("period <= ?"); args.push(to); }
   if (dim !== null) { where.push("dim = ?"); args.push(dim); }
+  const dimlike = u.searchParams.get("dimlike");   // префикс среза, например «Сайт|t|%»
+  if (dimlike) { where.push("dim LIKE ?"); args.push(dimlike); }
   if (ptype !== "day") {
     if (asof) { where.push("asof = ?"); args.push(asof); }
     else {

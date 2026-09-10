@@ -6,6 +6,15 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Штаб · Маркетинг · YouTube</title>
 <link rel="stylesheet" href="/ui.css">
+<style>
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.g2{grid-template-columns:1fr}}
+.mini{font-size:12.5px}.mini h3{margin:0 0 2px;font-size:13.5px;font-weight:600}.mini h3 small{font-weight:400;color:var(--dim);font-size:12px;margin-left:6px}
+.mini .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:8px}.mini .row .r{color:var(--dim);white-space:nowrap}.mini .row .r b{color:var(--ink)}
+.mini .foot{margin-top:10px;font-size:11.5px;color:var(--faint)}
+.q{display:inline-block;min-width:42px;text-align:center;font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:7px}
+.q.ok{background:var(--ok-bg);color:var(--ok)}.q.bad{background:var(--bad-bg);color:var(--bad)}.q.mid{background:var(--soft);color:var(--dim)}
+.chip{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:7px;background:var(--mid-bg);color:var(--mid);margin-left:6px;vertical-align:1px}
+</style>
 </head>
 <body>
 <div class="layout">
@@ -25,6 +34,7 @@
 <main id="section-standard">
   <div class="kpis" id="kpis"></div>
   <div class="card"><h2>Воронка источника <small id="funnel-sub"></small></h2><div class="funnel" id="funnel"></div><p class="note" id="fnote"></p></div>
+  <div class="card" id="seg-cards"><h2>Срезы источника <small id="seg-sub"></small></h2><div class="g2" id="segs"><p class="empty">загрузка…</p></div><p class="note" id="seg-note"></p></div>
   <div class="grid2">
     <div class="card"><h2>По неделям <small>8 полных недель + текущая</small></h2><div id="weeks"></div></div>
     <div class="card"><h2>Тренд <small>лидов источника в неделю · доля от всех лидов</small></h2><div id="trend"></div></div>
@@ -95,6 +105,34 @@ function render(day){
   weeks.forEach(function(wk){ wk["mkt.leads"] = sum(day,"mkt.leads",wk.s,wk.e); wk["share"] = pct(wk["mkt.leads"], sum(day,"all",wk.s,wk.e)) || 0; });
   document.getElementById("trend").innerHTML = trendSvg(weeks, series);
 }
+// срезы источника: когорта по месяцу лида за последние 3 месяца, теги по справочнику и правилам раздела «Теги»
+(function(){
+  var m0 = new Date(today.getFullYear(), today.getMonth() - 2, 1), mFrom = m0.getFullYear() + "-" + String(m0.getMonth() + 1).padStart(2, "0");
+  Promise.all([
+    api("metric=seg.leads,seg.answered,seg.q3,seg.qual,seg.booked,seg.held,seg.sales&ptype=month&from=" + mFrom + "&dimlike=" + encodeURIComponent(SRC + "|%")),
+    fetch("/api/tags", { credentials: "same-origin" }).then(function(r){ return r.json(); }).catch(function(){ return {}; })
+  ]).then(function(res){
+    var rows = (res[0] && res[0].rows) || [], tg = res[1] || {}, rules = (tg.rules || []).map(function(r){ try { return new RegExp(r.pattern, "i"); } catch (e) { return null; } }).filter(Boolean), kinds = tg.kinds || {};
+    function isService(tag){ var k = kinds[tag] && kinds[tag].kind; if (k === "s") return true; if (k === "m") return false; return rules.some(function(re){ return re.test(tag); }); }
+    function isNew(tag){ return !(kinds[tag] && kinds[tag].kind) && !rules.some(function(re){ return re.test(tag); }); }
+    var by = {};   // code → name → {metric → value}
+    rows.forEach(function(r){ var m = /^[^|]*\|([tsmc])\|(.*)$/.exec(r.dim); if (!m) return; var o = (by[m[1]] = by[m[1]] || {}); (o[m[2]] = o[m[2]] || {})[r.metric] = ((o[m[2]] || {})[r.metric] || 0) + r.value; });
+    var tot = {}; Object.keys(by.s || {}).forEach(function(n){ var o = by.s[n]; Object.keys(o).forEach(function(k){ tot[k] = (tot[k] || 0) + o[k]; }); });
+    var avg = tot["seg.leads"] ? 100 * (tot["seg.held"] || 0) / tot["seg.leads"] : 0, hidden = 0;
+    function qc(v){ if (v == null) return "mid"; return v >= avg * 1.1 ? "ok" : v < avg * 0.85 ? "bad" : "mid"; }
+    function card(code, title){
+      var list = Object.keys(by[code] || {}).filter(function(n){ if (code === "t" && isService(n)) { hidden++; return false; } return true; })
+        .map(function(n){ var o = by[code][n]; return { n: n, l: o["seg.leads"] || 0, h: o["seg.held"] || 0, s: o["seg.sales"] || 0 }; }).sort(function(a, b){ return b.l - a.l; });
+      var max = list[0] ? list[0].l : 1;
+      return '<div class="mini"><h3>' + title + '<small>' + list.length + ' сегм.</small></h3>' + (list.length ? list.slice(0, 6).map(function(r){ var cv = r.l ? 100 * r.h / r.l : null;
+        return '<div class="row"><span>' + esc(r.n) + (code === "t" && isNew(r.n) ? '<span class="chip">новый</span>' : '') + '</span><span class="r"><b>' + r.l + '</b> лидов · ' + r.h + ' встреч' + (r.s ? ' · ' + r.s + ' чек' : '') + ' · <span class="q ' + qc(cv) + '">' + (cv == null ? "—" : Math.round(cv) + "%") + '</span></span></div><div class="bar"><i style="width:' + Math.round(100 * r.l / max) + '%"></i></div>'; }).join("") : '<p class="empty">нет данных</p>')
+        + (code === "t" && hidden ? '<div class="foot">скрыто служебных тегов: ' + hidden + ' · настраивается в разделе «Теги»</div>' : '') + '</div>';
+    }
+    document.getElementById("seg-sub").textContent = "когорта по месяцу лида · с " + dmy(m0) + " по " + dmy(yesterday) + " · лид → встреча по источнику " + Math.round(avg) + "%";
+    document.getElementById("segs").innerHTML = rows.length ? card("t", "Теги") + card("s", "utm_source") + card("m", "utm_medium") + card("c", "utm_campaign") : '<p class="empty">срезы появятся после ближайшего ночного сбора</p>';
+    document.getElementById("seg-note").textContent = rows.length ? "Ступени считаются по когорте: сделка относится к месяцу лида, встреча и чек засчитываются в него же, когда бы ни случились. «Не задан» — сделки без UTM. Зелёным — конверсия лид → встреча выше средней по источнику на 10%, красным — ниже на 15%." : "";
+  });
+})();
 function kpi3(id, name, sub, day){
   var y = (day[id] && day[id][iso(yesterday)]) || 0, w = sum(day,id,wkStart,yesterday), wp = sum(day,id,wkPrevStart,wkPrevEnd), mt = sum(day,id,monthStart,yesterday), mp = sum(day,id,pmStart,pmEnd);
   return '<div class="kpi"><span class="nm">' + name + ' <span class="plan">· ' + sub + '</span></span><span class="v">' + y + ' <span class="plan">вчера</span></span>'
