@@ -35,7 +35,7 @@
   <div class="kpis" id="kpis"></div>
   <p class="note" style="margin:-6px 0 0">Проценты в карточках — изменение к такому же прошлому периоду: у недели к прошлой неделе за те же дни, у месяца к прошлому месяцу по то же число.</p>
   <div class="card"><h2>Воронка источника <small id="funnel-sub"></small></h2><div class="funnel funnel5" id="funnel"></div><p class="note" id="fnote"></p></div>
-  <div class="card" id="seg-cards"><h2>Срезы источника <small id="seg-sub"></small></h2><div class="g2" id="segs"><p class="empty">загрузка…</p></div><p class="note" id="seg-note"></p></div>
+  <div class="card" id="seg-cards"><h2>{{SEG_TITLE}} <small id="seg-sub"></small></h2><div class="g2" id="segs"><p class="empty">загрузка…</p></div><p class="note" id="seg-note"></p></div>
   <div class="grid2">
     <div class="card"><h2>По неделям <small>8 полных недель + текущая</small></h2><div id="weeks"></div></div>
     <div class="card"><h2>Тренд <small>лидов источника в неделю · доля от всех лидов</small></h2><div id="trend"></div></div>
@@ -129,10 +129,10 @@ function render(day){
       return '<div class="mini"><h3>' + title + '<small>' + list.length + ' сегм.</small></h3>' + (list.length ? rowsHtml + (list.length > 6 ? '<div class="foot"><a class="more-tg" data-n="' + (list.length - 6) + '">ещё ' + (list.length - 6) + '</a></div>' : '') : '<p class="empty">нет данных</p>')
         + (code === "t" && hidden ? '<div class="foot">скрыто служебных тегов: ' + hidden + ' · настраивается в разделе «Теги»</div>' : '') + '</div>';
     }
-    document.getElementById("seg-sub").textContent = "когорта по месяцу лида · с " + dmy(m0) + " по " + dmy(yesterday) + " · лид → ЦА по источнику " + Math.round(avg) + "%";
+    document.getElementById("seg-sub").textContent = "лиды с " + dmy(m0) + " по " + dmy(yesterday) + " и что с ними стало · лид → ЦА по источнику " + Math.round(avg) + "%";
     document.getElementById("segs").innerHTML = rows.length ? card("t", "Теги") + card("s", "utm_source") + card("m", "utm_medium") + card("c", "utm_campaign") : '<p class="empty">срезы появятся после ближайшего ночного сбора</p>';
     document.querySelectorAll("#segs .more-tg").forEach(function(a){ a.onclick = function(){ var card = a.closest(".mini"), open = a.textContent.indexOf("ещё") === 0; card.querySelectorAll(".seg-row.more").forEach(function(r){ r.hidden = !open; }); a.textContent = open ? "свернуть" : "ещё " + a.dataset.n; }; });
-    document.getElementById("seg-note").textContent = rows.length ? "Ступени считаются по когорте: сделка относится к месяцу лида, встреча и чек засчитываются в него же, когда бы ни случились. «Не задан» — сделки без UTM. Процент — конверсия лид → ЦА: зелёным выше средней по источнику на 10%, красным ниже на 15%." : "";
+    document.getElementById("seg-note").textContent = rows.length ? "Считается по лидам: берутся сделки, вступившие в чат за период, и по каждой смотрится, дошла ли она до ЦА, встречи и чека, когда бы это ни случилось. «Не задан» — сделки без UTM. Процент — конверсия лид → ЦА: зелёным выше средней по источнику на 10%, красным ниже на 15%." : "";
   });
 })();
 function kpi3(id, name, sub, day){

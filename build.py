@@ -166,7 +166,7 @@ def build_sources():
     """Страницы источников маркетинга из одного шаблона."""
     tpl = rd(os.path.join(HERE, "site", "src", "source.tpl.html"))
     for slug, src, title in SOURCES:
-        page = tpl.replace("{{SRC}}", src).replace("{{TITLE}}", title).replace("{{SLUG}}", slug).replace("{{SECTION}}", "marketing." + slug)
+        page = tpl.replace("{{SRC}}", src).replace("{{TITLE}}", title).replace("{{SLUG}}", slug).replace("{{SECTION}}", "marketing." + slug).replace("{{SEG_TITLE}}", "Эффективность блогеров" if slug == "influence" else "Срезы источника")
         wr(os.path.join(PUB, "marketing", slug, "index.html"), page)
     print("источники маркетинга: %d страниц" % len(SOURCES))
 

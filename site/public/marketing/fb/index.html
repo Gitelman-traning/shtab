@@ -129,10 +129,10 @@ function render(day){
       return '<div class="mini"><h3>' + title + '<small>' + list.length + ' сегм.</small></h3>' + (list.length ? rowsHtml + (list.length > 6 ? '<div class="foot"><a class="more-tg" data-n="' + (list.length - 6) + '">ещё ' + (list.length - 6) + '</a></div>' : '') : '<p class="empty">нет данных</p>')
         + (code === "t" && hidden ? '<div class="foot">скрыто служебных тегов: ' + hidden + ' · настраивается в разделе «Теги»</div>' : '') + '</div>';
     }
-    document.getElementById("seg-sub").textContent = "когорта по месяцу лида · с " + dmy(m0) + " по " + dmy(yesterday) + " · лид → ЦА по источнику " + Math.round(avg) + "%";
+    document.getElementById("seg-sub").textContent = "лиды с " + dmy(m0) + " по " + dmy(yesterday) + " и что с ними стало · лид → ЦА по источнику " + Math.round(avg) + "%";
     document.getElementById("segs").innerHTML = rows.length ? card("t", "Теги") + card("s", "utm_source") + card("m", "utm_medium") + card("c", "utm_campaign") : '<p class="empty">срезы появятся после ближайшего ночного сбора</p>';
     document.querySelectorAll("#segs .more-tg").forEach(function(a){ a.onclick = function(){ var card = a.closest(".mini"), open = a.textContent.indexOf("ещё") === 0; card.querySelectorAll(".seg-row.more").forEach(function(r){ r.hidden = !open; }); a.textContent = open ? "свернуть" : "ещё " + a.dataset.n; }; });
-    document.getElementById("seg-note").textContent = rows.length ? "Ступени считаются по когорте: сделка относится к месяцу лида, встреча и чек засчитываются в него же, когда бы ни случились. «Не задан» — сделки без UTM. Процент — конверсия лид → ЦА: зелёным выше средней по источнику на 10%, красным ниже на 15%." : "";
+    document.getElementById("seg-note").textContent = rows.length ? "Считается по лидам: берутся сделки, вступившие в чат за период, и по каждой смотрится, дошла ли она до ЦА, встречи и чека, когда бы это ни случилось. «Не задан» — сделки без UTM. Процент — конверсия лид → ЦА: зелёным выше средней по источнику на 10%, красным ниже на 15%." : "";
   });
 })();
 function kpi3(id, name, sub, day){

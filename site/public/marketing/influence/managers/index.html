@@ -22,7 +22,7 @@ td.name{min-width:200px}
 <aside class="side" id="side"></aside>
 <div class="pane">
 <header>
-  <div><div class="crumbs">Маркетинг · Инфлюенс · <b>Менеджеры</b></div><h1>Менеджеры инфлюенса</h1><p class="sub">Интеграции с блогерами по менеджеру, который их ведёт: лиды, ЦА, назначено, проведено, чеки по каждой интеграции. Когорта по месяцу лида.</p></div>
+  <div><div class="crumbs">Маркетинг · Инфлюенс · <b>Менеджеры</b></div><h1>Менеджеры инфлюенса</h1><p class="sub">Интеграции с блогерами по менеджеру, который их ведёт: лиды, ЦА, назначено, проведено, чеки по каждой интеграции. Считается по лидам: взяты сделки, вступившие в чат за период, и по каждой смотрится, до чего она дошла.</p></div>
   <div class="spacer"></div>
   <div class="themer" role="group" aria-label="Тема оформления">
     <button type="button" data-set="auto" aria-pressed="true">Авто</button>
@@ -36,7 +36,7 @@ td.name{min-width:200px}
   <div class="seg" id="period"></div>
   <div class="kpis" id="kpis"></div>
   <div id="managers"></div>
-  <footer>Интеграция — тег сделки в amoCRM (например «7.07_Дмитрий_Фомин»), руководитель интеграции задаётся в разделе «Настройки → Теги». Ступени считаются по когорте: сделка относится к месяцу лида, ЦА, встреча и чек засчитываются в него же, когда бы ни случились. Служебные теги не показываются.</footer>
+  <footer>Интеграция — тег сделки в amoCRM (например «7.07_Дмитрий_Фомин»), руководитель интеграции задаётся в разделе «Настройки → Теги». Сделка относится к месяцу, когда лид вступил в чат; ЦА, встреча и чек засчитываются в этот же месяц, когда бы они ни случились. Служебные теги не показываются.</footer>
 </main>
 </div>
 </div>
@@ -54,7 +54,7 @@ Promise.all([
 ]).then(function(res){
   if (!res[0].ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span></div>'; return; }
   ROWS = res[0].rows || []; TG = res[1] || {};
-  document.getElementById("stamp").textContent = ROWS.length ? "когорты " + mname(MONTHS[0]) + " — " + mname(MONTHS[2]) + " · факт по " + dmy(yesterday) : "данных нет";
+  document.getElementById("stamp").textContent = ROWS.length ? "лиды " + mname(MONTHS[0]) + " — " + mname(MONTHS[2]) + " · факт по " + dmy(yesterday) : "данных нет";
   var el = document.getElementById("period");
   el.innerHTML = '<button data-p="all" aria-pressed="true">3 месяца</button>' + MONTHS.map(function(m){ return '<button data-p="' + m + '" aria-pressed="false">' + mname(m) + '</button>'; }).join("");
   el.querySelectorAll("button").forEach(function(b){ b.onclick = function(){ el.querySelectorAll("button").forEach(function(x){ x.setAttribute("aria-pressed", x === b); }); SEL = b.dataset.p; render(); }; });
