@@ -46,7 +46,7 @@
   <div class="card ref"><h2>Справочник тегов <small id="ref-sub"></small></h2>
     <div class="flt" id="flt"><button data-f="all" aria-pressed="true">Все</button><button data-f="new" aria-pressed="false">Новые</button><button data-f="m" aria-pressed="false">Маркетинговые</button><button data-f="s" aria-pressed="false">Служебные</button></div>
     <div class="wide" id="ref"></div>
-    <p class="note">Лиды считаются по когорте за последние четыре месяца по всем источникам. «Новый» — тег, который не размечен и не подошёл ни под одно правило: он показывается в срезах как маркетинговый, пока его не разметят.</p></div>
+    <p class="note">У тегов, встречающихся в «Интеграциях», столбец «Руководитель» — кто из менеджеров инфлюенса ведёт эту интеграцию; по нему собирается страница «Инфлюенс → Менеджеры». Лиды считаются по когорте за последние четыре месяца по всем источникам. «Новый» — тег, который не размечен и не подошёл ни под одно правило: он показывается в срезах как маркетинговый, пока его не разметят.</p></div>
   <footer>Признак тега един для всех источников. Изменения применяются сразу: страницы источников читают справочник и правила при каждой загрузке.</footer>
 </main>
 </div>
@@ -56,7 +56,7 @@
 function api(q){ return fetch("/api/points?" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
 function post(body){ return fetch("/api/tags", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function(r){ return r.json(); }); }
 var today = new Date(); var m0 = new Date(today.getFullYear(), today.getMonth() - 3, 1), mFrom = m0.getFullYear() + "-" + String(m0.getMonth() + 1).padStart(2, "0");
-var TAGS = [], RULES = [], KINDS = {}, FILTER = "all";
+var TAGS = [], RULES = [], KINDS = {}, FILTER = "all", OWNERS = [];
 function load(){
   return Promise.all([
     api("metric=seg.leads,seg.held&ptype=month&from=" + mFrom + "&dimlike=" + encodeURIComponent("%|t|%")),
@@ -64,6 +64,7 @@ function load(){
   ]).then(function(res){
     if (!res[1].ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">' + esc(res[1].error || "нет доступа") + '</span></div>'; return; }
     RULES = res[1].rules || []; KINDS = res[1].kinds || {};
+    OWNERS = ["Маша Кишко", "Настя Богоявленская"]; Object.keys(KINDS).forEach(function(k){ var o = KINDS[k].owner; if (o && OWNERS.indexOf(o) < 0) OWNERS.push(o); });
     var by = {};
     (res[0].rows || []).forEach(function(r){ var m = /^([^|]*)\|t\|(.*)$/.exec(r.dim); if (!m) return; var o = by[m[2]] = by[m[2]] || { tag: m[2], leads: 0, held: 0, src: {} };
       if (r.metric === "seg.leads") { o.leads += r.value; o.src[m[1]] = (o.src[m[1]] || 0) + r.value; } else o.held += r.value; });
@@ -74,7 +75,8 @@ function load(){
 }
 function reOf(p){ try { return new RegExp(p, "i"); } catch (e) { return null; } }
 function ruleHit(tag){ return RULES.some(function(r){ var re = reOf(r.pattern); return re && re.test(tag); }); }
-function status(tag){ var k = KINDS[tag] && KINDS[tag].kind; if (k) return k; return ruleHit(tag) ? "s-auto" : "new"; }
+function status(tag){ var k = KINDS[tag] && KINDS[tag].kind; if (k) return k; if (KINDS[tag] && KINDS[tag].owner) return "m"; return ruleHit(tag) ? "s-auto" : "new"; }
+// «Руководитель» — у тегов Инфлюенса: кто из менеджеров ведёт эту интеграцию; используется на странице /marketing/influence/managers
 function render(){
   var st = { m: 0, s: 0, "s-auto": 0, "new": 0 }; TAGS.forEach(function(t){ st[status(t.tag)]++; });
   document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Тегов в срезах</span><span class="v">' + TAGS.length + '</span><span class="row"><span>правил</span><b>' + RULES.length + '</b></span></div>'
@@ -85,12 +87,15 @@ function render(){
   document.querySelectorAll("#rules [data-del]").forEach(function(b){ b.onclick = function(){ if (!confirm("Удалить правило?")) return; post({ action: "rule_del", id: +b.dataset.del }).then(load); }; });
   var list = TAGS.filter(function(t){ var s = status(t.tag); return FILTER === "all" || (FILTER === "new" && s === "new") || (FILTER === "m" && (s === "m" || s === "new")) || (FILTER === "s" && (s === "s" || s === "s-auto")); });
   document.getElementById("ref-sub").textContent = list.length + " тегов · лиды за 4 месяца по всем источникам";
-  document.getElementById("ref").innerHTML = '<table><thead><tr><th>Тег</th><th class="num">Лиды</th><th class="num">Встречи</th><th>Где встречается</th><th>Сейчас</th><th>Разметка</th></tr></thead><tbody>'
+  document.getElementById("ref").innerHTML = '<table><thead><tr><th>Тег</th><th class="num">Лиды</th><th class="num">Встречи</th><th>Где встречается</th><th>Сейчас</th><th>Разметка</th><th>Руководитель</th></tr></thead><tbody>'
     + list.map(function(t){ var s = status(t.tag), k = KINDS[t.tag] || {};
       var now = s === "m" ? '<span class="chip m">маркетинг</span>' : s === "s" ? '<span class="chip">служебный</span>' : s === "s-auto" ? '<span class="chip">служебный · по правилу</span>' : '<span class="chip n">новый · показывается</span>';
       var srcs = Object.keys(t.src).sort(function(a, b){ return t.src[b] - t.src[a]; }).slice(0, 3).map(function(x){ return esc(x) + ' ' + t.src[x]; }).join(", ");
       return '<tr><td>' + esc(t.tag) + (k.set_by ? '<div style="font-size:11px;color:var(--faint)">' + esc(k.set_by) + ' · ' + esc((k.updated_at || "").slice(0, 10)) + '</div>' : '') + '</td><td class="num">' + t.leads + '</td><td class="num">' + t.held + '</td><td style="color:var(--dim);font-size:12px">' + srcs + '</td><td>' + now + '</td>'
-        + '<td class="act"><button data-t="' + esc(t.tag) + '" data-k="m" aria-pressed="' + (s === "m") + '">маркетинг</button><button class="s" data-t="' + esc(t.tag) + '" data-k="s" aria-pressed="' + (s === "s") + '">служебный</button>' + (k.kind ? '<button data-t="' + esc(t.tag) + '" data-k="">сброс</button>' : '') + '</td></tr>'; }).join("") + '</tbody></table>';
+        + '<td class="act"><button data-t="' + esc(t.tag) + '" data-k="m" aria-pressed="' + (s === "m") + '">маркетинг</button><button class="s" data-t="' + esc(t.tag) + '" data-k="s" aria-pressed="' + (s === "s") + '">служебный</button>' + (k.kind ? '<button data-t="' + esc(t.tag) + '" data-k="">сброс</button>' : '') + '</td>'
+        + '<td>' + (t.src["Интеграции"] ? '<select data-owner="' + esc(t.tag) + '"><option value="">—</option>' + OWNERS.map(function(o){ return '<option' + (k.owner === o ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join("") + '<option value="+">другой…</option></select>' : (k.owner ? esc(k.owner) : '')) + '</td></tr>'; }).join("") + '</tbody></table>';
+  document.querySelectorAll("#ref [data-owner]").forEach(function(s){ s.onchange = function(){ var v = s.value; if (v === "+") { v = prompt("Имя руководителя интеграции:") || ""; if (!v) { load(); return; } }
+    post({ action: "owner", tag: s.dataset.owner, owner: v }).then(function(r){ if (!r.ok) alert(r.error); load(); }); }; });
   document.querySelectorAll("#ref [data-k]").forEach(function(b){ b.onclick = function(){ post({ action: "kind", tag: b.dataset.t, kind: b.dataset.k }).then(function(r){ if (!r.ok) alert(r.error); load(); }); }; });
 }
 document.querySelectorAll("#flt button").forEach(function(b){ b.onclick = function(){ document.querySelectorAll("#flt button").forEach(function(x){ x.setAttribute("aria-pressed", x === b); }); FILTER = b.dataset.f; render(); }; });

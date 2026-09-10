@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Инфлюенс · Менеджеры</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.seg{display:inline-flex;background:var(--soft);border-radius:10px;padding:3px;margin:0 0 14px}
+.seg button{font:inherit;font-size:12px;background:none;border:0;color:var(--dim);padding:5px 11px;border-radius:7px;cursor:pointer}.seg button[aria-pressed="true"]{background:var(--card);color:var(--gold);font-weight:600}
+.q{display:inline-block;min-width:42px;text-align:center;font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:7px}
+.q.ok{background:var(--ok-bg);color:var(--ok)}.q.bad{background:var(--bad-bg);color:var(--bad)}.q.mid{background:var(--soft);color:var(--dim)}
+.mgr h2 .tot{font-weight:400;color:var(--dim);font-size:12.5px;margin-left:8px}
+.bar{height:8px;border-radius:4px;background:var(--soft);position:relative;overflow:hidden;margin-top:5px}.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--gold-b)}
+td.name{min-width:200px}
+.chip{font-size:10.5px;padding:1px 6px;border-radius:6px;background:var(--mid-bg);color:var(--mid);margin-left:6px;vertical-align:1px}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · Инфлюенс · <b>Менеджеры</b></div><h1>Менеджеры инфлюенса</h1><p class="sub">Интеграции с блогерами по менеджеру, который их ведёт: лиды, ЦА, назначено, проведено, чеки по каждой интеграции. Когорта по месяцу лида.</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<div id="section-editor" data-section="marketing.influence"></div>
+<main id="section-standard">
+  <div class="seg" id="period"></div>
+  <div class="kpis" id="kpis"></div>
+  <div id="managers"></div>
+  <footer>Интеграция — тег сделки в amoCRM (например «7.07_Дмитрий_Фомин»), руководитель интеграции задаётся в разделе «Настройки → Теги». Ступени считаются по когорте: сделка относится к месяцу лида, ЦА, встреча и чек засчитываются в него же, когда бы ни случились. Служебные теги не показываются.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+function api(q){ return fetch("/api/points?" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
+var today = new Date(); today.setHours(0,0,0,0); var yesterday = addDays(today, -1);
+var MONTHS = []; for (var k = 2; k >= 0; k--) { var d = new Date(today.getFullYear(), today.getMonth() - k, 1); MONTHS.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); }
+var MN = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+function mname(m){ return MN[+m.slice(5, 7) - 1]; }
+var SEL = "all", ROWS = [], TG = {};
+Promise.all([
+  api("metric=seg.leads,seg.qual,seg.booked,seg.held,seg.sales&ptype=month&from=" + MONTHS[0] + "&dimlike=" + encodeURIComponent("Интеграции|t|%")),
+  fetch("/api/tags", { credentials: "same-origin" }).then(function(r){ return r.json(); }).catch(function(){ return {}; })
+]).then(function(res){
+  if (!res[0].ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span></div>'; return; }
+  ROWS = res[0].rows || []; TG = res[1] || {};
+  document.getElementById("stamp").textContent = ROWS.length ? "когорты " + mname(MONTHS[0]) + " — " + mname(MONTHS[2]) + " · факт по " + dmy(yesterday) : "данных нет";
+  var el = document.getElementById("period");
+  el.innerHTML = '<button data-p="all" aria-pressed="true">3 месяца</button>' + MONTHS.map(function(m){ return '<button data-p="' + m + '" aria-pressed="false">' + mname(m) + '</button>'; }).join("");
+  el.querySelectorAll("button").forEach(function(b){ b.onclick = function(){ el.querySelectorAll("button").forEach(function(x){ x.setAttribute("aria-pressed", x === b); }); SEL = b.dataset.p; render(); }; });
+  render();
+});
+function render(){
+  var rules = (TG.rules || []).map(function(r){ try { return new RegExp(r.pattern, "i"); } catch (e) { return null; } }).filter(Boolean), kinds = TG.kinds || {};
+  function isService(tag){ var k = kinds[tag] && kinds[tag].kind; if (k === "s") return true; if (k === "m" || (kinds[tag] && kinds[tag].owner)) return false; return rules.some(function(re){ return re.test(tag); }); }
+  var by = {};
+  ROWS.forEach(function(r){ if (SEL !== "all" && r.period !== SEL) return; var tag = r.dim.split("|t|")[1]; if (tag == null || isService(tag)) return;
+    var o = by[tag] = by[tag] || { tag: tag, f: {} }; o.f[r.metric] = (o.f[r.metric] || 0) + r.value; });
+  var groups = {}, order = ["Маша Кишко", "Настя Богоявленская"];
+  Object.keys(by).forEach(function(tag){ var owner = (kinds[tag] && kinds[tag].owner) || ""; if (owner && order.indexOf(owner) < 0) order.push(owner); (groups[owner || "—"] = groups[owner || "—"] || []).push(by[tag]); });
+  order.push("—");
+  var T = {}; Object.keys(by).forEach(function(t){ Object.keys(by[t].f).forEach(function(m){ T[m] = (T[m] || 0) + by[t].f[m]; }); });
+  var avg = T["seg.leads"] ? Math.round(100 * (T["seg.qual"] || 0) / T["seg.leads"]) : 0;
+  function qc(v){ if (v == null) return "mid"; return v >= avg * 1.1 ? "ok" : v < avg * 0.85 ? "bad" : "mid"; }
+  var g = function(o, m){ return o.f[m] || 0; };
+  document.getElementById("kpis").innerHTML = order.filter(function(o){ return groups[o]; }).map(function(o){ var rows = groups[o], s = {}; rows.forEach(function(r){ Object.keys(r.f).forEach(function(m){ s[m] = (s[m] || 0) + r.f[m]; }); });
+    return '<div class="kpi"><span class="nm">' + (o === "—" ? "Без руководителя" : esc(o)) + ' <span class="plan">· ' + rows.length + ' интегр.</span></span><span class="v">' + (s["seg.leads"] || 0) + ' <span class="plan">лидов</span></span>'
+      + '<span class="row"><span>ЦА · лид → ЦА</span><b>' + (s["seg.qual"] || 0) + ' · ' + fmtPct(pct(s["seg.qual"] || 0, s["seg.leads"] || 0)) + '</b></span><span class="row"><span>назначено / проведено</span><b>' + (s["seg.booked"] || 0) + ' / ' + (s["seg.held"] || 0) + '</b></span><span class="row"><span>чеков</span><b>' + (s["seg.sales"] || 0) + '</b></span></div>'; }).join("")
+    + '<div class="kpi"><span class="nm">Инфлюенс, всего</span><span class="v">' + (T["seg.leads"] || 0) + ' <span class="plan">лидов</span></span><span class="row"><span>ЦА · лид → ЦА</span><b>' + (T["seg.qual"] || 0) + ' · ' + fmtPct(avg) + '</b></span><span class="row"><span>назначено / проведено</span><b>' + (T["seg.booked"] || 0) + ' / ' + (T["seg.held"] || 0) + '</b></span><span class="row"><span>чеков</span><b>' + (T["seg.sales"] || 0) + '</b></span></div>';
+  document.getElementById("managers").innerHTML = order.filter(function(o){ return groups[o]; }).map(function(o){ var rows = groups[o].sort(function(a, b){ return g(b, "seg.leads") - g(a, "seg.leads"); }), max = g(rows[0], "seg.leads") || 1;
+    return '<div class="card mgr"><h2>' + (o === "—" ? "Без руководителя" : esc(o)) + '<span class="tot">' + rows.length + ' интеграций · ' + rows.reduce(function(s, r){ return s + g(r, "seg.leads"); }, 0) + ' лидов' + (o === "—" ? ' · назначьте руководителя в разделе «Теги»' : '') + '</span></h2><div class="wide"><table><thead><tr><th>Интеграция</th><th class="num">Лиды</th><th class="num">ЦА</th><th class="num">Лид → ЦА</th><th class="num">Назначено</th><th class="num">Проведено</th><th class="num">Чек</th><th class="num">Лид → встреча</th></tr></thead><tbody>'
+      + rows.map(function(r){ var cv = pct(g(r, "seg.qual"), g(r, "seg.leads")); return '<tr><td class="name">' + esc(r.tag) + '<div class="bar"><i style="width:' + Math.round(100 * g(r, "seg.leads") / max) + '%"></i></div></td><td class="num">' + g(r, "seg.leads") + '</td><td class="num">' + g(r, "seg.qual") + '</td><td class="num"><span class="q ' + qc(cv) + '">' + fmtPct(cv) + '</span></td><td class="num">' + g(r, "seg.booked") + '</td><td class="num">' + g(r, "seg.held") + '</td><td class="num">' + g(r, "seg.sales") + '</td><td class="num">' + fmtPct(pct(g(r, "seg.held"), g(r, "seg.leads"))) + '</td></tr>'; }).join("")
+      + '</tbody></table></div></div>'; }).join("") || '<div class="card"><p class="empty">за выбранный период интеграций с лидами нет</p></div>';
+}
+</script>
+<script src="/section-editor.js"></script>
+<script src="/nav.js"></script>
+</body>
+</html>
