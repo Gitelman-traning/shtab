@@ -166,6 +166,13 @@ def deal_points(values, day_from, day_to):
             if in_range(booked_d):
                 add("l1.booked", booked_d)
                 add("l1.booked", booked_d, "src:" + source)
+            # квалифицирован ЦА/УЦА: «не назначили» или «прогрев», по дате квалификации
+            qual_d = parse_date(cell(r, c["qual_date"])) if "qual_date" in c else None
+            if qual_d is None and "qual2_date" in c:
+                qual_d = parse_date(cell(r, c["qual2_date"]))
+            if in_range(qual_d):
+                add("mkt.qual", qual_d)
+                add("mkt.qual", qual_d, "src:" + source)
         if not first_line:
             manager = cell(r, c["manager"]) or "без ответственного"
             held_d = parse_date(cell(r, c["held_date"]))
@@ -183,7 +190,7 @@ def deal_points(values, day_from, day_to):
     points = []
     day = day_from
     while day <= day_to:
-        for metric in ("mkt.leads", "l1.leads", "l1.booked", "l2.held", "l2.sales"):
+        for metric in ("mkt.leads", "mkt.qual", "l1.leads", "l1.booked", "l2.held", "l2.sales"):
             counts.setdefault((metric, day.isoformat(), ""), 0)
         day += dt.timedelta(days=1)
     for (metric, period, dim), n in counts.items():

@@ -58,7 +58,7 @@ var from = pmStart < histStart ? pmStart : histStart;
 
 Promise.all([
   api("metric=mkt.leads&ptype=day&dim=" + encodeURIComponent(SRC) + "&from=" + iso(from) + "&to=" + iso(yesterday)),
-  api("metric=l1.booked,l2.held,l2.sales&ptype=day&dim=" + encodeURIComponent("src:" + SRC) + "&from=" + iso(from) + "&to=" + iso(yesterday)),
+  api("metric=mkt.qual,l1.booked,l2.held,l2.sales&ptype=day&dim=" + encodeURIComponent("src:" + SRC) + "&from=" + iso(from) + "&to=" + iso(yesterday)),
   api("metric=mkt.leads&ptype=day&dim=&from=" + iso(from) + "&to=" + iso(yesterday))
 ]).then(function(res){
   if (!res[0].ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span></div>'; return; }
@@ -81,10 +81,8 @@ function render(day){
   document.getElementById("kpis").innerHTML =
     '<div class="kpi"><span class="nm">Лиды источника</span><span class="v">' + y + ' <span class="plan">вчера</span></span>'
     + '<span class="row"><span>неделя ' + dmy(wkStart) + '—' + dmy(yesterday) + '</span><b>' + w + delta(w, wp) + '</b></span>'
-    + '<span class="row"><span>месяц по ' + dmy(yesterday) + '</span><b>' + mt + delta(mt, mp) + '</b></span><span class="plan">план не задан</span></div>'
-    + '<div class="kpi"><span class="nm">Доля от всех лидов</span><span class="v">' + fmtPct(share) + ' <span class="plan">месяц</span></span>'
-    + '<span class="row"><span>прошлый месяц</span><b>' + fmtPct(shareP) + '</b></span><span class="row"><span>всего лидов за месяц</span><b>' + allM + '</b></span></div>'
-    + kpi3("l1.booked","Назначено диагностик","встреча назначена",day) + kpi3("l2.sales","Продажи","прислали чек",day);
+    + '<span class="row"><span>месяц по ' + dmy(yesterday) + '</span><b>' + mt + delta(mt, mp) + '</b></span><span class="row"><span>доля от всех лидов</span><b>' + fmtPct(share) + '</b></span></div>'
+    + kpi3("mkt.qual","ЦА лиды","квалифицированы ЦА / УЦА",day) + kpi3("l1.booked","Назначено диагностик","встреча назначена",day) + kpi3("l2.sales","Продажи","прислали чек",day);
   var L = mt, B = sum(day,"l1.booked",monthStart,yesterday), H = sum(day,"l2.held",monthStart,yesterday), S = sum(day,"l2.sales",monthStart,yesterday);
   document.getElementById("funnel-sub").textContent = "месяц, с " + dmy(monthStart) + " по " + dmy(yesterday);
   document.getElementById("funnel").innerHTML =
