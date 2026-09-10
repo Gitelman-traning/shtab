@@ -26,7 +26,13 @@ export async function onRequestGet({ request, env }) {
   if (ptype !== "day") {
     if (asof) { where.push("asof = ?"); args.push(asof); }
     else {
-      where.push("asof = (SELECT MAX(asof) FROM points p2 WHERE p2.metric = points.metric AND p2.ptype = points.ptype)");
+      // последний снимок по каждому показателю — одним запросом, а не подзапросом на каждую строку (это выжигало лимит чтений D1)
+      const mx = await env.DB.prepare("SELECT metric, MAX(asof) AS a FROM points WHERE metric IN (" + metrics.map(() => "?").join(",") + ") AND ptype = ? GROUP BY metric")
+        .bind(...metrics, ptype).all();
+      const pairs = (mx.results || []).filter((r) => r.a != null);
+      if (!pairs.length) return json({ ok: true, rows: [], plans: [] });
+      where.push("(" + pairs.map(() => "(metric = ? AND asof = ?)").join(" OR ") + ")");
+      for (const r of pairs) args.push(r.metric, r.a);
     }
   }
   const rows = await env.DB.prepare(
