@@ -30,7 +30,7 @@
       { name: "Сводка по источникам", href: "/marketing/", sec: "marketing" },
       { name: "Instagram SMM", href: "/marketing/instagram/", sec: "marketing.instagram" },
       { name: "Телеграм-канал", href: "/marketing/telegram/", sec: "marketing.telegram" },
-      { name: "Инфлюенс (интеграции)", href: "/marketing/influence/", sec: "marketing.influence" },
+      { name: "Инфлюенс", href: "/marketing/influence/", sec: "marketing.influence" },
       { name: "YouTube", href: "/marketing/youtube/", sec: "marketing.youtube" },
       { name: "Реклама FB", href: "/marketing/fb/", sec: "marketing.fb" },
       { name: "Чат на сайте", href: "/marketing/sitechat/", sec: "marketing.sitechat" },

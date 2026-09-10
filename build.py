@@ -159,7 +159,7 @@ def build_okk():
     return tmp
 
 
-SOURCES = [('instagram', 'Инстаграм smm', 'Instagram SMM'), ('telegram', 'Телеграм канал', 'Телеграм-канал'), ('influence', 'Интеграции', 'Инфлюенс (интеграции)'), ('youtube', 'YouTube', 'YouTube'), ('fb', 'Реклама FB', 'Реклама FB'), ('sitechat', 'GitelmanSiteChat', 'Чат на сайте'), ('site', 'Сайт', 'Сайт')]
+SOURCES = [('instagram', 'Инстаграм smm', 'Instagram SMM'), ('telegram', 'Телеграм канал', 'Телеграм-канал'), ('influence', 'Интеграции', 'Инфлюенс'), ('youtube', 'YouTube', 'YouTube'), ('fb', 'Реклама FB', 'Реклама FB'), ('sitechat', 'GitelmanSiteChat', 'Чат на сайте'), ('site', 'Сайт', 'Сайт')]
 
 
 def build_sources():
