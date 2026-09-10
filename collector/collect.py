@@ -149,6 +149,12 @@ def deal_points(values, day_from, day_to):
             if funnel == lead_funnel:
                 add("mkt.leads", lead_d)
                 add("mkt.leads", lead_d, cell(r, c["source"]) or "без источника")
+                if "tags" in c:
+                    # лиды площадок сайта: тег «tilda» = основной сайт, «журнал» = журнал (список в раскладке lead_tags)
+                    row_tags = [x.strip() for x in cell(r, c["tags"]).split(",") if x.strip()]
+                    for tg in L.get("lead_tags", []):
+                        if tg in row_tags:
+                            add("mkt.leads", lead_d, "tag:" + tg)
         if first_line:
             # по менеджеру Первой линии: назначено и проведено в той же сделке (колонка «встреча проведена»)
             b1 = parse_date(cell(r, c["booked_date"]))
@@ -426,6 +432,13 @@ def main():
     pp = participants_points(values, today)
     log("точек по участникам: %d" % len(pp))
     ap = activity_points(values, day_from, day_to)
+    try:
+        from metrika import metrika_points
+        mp = metrika_points(day_from, day_to, log)
+    except Exception as e:      # Метрика не должна ронять весь сбор
+        log("Метрика: ошибка %s" % e)
+        mp = []
+    ap = ap + mp
     fp, plans = plan_points(values, today)
     send(pts + pp + ap + fp, "период %s—%s" % (day_from, day_to), plans)
     log("ГОТОВО")

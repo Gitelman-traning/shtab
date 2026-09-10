@@ -36,7 +36,10 @@
       { name: "YouTube", href: "/marketing/youtube/", sec: "marketing.youtube" },
       { name: "Реклама FB", href: "/marketing/fb/", sec: "marketing.fb" },
       { name: "Чат на сайте", href: "/marketing/sitechat/", sec: "marketing.sitechat" },
-      { name: "Сайт", href: "/marketing/site/", sec: "marketing.site" }
+      { name: "Сайт", href: "/marketing/site/", sec: "marketing.site", children: [
+        { name: "Сайт gitelman.team", href: "/marketing/site/main/", sec: "marketing.site" },
+        { name: "Журнал", href: "/marketing/site/journal/", sec: "marketing.site" }
+      ] }
     ] },
     { id: "help", name: "Справка", icon: I.help, children: [
       { name: "Гайд и вопросы", href: "/guide", icon: I.help, sec: "guide" },

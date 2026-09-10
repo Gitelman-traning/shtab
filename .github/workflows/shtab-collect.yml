@@ -34,6 +34,8 @@ jobs:
           LAYOUT_JSON: ${{ secrets.LAYOUT_JSON }}
           SHTAB_URL: ${{ secrets.SHTAB_URL }}
           SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
+          METRIKA_TOKEN: ${{ secrets.METRIKA_TOKEN }}
+          METRIKA_COUNTERS: ${{ secrets.METRIKA_COUNTERS }}
           FROM: ${{ inputs.from }}
           TO: ${{ inputs.to }}
           SYNC_METRICS: ${{ inputs.sync_metrics }}

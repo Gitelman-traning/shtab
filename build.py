@@ -169,6 +169,12 @@ def build_sources():
         page = tpl.replace("{{SRC}}", src).replace("{{TITLE}}", title).replace("{{SLUG}}", slug).replace("{{SECTION}}", "marketing." + slug).replace("{{SEG_TITLE}}", "Эффективность блогеров" if slug == "influence" else "Срезы источника")
         wr(os.path.join(PUB, "marketing", slug, "index.html"), page)
     print("источники маркетинга: %d страниц" % len(SOURCES))
+    # площадки сайта: Метрика + лиды по тегу
+    wtpl = rd(os.path.join(HERE, "site", "src", "web.tpl.html"))
+    for slug, key, title, host, tag in [("main", "site", "Сайт", "gitelman.team", "tilda"), ("journal", "journal", "Журнал", "журнал", "журнал")]:
+        page = wtpl.replace("{{TITLE}}", title).replace("{{HOST}}", host).replace("{{KEY}}", key).replace("{{TAG}}", tag)
+        wr(os.path.join(PUB, "marketing", "site", slug, "index.html"), page)
+    print("площадки сайта: 2 страницы")
 
 
 def main():

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Маркетинг · Сайт · Сайт</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.srcs .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:9px;font-size:12.5px}.srcs .row .r{color:var(--dim);white-space:nowrap}.srcs .row .r b{color:var(--ink)}
+.bar{height:8px;border-radius:4px;background:var(--soft);position:relative;overflow:hidden;margin-top:5px}.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--gold-b)}
+.wait{padding:14px;background:var(--soft);border-radius:12px;font-size:12.5px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · Сайт · <b>Сайт</b></div><h1>Сайт · gitelman.team</h1><p class="sub">Клики и посетители из Яндекс Метрики, откуда они пришли, и сколько из них стало лидами: лиды — сделки с тегом «tilda».</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<div id="section-editor" data-section="marketing.site"></div>
+<main id="section-standard">
+  <div class="kpis" id="kpis"></div>
+  <p class="note" style="margin:-6px 0 0">Проценты в карточках — изменение к такому же прошлому периоду: у недели к прошлой неделе за те же дни, у месяца к прошлому месяцу по то же число.</p>
+  <div class="grid2">
+    <div class="card srcs"><h2>Откуда пришли <small id="src-sub"></small></h2><div id="sources"></div></div>
+    <div class="card srcs"><h2>Источники подробно <small>поисковики, соцсети, сайты · месяц</small></h2><div id="engines"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>По неделям <small>8 полных недель + текущая</small></h2><div class="wide" id="weeks"></div></div>
+    <div class="card"><h2>Тренд <small>визиты и лиды в неделю</small></h2><div id="trend"></div></div>
+  </div>
+  <footer>Визиты и посетители — Яндекс Метрика, счётчик gitelman.team, источник по последнему значимому переходу. Лид — сделка воронки продаж тренинга с тегом «tilda» по дате «вступил в чат». Конверсия визит → лид — грубая оценка: лид может прийти через несколько дней после визита.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var KEY = "site", TAG = "tilda";
+function api(q){ return fetch("/api/points?" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
+var today = new Date(); today.setHours(0,0,0,0);
+var yesterday = addDays(today, -1);
+var wkStart = monday(yesterday), wkPrevStart = addDays(wkStart,-7), wkPrevEnd = addDays(yesterday,-7);
+var monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+var pmStart = new Date(today.getFullYear(), today.getMonth()-1, 1);
+var pmEnd = new Date(pmStart.getFullYear(), pmStart.getMonth(), Math.min(yesterday.getDate(), new Date(pmStart.getFullYear(), pmStart.getMonth()+1, 0).getDate()));
+var histStart = addDays(wkStart, -7*8);
+var from = pmStart < histStart ? pmStart : histStart;
+Promise.all([
+  api("metric=web.visits,web.users&ptype=day&dim=" + encodeURIComponent(KEY) + "&from=" + iso(from) + "&to=" + iso(yesterday)),
+  api("metric=web.src,web.eng&ptype=day&dimlike=" + encodeURIComponent(KEY + "|%") + "&from=" + iso(monthStart) + "&to=" + iso(yesterday)),
+  api("metric=mkt.leads&ptype=day&dim=" + encodeURIComponent("tag:" + TAG) + "&from=" + iso(from) + "&to=" + iso(yesterday))
+]).then(function(res){
+  if (!res[0].ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span></div>'; return; }
+  var day = {};
+  res[0].rows.forEach(function(r){ (day[r.metric] = day[r.metric] || {})[r.period] = r.value; });
+  res[2].rows.forEach(function(r){ (day["leads"] = day["leads"] || {})[r.period] = r.value; });
+  render(day, res[1].rows || []);
+});
+function sum(tbl, m, a, b){ var s = 0, d = new Date(a); while (d <= b) { s += (tbl[m] && tbl[m][iso(d)]) || 0; d = addDays(d,1); } return s; }
+function kpi(id, name, sub, day, unit){
+  var y = (day[id] && day[id][iso(yesterday)]) || 0, w = sum(day,id,wkStart,yesterday), wp = sum(day,id,wkPrevStart,wkPrevEnd), mt = sum(day,id,monthStart,yesterday), mp = sum(day,id,pmStart,pmEnd);
+  return '<div class="kpi"><span class="nm">' + name + (sub ? ' <span class="plan">· ' + sub + '</span>' : '') + '</span><span class="v">' + y + ' <span class="plan">вчера</span></span>'
+    + '<span class="row"><span>неделя ' + dmy(wkStart) + '—' + dmy(yesterday) + '</span><b>' + w + delta(w, wp) + '</b></span><span class="row"><span>месяц по ' + dmy(yesterday) + '</span><b>' + mt + delta(mt, mp) + '</b></span></div>';
+}
+function render(day, srcRows){
+  var hasWeb = Object.keys(day["web.visits"] || {}).length;
+  var last = Object.keys(day["web.visits"] || {}).sort().pop();
+  document.getElementById("stamp").textContent = last ? "Метрика по " + last.split("-").reverse().join(".") : "Метрика не подключена";
+  if (!hasWeb) {
+    document.getElementById("kpis").innerHTML = '<div class="wait">Данные Яндекс Метрики ещё не подключены: нужен токен доступа и номер счётчика в настройках сборщика. Лиды площадки уже считаются ниже.</div>';
+  } else {
+    var V = sum(day,"web.visits",monthStart,yesterday), Lm = sum(day,"leads",monthStart,yesterday), Vp = sum(day,"web.visits",pmStart,pmEnd), Lp = sum(day,"leads",pmStart,pmEnd);
+    document.getElementById("kpis").innerHTML = kpi("web.visits","Визиты","клики на сайт",day) + kpi("web.users","Посетители","уникальные",day) + kpi("leads","Лиды","тег «" + esc(TAG) + "»",day)
+      + '<div class="kpi"><span class="nm">Визит → лид</span><span class="v">' + (V ? (100*Lm/V).toFixed(1) + "%" : "—") + ' <span class="plan">месяц</span></span><span class="row"><span>прошлый месяц</span><b>' + (Vp ? (100*Lp/Vp).toFixed(1) + "%" : "—") + '</b></span><span class="row"><span>визитов на лид</span><b>' + (Lm ? Math.round(V/Lm) : "—") + '</b></span></div>';
+  }
+  // источники
+  var bySrc = {}, byEng = {};
+  srcRows.forEach(function(r){ var n = r.dim.split("|").slice(1).join("|"); if (r.metric === "web.src") bySrc[n] = (bySrc[n]||0) + r.value; else byEng[n] = (byEng[n]||0) + r.value; });
+  function list(obj, id, top){
+    var arr = Object.keys(obj).map(function(k){ return [k, obj[k]]; }).sort(function(a,b){ return b[1]-a[1]; }), tot = arr.reduce(function(s,x){ return s + x[1]; }, 0), max = arr[0] ? arr[0][1] : 1;
+    document.getElementById(id).innerHTML = arr.length ? arr.slice(0, top).map(function(x){ return '<div class="row"><span>' + esc(x[0]) + '</span><span class="r"><b>' + x[1] + '</b> · ' + Math.round(100*x[1]/tot) + '%</span></div><div class="bar"><i style="width:' + Math.round(100*x[1]/max) + '%"></i></div>'; }).join("") : '<p class="empty">' + (hasWeb ? 'за месяц визитов нет' : 'появится после подключения Метрики') + '</p>';
+    return tot;
+  }
+  var tot = list(bySrc, "sources", 12); list(byEng, "engines", 12);
+  document.getElementById("src-sub").textContent = hasWeb ? "визиты за месяц с " + dmy(monthStart) + " по " + dmy(yesterday) + " · " + tot + " визитов" : "";
+  // недели
+  var weeks = [];
+  for (var k = 8; k >= 1; k--) { var s = addDays(wkStart,-7*k); weeks.push({ s: s, e: addDays(s,6), partial: false }); }
+  weeks.push({ s: wkStart, e: yesterday, partial: true });
+  weeks.forEach(function(w){ w.v = sum(day,"web.visits",w.s,w.e); w.u = sum(day,"web.users",w.s,w.e); w.l = sum(day,"leads",w.s,w.e); });
+  document.getElementById("weeks").innerHTML = '<table><thead><tr><th>Неделя</th><th class="num">Визиты</th><th class="num">Посетители</th><th class="num">Лиды</th><th class="num">Визит → лид</th></tr></thead><tbody>'
+    + weeks.map(function(w){ return '<tr' + (w.partial?' style="color:var(--gold)"':'') + '><td class="k">' + dmy(w.s) + (w.partial?' · идёт':'') + '</td><td class="num">' + (hasWeb ? w.v : "—") + '</td><td class="num">' + (hasWeb ? w.u : "—") + '</td><td class="num">' + w.l + '</td><td class="num">' + (w.v ? (100*w.l/w.v).toFixed(1) + "%" : "—") + '</td></tr>'; }).join("") + '</tbody></table>';
+  document.getElementById("trend").innerHTML = trendSvg(weeks, hasWeb ? [["v","Визиты","var(--blue-bar)"],["l","Лиды","var(--gold-b)"]] : [["l","Лиды","var(--gold-b)"]]);
+}
+function trendSvg(weeks, series){
+  var W = 640, rowH = 64, padL = 96, padR = 14, padB = 22, H = rowH * series.length + padB;
+  var x = function(i){ return padL + (W - padL - padR) * (i + 0.5) / weeks.length; };
+  var out = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" role="img" aria-label="Тренд">';
+  series.forEach(function(sr, si){
+    var top = si * rowH, max = 1; weeks.forEach(function(w){ max = Math.max(max, w[sr[0]]); });
+    var y = function(v){ return top + 18 + (rowH - 30) * (1 - v / max); };
+    out += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + (top + rowH - 8) + '" y2="' + (top + rowH - 8) + '" stroke="var(--line-2)"/>'
+      + '<text x="' + (padL - 10) + '" y="' + (top + rowH/2 + 2) + '" font-size="12" fill="var(--dim)" text-anchor="end">' + sr[1] + '</text>'
+      + '<polyline points="' + weeks.map(function(w,i){ return x(i) + "," + y(w[sr[0]]); }).join(" ") + '" fill="none" stroke="' + sr[2] + '" stroke-width="2" stroke-linejoin="round"/>';
+    weeks.forEach(function(w,i){ out += '<circle cx="' + x(i) + '" cy="' + y(w[sr[0]]) + '" r="3" fill="' + sr[2] + '"' + (w.partial?' opacity=".5"':'') + '/><text x="' + x(i) + '" y="' + (y(w[sr[0]]) - 6) + '" font-size="10" fill="var(--dim)" text-anchor="middle">' + w[sr[0]] + '</text>'; });
+  });
+  weeks.forEach(function(w,i){ out += '<text x="' + x(i) + '" y="' + (H - 6) + '" font-size="10.5" fill="' + (w.partial?'var(--gold)':'var(--faint)') + '" text-anchor="middle">' + dmy(w.s) + '</text>'; });
+  return out + '</svg>';
+}
+</script>
+<script src="/section-editor.js"></script>
+<script src="/nav.js"></script>
+</body>
+</html>
