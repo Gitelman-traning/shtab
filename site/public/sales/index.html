@@ -148,9 +148,9 @@ function pct(a,b){ return b ? Math.round(100*a/b) : null; }
 function fmtPct(p){ return p==null ? "—" : p + "%"; }
 function delta(cur, prev){
   if (prev == null || cur == null) return "";
-  if (!prev) return cur ? '<span class="d up">новое</span>' : '<span class="d flat">0</span>';
+  if (!prev) return cur ? '<span class="d up" title="в прошлом периоде было 0">новое</span>' : '<span class="d flat">0</span>';
   var d = Math.round(100*(cur-prev)/prev); var cls = d > 3 ? "up" : d < -3 ? "down" : "flat";
-  return '<span class="d ' + cls + '">' + (d>0?"+":"") + d + '%</span>';
+  return '<span class="d ' + cls + '" title="к такому же прошлому периоду: было ' + prev + ', стало ' + cur + '">' + (d>0?"+":"") + d + '%</span>';
 }
 var today = new Date(); today.setHours(0,0,0,0);
 var yesterday = addDays(today, -1);

@@ -137,6 +137,7 @@ footer{padding:8px 24px 30px;font-size:12px;color:var(--faint)}
 <div id="section-editor" data-section="hub"></div>
 <main id="section-standard">
   <div class="kpis" id="kpis"></div>
+  <p class="note" style="margin:-6px 0 0">Проценты в карточках — изменение к такому же прошлому периоду: у недели к прошлой неделе за те же дни, у месяца к прошлому месяцу по то же число.</p>
   <div class="grid2">
     <div class="card"><h2>Воронка <small id="funnel-sub"></small></h2><div class="funnel" id="funnel"></div><p class="note" id="bottleneck"></p></div>
     <div class="card"><h2>Участники по потокам <small id="pay-sub"></small></h2><div id="pay"></div></div>
@@ -186,10 +187,10 @@ function pct(a,b){ return b ? Math.round(100*a/b) : null; }
 function fmtPct(p){ return p==null ? "—" : p + "%"; }
 function delta(cur, prev){
   if (prev == null || cur == null) return "";
-  if (!prev) return cur ? '<span class="d up">новое</span>' : '<span class="d flat">0</span>';
+  if (!prev) return cur ? '<span class="d up" title="в прошлом периоде было 0">новое</span>' : '<span class="d flat">0</span>';
   var d = Math.round(100*(cur-prev)/prev);
   var cls = d > 3 ? "up" : d < -3 ? "down" : "flat";
-  return '<span class="d ' + cls + '">' + (d>0?"+":"") + d + '%</span>';
+  return '<span class="d ' + cls + '" title="к такому же прошлому периоду: было ' + prev + ', стало ' + cur + '">' + (d>0?"+":"") + d + '%</span>';
 }
 
 var today = new Date(); today.setHours(0,0,0,0);

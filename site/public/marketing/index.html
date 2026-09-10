@@ -114,6 +114,7 @@ footer{padding:8px 24px 30px;font-size:12px;color:var(--faint)}
 <div id="section-editor" data-section="marketing"></div>
 <main id="section-standard">
   <div class="kpis" id="kpis"></div>
+  <p class="note" style="margin:-6px 0 0">Проценты в карточках — изменение к такому же прошлому периоду: у недели к прошлой неделе за те же дни, у месяца к прошлому месяцу по то же число.</p>
   <div class="grid2">
     <div class="card"><h2>Источники по неделям <small>8 полных недель + текущая</small></h2><div class="wide" style="overflow-x:auto" id="srcweeks"></div></div>
     <div class="card"><h2>Органика и платный <small>лидов в неделю</small></h2><div id="trend"></div>
@@ -148,9 +149,9 @@ function monday(d){ var x = new Date(d); var wd = (x.getDay()+6)%7; x.setDate(x.
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]}); }
 function delta(cur, prev){
   if (prev == null || cur == null) return "";
-  if (!prev) return cur ? '<span class="d up">новое</span>' : '<span class="d flat">0</span>';
+  if (!prev) return cur ? '<span class="d up" title="в прошлом периоде было 0">новое</span>' : '<span class="d flat">0</span>';
   var d = Math.round(100*(cur-prev)/prev); var cls = d > 3 ? "up" : d < -3 ? "down" : "flat";
-  return '<span class="d ' + cls + '">' + (d>0?"+":"") + d + '%</span>';
+  return '<span class="d ' + cls + '" title="к такому же прошлому периоду: было ' + prev + ', стало ' + cur + '">' + (d>0?"+":"") + d + '%</span>';
 }
 var today = new Date(); today.setHours(0,0,0,0);
 var yesterday = addDays(today, -1);

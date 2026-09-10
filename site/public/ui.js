@@ -15,7 +15,7 @@ function fmtPct(p){ return p==null ? "—" : p + "%"; }
 function avg(a){ return a.length ? a.reduce(function(x,y){return x+y},0)/a.length : null; }
 function delta(cur, prev){
   if (prev == null || cur == null) return "";
-  if (!prev) return cur ? '<span class="d up">новое</span>' : '<span class="d flat">0</span>';
+  if (!prev) return cur ? '<span class="d up" title="в прошлом периоде было 0">новое</span>' : '<span class="d flat">0</span>';
   var d = Math.round(100*(cur-prev)/prev); var cls = d > 3 ? "up" : d < -3 ? "down" : "flat";
-  return '<span class="d ' + cls + '">' + (d>0?"+":"") + d + '%</span>';
+  return '<span class="d ' + cls + '" title="к такому же прошлому периоду: было ' + prev + ', стало ' + cur + '">' + (d>0?"+":"") + d + '%</span>';
 }
