@@ -52,6 +52,8 @@ td.k{color:var(--dim)} tr.tot td{font-weight:600;background:var(--zebra)}
 .tag.paid{background:var(--gold-soft);color:var(--gold)} .tag.org{background:var(--ok-bg);color:var(--ok)}
 .funnel{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:stretch}
 .funnel.funnel3{grid-template-columns:repeat(3,1fr)}
+.funnel.funnel5{grid-template-columns:repeat(5,1fr)}
+@media (max-width:900px){.funnel.funnel5{grid-template-columns:repeat(3,1fr)}}
 .step{background:var(--soft);border-radius:12px;padding:12px 14px;position:relative}
 .step .nm{font-size:12px;color:var(--dim)} .step .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
 .step .cr{font-size:12px;color:var(--dim);margin-top:4px} .step .cr b{color:var(--ink)}

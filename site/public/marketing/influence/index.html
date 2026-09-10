@@ -21,7 +21,7 @@
 <aside class="side" id="side"></aside>
 <div class="pane">
 <header>
-  <div><div class="crumbs">Маркетинг · <b>Инфлюенс (интеграции)</b></div><h1>Инфлюенс (интеграции)</h1><p class="sub">Лиды источника «Интеграции» и что с ними дальше: назначено, проведено, продажи. Назначено, проведено и продажи считаются по своим датам, поэтому за месяц могут относиться к лидам прошлых недель.</p></div>
+  <div><div class="crumbs">Маркетинг · <b>Инфлюенс (интеграции)</b></div><h1>Инфлюенс (интеграции)</h1><p class="sub">Лиды источника «Интеграции» и что с ними дальше: ЦА, назначено, проведено, продажи. ЦА, назначено, проведено и продажи считаются по своим датам, поэтому за месяц могут относиться к лидам прошлых недель.</p></div>
   <div class="spacer"></div>
   <div class="themer" role="group" aria-label="Тема оформления">
     <button type="button" data-set="auto" aria-pressed="true">Авто</button>
@@ -34,7 +34,7 @@
 <main id="section-standard">
   <div class="kpis" id="kpis"></div>
   <p class="note" style="margin:-6px 0 0">Проценты в карточках — изменение к такому же прошлому периоду: у недели к прошлой неделе за те же дни, у месяца к прошлому месяцу по то же число.</p>
-  <div class="card"><h2>Воронка источника <small id="funnel-sub"></small></h2><div class="funnel" id="funnel"></div><p class="note" id="fnote"></p></div>
+  <div class="card"><h2>Воронка источника <small id="funnel-sub"></small></h2><div class="funnel funnel5" id="funnel"></div><p class="note" id="fnote"></p></div>
   <div class="card" id="seg-cards"><h2>Срезы источника <small id="seg-sub"></small></h2><div class="g2" id="segs"><p class="empty">загрузка…</p></div><p class="note" id="seg-note"></p></div>
   <div class="grid2">
     <div class="card"><h2>По неделям <small>8 полных недель + текущая</small></h2><div id="weeks"></div></div>
@@ -84,11 +84,12 @@ function render(day){
     + '<span class="row"><span>неделя ' + dmy(wkStart) + '—' + dmy(yesterday) + '</span><b>' + w + delta(w, wp) + '</b></span>'
     + '<span class="row"><span>месяц по ' + dmy(yesterday) + '</span><b>' + mt + delta(mt, mp) + '</b></span><span class="row"><span>доля от всех лидов</span><b>' + fmtPct(share) + '</b></span></div>'
     + kpi3("mkt.qual","ЦА лиды","квалифицированы ЦА / УЦА",day) + kpi3("l1.booked","Назначено диагностик","встреча назначена",day) + kpi3("l2.sales","Продажи","прислали чек",day);
-  var L = mt, B = sum(day,"l1.booked",monthStart,yesterday), H = sum(day,"l2.held",monthStart,yesterday), S = sum(day,"l2.sales",monthStart,yesterday);
+  var L = mt, Q = sum(day,"mkt.qual",monthStart,yesterday), B = sum(day,"l1.booked",monthStart,yesterday), H = sum(day,"l2.held",monthStart,yesterday), S = sum(day,"l2.sales",monthStart,yesterday);
   document.getElementById("funnel-sub").textContent = "месяц, с " + dmy(monthStart) + " по " + dmy(yesterday);
   document.getElementById("funnel").innerHTML =
     '<div class="step"><div class="nm">Лиды</div><div class="v">' + L + '</div><div class="cr">источник «' + esc(SRC) + '»</div></div>'
-    + '<div class="step"><div class="nm">Назначено</div><div class="v">' + B + '</div><div class="cr">лид → встреча <b>' + fmtPct(pct(B,L)) + '</b></div></div>'
+    + '<div class="step"><div class="nm">ЦА</div><div class="v">' + Q + '</div><div class="cr">лид → ЦА <b>' + fmtPct(pct(Q,L)) + '</b></div></div>'
+    + '<div class="step"><div class="nm">Назначено</div><div class="v">' + B + '</div><div class="cr">ЦА → назначено <b>' + fmtPct(pct(B,Q)) + '</b></div></div>'
     + '<div class="step"><div class="nm">Проведено</div><div class="v">' + H + '</div><div class="cr">назначено → проведено <b>' + fmtPct(pct(H,B)) + '</b></div></div>'
     + '<div class="step"><div class="nm">Продажи</div><div class="v">' + S + '</div><div class="cr">проведено → продажа <b>' + fmtPct(pct(S,H)) + '</b></div></div>';
   var hasDown = Object.keys(day["l1.booked"]||{}).length || Object.keys(day["l2.held"]||{}).length;
@@ -96,9 +97,9 @@ function render(day){
   var weeks = [];
   for (var k = 8; k >= 1; k--) { var s = addDays(wkStart,-7*k); weeks.push({ s: s, e: addDays(s,6), partial: false }); }
   weeks.push({ s: wkStart, e: yesterday, partial: true });
-  document.getElementById("weeks").innerHTML = '<table><thead><tr><th>Неделя</th><th class="num">Лиды</th><th class="num">Доля</th><th class="num">Назнач.</th><th class="num">Провед.</th><th class="num">Продажи</th></tr></thead><tbody>'
+  document.getElementById("weeks").innerHTML = '<table><thead><tr><th>Неделя</th><th class="num">Лиды</th><th class="num">Доля</th><th class="num">ЦА</th><th class="num">Назнач.</th><th class="num">Провед.</th><th class="num">Продажи</th></tr></thead><tbody>'
     + weeks.map(function(wk){ var l = sum(day,"mkt.leads",wk.s,wk.e), a = sum(day,"all",wk.s,wk.e);
-      return '<tr' + (wk.partial?' style="color:var(--gold)"':'') + '><td class="k">' + dmy(wk.s) + (wk.partial?' · идёт':'') + '</td><td class="num">' + l + '</td><td class="num">' + fmtPct(pct(l,a)) + '</td><td class="num">' + sum(day,"l1.booked",wk.s,wk.e) + '</td><td class="num">' + sum(day,"l2.held",wk.s,wk.e) + '</td><td class="num">' + sum(day,"l2.sales",wk.s,wk.e) + '</td></tr>'; }).join("")
+      return '<tr' + (wk.partial?' style="color:var(--gold)"':'') + '><td class="k">' + dmy(wk.s) + (wk.partial?' · идёт':'') + '</td><td class="num">' + l + '</td><td class="num">' + fmtPct(pct(l,a)) + '</td><td class="num">' + sum(day,"mkt.qual",wk.s,wk.e) + '</td><td class="num">' + sum(day,"l1.booked",wk.s,wk.e) + '</td><td class="num">' + sum(day,"l2.held",wk.s,wk.e) + '</td><td class="num">' + sum(day,"l2.sales",wk.s,wk.e) + '</td></tr>'; }).join("")
     + '</tbody></table>';
   var series = [["mkt.leads","Лиды","var(--gold-b)"],["share","Доля, %","var(--blue-bar)"]];
   weeks.forEach(function(wk){ wk["mkt.leads"] = sum(day,"mkt.leads",wk.s,wk.e); wk["share"] = pct(wk["mkt.leads"], sum(day,"all",wk.s,wk.e)) || 0; });
