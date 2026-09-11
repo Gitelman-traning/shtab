@@ -70,7 +70,12 @@
     + ".side .collapse svg{flex:none;width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;transition:transform .16s}:root[data-menu=mini] .side .collapse svg{transform:rotate(180deg)}"
     + ":root[data-menu=mini] .side .brand b,:root[data-menu=mini] .side .brand span,:root[data-menu=mini] .side .it span,:root[data-menu=mini] .side .chev,:root[data-menu=mini] .side .sub,:root[data-menu=mini] .side .collapse span{display:none}"
     + ":root[data-menu=mini] .side .it{justify-content:center;padding:11px 0}"
-    + "@media (max-width:760px){.side{width:64px}.side .brand b,.side .brand span,.side .it span,.side .chev,.side .sub,.side .collapse span{display:none}.side .it{justify-content:center;padding:11px 0}}"
+    + "@media (max-width:760px){.side{position:fixed;left:0;top:0;bottom:0;width:272px;height:100vh;z-index:60;transform:translateX(-100%);transition:transform .18s ease;box-shadow:none}"
+    + ":root[data-nav=open] .side{transform:none;box-shadow:0 12px 40px rgba(0,0,0,.35)}.side .collapse{display:none}"
+    + ".nav-burger{position:fixed;left:10px;top:10px;z-index:59;width:40px;height:40px;border-radius:11px;border:1px solid var(--line-2);background:var(--card);color:var(--ink);display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.08)}"
+    + ".nav-burger svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8}.nav-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:58;display:none}:root[data-nav=open] .nav-backdrop{display:block}"
+    + "header{padding-left:62px}.pane header .crumbs{padding-left:0}}"
+    + "@media (min-width:761px){.nav-burger,.nav-backdrop{display:none}}"
     + ".acct{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);margin-left:8px;white-space:nowrap}.acct b{color:var(--ink);font-weight:600}.acct a{color:var(--gold);text-decoration:none;padding:4px 9px;border-radius:7px;background:var(--gold-soft);font-weight:600}";
   var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
@@ -115,8 +120,21 @@
       }
     });
   }
+  // мобильный экран: кнопка-бургер и выезжающее меню; узкий режим (mini) на телефоне не используется
+  var mobile = window.matchMedia("(max-width:760px)");
+  if (side) {
+    var burger = document.createElement("button"); burger.type = "button"; burger.className = "nav-burger"; burger.setAttribute("aria-label", "Меню");
+    burger.innerHTML = '<svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h14" stroke-linecap="round"/></svg>';
+    var back = document.createElement("div"); back.className = "nav-backdrop";
+    document.body.appendChild(burger); document.body.appendChild(back);
+    var setOpen = function (o) { if (o) document.documentElement.setAttribute("data-nav", "open"); else document.documentElement.removeAttribute("data-nav"); };
+    burger.addEventListener("click", function () { setOpen(document.documentElement.getAttribute("data-nav") !== "open"); });
+    back.addEventListener("click", function () { setOpen(false); });
+    side.addEventListener("click", function (e) { if (e.target.closest("a") && mobile.matches) setOpen(false); });
+  }
   // свёрнутое меню — общий ключ с прежними страницами
-  (function () { var m = null; try { m = localStorage.getItem("okk-menu"); } catch (e) {} document.documentElement.setAttribute("data-menu", m || "full");
+  (function () { var m = null; try { m = localStorage.getItem("okk-menu"); } catch (e) {} document.documentElement.setAttribute("data-menu", mobile.matches ? "full" : (m || "full"));
+    mobile.addEventListener && mobile.addEventListener("change", function (ev) { if (ev.matches) document.documentElement.setAttribute("data-menu", "full"); });
     var b = document.getElementById("menu-toggle"); if (b) b.addEventListener("click", function () { var n = document.documentElement.getAttribute("data-menu") === "mini" ? "full" : "mini"; try { localStorage.setItem("okk-menu", n); } catch (e) {} document.documentElement.setAttribute("data-menu", n); }); })();
 
   // кто вошёл: пункты для админа и виджет в шапке
