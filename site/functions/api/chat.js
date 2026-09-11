@@ -76,9 +76,64 @@ async function digest(env) {
   return { data: L.join("\n"), reg: regText, know: knowText };
 }
 
+// ---------- срезы по словам из вопроса: блогеры/теги, UTM, источники, менеджеры ----------
+const TR = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya" };
+function translit(s) { return s.split("").map((c) => TR[c] ?? c).join(""); }
+function stem(w) { return w.length > 5 ? w.slice(0, w.length - 2) : w.length > 4 ? w.slice(0, w.length - 1) : w; }   // «бони», «боню» → «бон»
+function tokens(q) {
+  const out = new Set();
+  for (const w of q.toLowerCase().replace(/[^\p{L}\p{N}_]+/gu, " ").split(" ")) {
+    if (w.length < 3 || /^(как|что|где|кто|это|для|при|или|про|над|под|без|лид|лида|лиды|лидов|ца|уца|месяц|неделя|недел|конверсия|конверсии|сколько|какая|какой|какие|какое|у|из|в|на|по|и|с|за|от|до)$/.test(w)) continue;
+    out.add(w); out.add(stem(w)); const tl = translit(w); out.add(tl); out.add(stem(tl));
+  }
+  return [...out].filter((x) => x.length >= 3);
+}
+function hit(name, toks) { const n = name.toLowerCase(), nt = translit(n); return toks.some((k) => n.includes(k) || nt.includes(k)); }
+
+async function lookup(env, question, monthFrom) {
+  const toks = tokens(question);
+  if (!toks.length) return "";
+  const q = (sql, ...args) => env.DB.prepare(sql).bind(...args).all().then((r) => r.results || []);
+  const dims = await q("SELECT DISTINCT dim FROM points WHERE ptype='month' AND metric='seg.leads' AND period >= ?", monthFrom);
+  const wantsBloggers = /блогер|интеграц|инфлюенс|тег/i.test(question);
+  let matched = dims.map((r) => r.dim).filter((d) => { const parts = d.split("|"); return parts.length === 3 && (hit(parts[2], toks) || (parts[1] !== "t" && hit(parts[0], toks) && /utm|источник|кампан|source|medium|campaign/i.test(question))); });
+  if (!matched.length && wantsBloggers) matched = dims.map((r) => r.dim).filter((d) => d.startsWith("Интеграции|t|"));
+  const out = [];
+  if (matched.length) {
+    const top = matched.slice(0, 40);
+    const rows = await q("SELECT metric, period, dim, value FROM points WHERE ptype='month' AND metric LIKE 'seg.%' AND dim IN (" + top.map(() => "?").join(",") + ") AND period >= ? ORDER BY dim, period", ...top, monthFrom);
+    const owners = await q("SELECT tag, owner, kind FROM tags").catch(() => []);
+    const own = {}; owners.forEach((r) => { own[r.tag] = r; });
+    const by = {}; rows.forEach((r) => { const o = (by[r.dim] = by[r.dim] || {}); (o[r.period] = o[r.period] || {})[r.metric] = r.value; });
+    const list = Object.keys(by).map((d) => { const tot = {}; Object.values(by[d]).forEach((m) => Object.keys(m).forEach((k) => { tot[k] = (tot[k] || 0) + m[k]; })); return { d, tot }; })
+      .sort((a, b) => (b.tot["seg.leads"] || 0) - (a.tot["seg.leads"] || 0)).slice(0, 25);
+    out.push("СРЕЗЫ ПО ВОПРОСУ (по месяцу лида: сделки, вступившие в чат в этом месяце, и что с ними стало; формат лиды/ЦА/назначено/проведено/чек):");
+    for (const { d, tot } of list) {
+      const [src, code, name] = d.split("|");
+      const kind = { t: "тег", s: "utm_source", m: "utm_medium", c: "utm_campaign" }[code] || code;
+      const o = own[name];
+      const months = Object.keys(by[d]).sort().map((mo) => { const m = by[d][mo]; return `${mo}: ${m["seg.leads"] || 0}/${m["seg.qual"] || 0}/${m["seg.booked"] || 0}/${m["seg.held"] || 0}/${m["seg.sales"] || 0}`; }).join("; ");
+      const L = tot["seg.leads"] || 0, Q = tot["seg.qual"] || 0, H = tot["seg.held"] || 0;
+      out.push(`- ${src} · ${kind} «${name}»${o && o.owner ? " (ведёт " + o.owner + ")" : ""}: ${months}; итого лиды ${L}, ЦА ${Q} (лид→ЦА ${pct(Q, L)}), назначено ${tot["seg.booked"] || 0}, проведено ${H} (лид→встреча ${pct(H, L)}), чеков ${tot["seg.sales"] || 0}`);
+    }
+    if (matched.length > list.length) out.push(`…и ещё ${matched.length - list.length} совпадений не показаны — уточните название.`);
+  }
+  // менеджеры: недели по l1m.* / l2.*
+  const mgrRows = await q("SELECT DISTINCT metric, dim FROM points WHERE ptype='day' AND dim <> '' AND dim NOT LIKE 'src:%' AND dim NOT LIKE 'tag:%' AND metric IN ('l1m.leads','l1m.held','l1m.calls','l1m.talk','l1m.touches','l2.held','l2.sales') AND period >= ?", monthFrom + "-01");
+  const names = [...new Set(mgrRows.map((r) => r.dim))].filter((n) => hit(n, toks)).slice(0, 4);
+  if (names.length) {
+    const rows = await q("SELECT metric, dim, period, value FROM points WHERE ptype='day' AND dim IN (" + names.map(() => "?").join(",") + ") AND metric IN ('l1m.leads','l1m.booked','l1m.held','l1m.calls','l1m.talk','l1m.touches','l2.held','l2.sales') AND period >= ? ORDER BY period", ...names, monthFrom + "-01");
+    const agg = {}; rows.forEach((r) => { const mo = r.period.slice(0, 7), o = (agg[r.dim] = agg[r.dim] || {}); (o[mo] = o[mo] || {})[r.metric] = ((o[mo] || {})[r.metric] || 0) + r.value; });
+    out.push("МЕНЕДЖЕРЫ ПО ВОПРОСУ (по месяцам; Первая линия: лиды/назначено/проведено встреч, звонков с разговором, минут разговора, касаний базы; Вторая линия: проведено диагностик/продаж):");
+    for (const n of Object.keys(agg)) out.push(`- ${n}: ` + Object.keys(agg[n]).sort().map((mo) => { const m = agg[n][mo]; const l1 = m["l1m.leads"] != null || m["l1m.held"] != null;
+      return l1 ? `${mo}: лиды ${m["l1m.leads"] || 0}, назначено ${m["l1m.booked"] || 0}, проведено ${m["l1m.held"] || 0}, звонков ${m["l1m.calls"] || 0}, минут ${Math.round(m["l1m.talk"] || 0)}, касаний ${m["l1m.touches"] || 0}` : `${mo}: проведено ${m["l2.held"] || 0}, продаж ${m["l2.sales"] || 0}`; }).join("; "));
+  }
+  return out.join("\n");
+}
+
 const SYSTEM = `Ты — помощник «Штаба», внутреннего центра показателей компании Gitelman Team (обучение предпринимателей: лиды из маркетинга → квалификация Первой линией → диагностика Второй линией → продажа → участие в потоке).
 Отвечай по-русски, коротко и по делу, без вступлений. Цифры бери только из блока ДАННЫЕ и всегда называй период («за сентябрь по 09.09», «за неделю 07–13.09»).
-Если в данных нужного нет — так и скажи и подскажи, на какой странице Штаба это смотреть (см. КАРТА РАЗДЕЛОВ). Не выдумывай цифры и имена.
+Если спрашивают про конкретного блогера, интеграцию, тег, UTM, источник или менеджера — ищи в блоке «СРЕЗЫ ПО ВОПРОСУ» / «МЕНЕДЖЕРЫ ПО ВОПРОСУ» и отвечай цифрами оттуда; имя может быть написано по-разному (Боня = bonya1607, bonya0508, 15.06_Боня — перечисли все подходящие). Если совпадений нет — так и скажи и подскажи страницу (см. КАРТА РАЗДЕЛОВ). Не выдумывай цифры и имена.
 На общие вопросы (не про данные компании) отвечать можно — как обычный ассистент, кратко.
 Формат: обычный текст, короткие абзацы или список через «- »; без заголовков и таблиц.`;
 
@@ -92,7 +147,10 @@ export async function onRequestPost({ request, env }) {
     .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return bad("нужен вопрос");
   const d = await digest(env);
-  const system = SYSTEM + "\n\n=== ДАННЫЕ ===\n" + d.data + "\n\n=== ОПРЕДЕЛЕНИЯ ПОКАЗАТЕЛЕЙ ===\n" + d.reg + (d.know ? "\n\n=== СПРАВКА ===\n" + d.know : "");
+  const m0 = new Date(); m0.setUTCDate(1); m0.setUTCMonth(m0.getUTCMonth() - 2);
+  let extra = "";
+  try { extra = await lookup(env, msgs.filter((m) => m.role === "user").slice(-2).map((m) => m.content).join(" "), m0.toISOString().slice(0, 7)); } catch (e) { extra = ""; }
+  const system = SYSTEM + "\n\n=== ДАННЫЕ ===\n" + d.data + (extra ? "\n\n=== " + extra : "") + "\n\n=== ОПРЕДЕЛЕНИЯ ПОКАЗАТЕЛЕЙ ===\n" + d.reg + (d.know ? "\n\n=== СПРАВКА ===\n" + d.know : "");
   let answer;
   try {
     const r = await llmChat(env, [{ role: "system", content: system }, ...msgs], { max_tokens: 1200, temperature: 0.3 });
