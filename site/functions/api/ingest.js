@@ -1,5 +1,6 @@
 // POST /api/ingest — сборщик присылает пачку точек. Идемпотентно: одна и та же точка перезаписывается.
-// Тело: {"collector": "amo-sheet", "points": [{"metric","ptype","period","dim","asof","value"}, ...], "plans": [{"metric","ptype","period","dim","value"}, ...]}
+// Тело: {"collector": "amo-sheet", "points": [{"metric","ptype","period","dim","asof","value"}, ...], "plans": [{"metric","ptype","period","dim","value"}, ...],
+//        "okna": [{"day","mgr","key","n","items"}, ...], "goals": [{"mgr","month","goal","base","rate","note"}, ...]}
 import { json, bad, hasIngestToken, now } from "./_lib.js";
 
 const CHUNK = 80;   // D1 принимает пачки запросов; держим их небольшими
@@ -15,7 +16,7 @@ export async function onRequestPost({ request, env }) {
   const points = Array.isArray(body.points) ? body.points : [];
   const plans = Array.isArray(body.plans) ? body.plans : [];
   const collector = String(body.collector || "unknown").slice(0, 60);
-  if (!points.length && !plans.length) return bad("пустая пачка");
+  if (!points.length && !plans.length && !(Array.isArray(body.okna) && body.okna.length) && !(Array.isArray(body.goals) && body.goals.length)) return bad("пустая пачка");
 
   const stamp = now();
   const stmt = env.DB.prepare(
@@ -44,6 +45,32 @@ export async function onRequestPost({ request, env }) {
     for (const p of plans.slice(0, 500)) {
       if (!p || !p.metric || !p.ptype || !p.period || typeof p.value !== "number" || !isFinite(p.value)) continue;
       batch.push(ps.bind(String(p.metric), String(p.ptype), String(p.period), String(p.dim || ""), p.value, "collector:" + collector, stamp));
+    }
+    if (batch.length) { await env.DB.batch(batch); written += batch.length; }
+  }
+  // окна менеджеров: показатель дня с пруф-списком (collector/okna.py)
+  const okna = Array.isArray(body.okna) ? body.okna : [];
+  if (okna.length) {
+    const os = env.DB.prepare(
+      "INSERT INTO okna (day, mgr, key, n, items, updated_at) VALUES (?,?,?,?,?,?) " +
+      "ON CONFLICT(day, mgr, key) DO UPDATE SET n = excluded.n, items = excluded.items, updated_at = excluded.updated_at");
+    const batch = [];
+    for (const r of okna.slice(0, 200)) {
+      if (!r || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.day || "")) || !r.mgr || !r.key) continue;
+      const items = Array.isArray(r.items) ? r.items : [];
+      batch.push(os.bind(String(r.day), String(r.mgr).slice(0, 40), String(r.key).slice(0, 40), Number(r.n) || items.length, JSON.stringify(items), stamp));
+    }
+    for (let i = 0; i < batch.length; i += 20) { await env.DB.batch(batch.slice(i, i + 20)); written += Math.min(20, batch.length - i); }
+  }
+  const goals = Array.isArray(body.goals) ? body.goals : [];
+  if (goals.length) {
+    const gs = env.DB.prepare(
+      "INSERT INTO okna_goals (mgr, month, goal, base, rate, note, set_by, updated_at) VALUES (?,?,?,?,?,?,?,?) " +
+      "ON CONFLICT(mgr, month) DO UPDATE SET goal = excluded.goal, base = excluded.base, rate = excluded.rate, note = excluded.note, set_by = excluded.set_by, updated_at = excluded.updated_at");
+    const batch = [];
+    for (const g of goals.slice(0, 50)) {
+      if (!g || !g.mgr || !/^\d{4}-\d{2}$/.test(String(g.month || "")) || typeof g.goal !== "number") continue;
+      batch.push(gs.bind(String(g.mgr).slice(0, 40), String(g.month), g.goal, Number(g.base) || 25000, Number(g.rate) || 1500, String(g.note || "").slice(0, 200), "collector:" + collector, stamp));
     }
     if (batch.length) { await env.DB.batch(batch); written += batch.length; }
   }

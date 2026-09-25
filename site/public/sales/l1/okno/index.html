@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Первая линия · Окно на день</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.tabs button{border:1px solid var(--line-2);background:var(--card);color:var(--dim);border-radius:10px;padding:7px 14px;font:inherit;font-size:13px;cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--gold-soft);color:var(--gold);border-color:transparent;font-weight:600}
+.tabs select{border:1px solid var(--line-2);background:var(--card);color:var(--ink);border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;margin-left:auto}
+.goal{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+@media (max-width:900px){.goal{grid-template-columns:1fr}}
+.want{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.want label{font-size:13px;color:var(--dim)}
+.want input{width:130px;border:0;border-bottom:1px solid var(--line-2);background:none;color:var(--ink);font:inherit;font-size:22px;font-weight:600;padding:0 2px;font-variant-numeric:tabular-nums}
+.want input:focus{outline:none;border-color:var(--gold-b)}
+.need{font-size:22px;font-weight:600;margin:6px 0 2px;line-height:1.2}
+.need small{font-size:12.5px;font-weight:400;color:var(--dim);display:block;margin-top:2px}
+.ladder .tr{position:relative;height:12px;border-radius:6px;background:var(--soft);margin:24px 0 28px}
+.ladder .tr .fc{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--gold-b)}
+.ladder .tr .cap{position:absolute;top:-17px;font-size:10.5px;color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ladder .tr .cap b{color:var(--ink);font-weight:600}.ladder .tr .cap.l{left:0}.ladder .tr .cap.e{right:0}
+.ladder .tr .mk{position:absolute;top:-4px;bottom:-4px;width:0;border-left:2px solid var(--gold-b)}
+.ladder .tr .mk.pace{border-left-style:dashed;border-left-color:var(--ink);opacity:.55}
+.ladder .tr .mk i{position:absolute;left:-1px;transform:translateX(-50%);bottom:-22px;font-size:10.5px;font-style:normal;white-space:nowrap;font-variant-numeric:tabular-nums;background:var(--soft);border:1px solid var(--gold-b);border-radius:9px;padding:1px 7px;color:var(--gold)}
+.ladder .tr .mk i b{color:var(--gold);font-weight:600}
+.ladder .tr .mk.pace i{bottom:auto;top:-22px;border-color:var(--line-2);color:var(--ink);opacity:1}.ladder .tr .mk.pace i b{color:var(--ink)}
+.ladder .tr .mk.near i{transform:none;left:6px}.ladder .tr .mk.far i{transform:none;left:auto;right:6px}
+.money{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--dim);flex-wrap:wrap}
+.money b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.pd{font-size:13px;line-height:1.55;margin:0}.pd p{margin:0 0 8px}.pd b{font-weight:600}
+.pd .gap.bad{color:var(--bad)}.pd .gap.ok{color:var(--ok)}
+.today{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--gold-soft);color:var(--gold);font-size:13.5px}
+.today b{font-size:20px;font-weight:600;margin-right:4px;font-variant-numeric:tabular-nums}
+.convs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:900px){.convs{grid-template-columns:1fr}}
+.conv{background:var(--soft);border-radius:12px;padding:12px 14px}
+.conv .cvl{font-size:12px;color:var(--dim);margin:0}
+.conv .cvn{font-size:30px;font-weight:600;margin:2px 0 4px;line-height:1.1;font-variant-numeric:tabular-nums}
+.conv .cvn small{font-size:12px;font-weight:400;color:var(--dim);margin-left:6px}
+.conv p{margin:0 0 3px;font-size:12.5px;color:var(--dim)}
+.pf{border:0;background:var(--card);color:var(--ink);font:inherit;font-size:12.5px;font-weight:600;padding:1px 8px;border-radius:8px;cursor:pointer;font-variant-numeric:tabular-nums;border:1px solid var(--line-2)}
+.pf:hover{border-color:var(--gold-b);color:var(--gold)}.pf[aria-expanded=true]{background:var(--gold-soft);color:var(--gold);border-color:transparent}
+.pb{margin:12px 0 0;border:1px solid var(--line-2);border-radius:12px;padding:10px 14px;max-height:460px;overflow:auto}
+.pb .pt{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:600;font-size:13px;margin:0 0 6px}
+.pb .pt button{border:0;background:none;color:var(--dim);font:inherit;font-size:12px;cursor:pointer}
+.pb .pi{margin:0;padding:4px 0;border-top:1px solid var(--line);font-size:12.5px;display:flex;gap:8px;align-items:baseline}
+.pb .pi a{font-variant-numeric:tabular-nums;flex:none}.pb .pi .nm{color:var(--ink);font-weight:500}.pb .pi .lb{color:var(--dim)}
+.pb .empty{color:var(--faint);font-size:12.5px;padding:6px 0}
+.col td.num,.col th.num{text-align:right;font-variant-numeric:tabular-nums}
+.col td.me{color:var(--gold);font-weight:600}
+.rules{font-size:12.5px;color:var(--dim);line-height:1.55}.rules p{margin:0 0 6px}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Отдел продаж · Первая линия · <b>Окно на день</b></div><h1 id="h1">Окно на день</h1><p class="sub" id="sub">Цель по деньгам, три конверсии месяца и списки сделок под каждой цифрой</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div class="tabs" id="tabs"></div>
+  <div id="body"><div class="card"><p class="empty">загрузка…</p></div></div>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var SHOW = { "Маргарита": "Марго", "Алина": "Алина", "Юлия": "Юля", "Полина": "Полина" };
+var ORDER = ["Маргарита", "Алина", "Юлия", "Полина"];
+var MON_NOM = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+var MON_PREP = ["январе","феврале","марте","апреле","мае","июне","июле","августе","сентябре","октябре","ноябре","декабре"];
+var MON_GEN = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+var WD = ["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"];
+var AMO = "https://pavelgitelman.amocrm.ru/leads/detail/";
+var DATA = null, DAY = "", MGR = "";
+
+function plural(n, a, b, c){ n = Math.abs(n) % 100; var m = n % 10; if (n > 10 && n < 20) return c; if (m > 1 && m < 5) return b; if (m === 1) return a; return c; }
+function rub(n){ return Math.round(n).toLocaleString("ru-RU").replace(/ /g, " ") + " ₽"; }
+function num(n){ return Math.round(n).toLocaleString("ru-RU").replace(/ /g, " "); }
+function q(s){ var m = /[?&]mgr=([^&]+)/.exec(location.search); return m ? decodeURIComponent(m[1]) : ""; }
+
+function load(day){
+  return fetch("/api/okna" + (day ? "?day=" + day : ""), { credentials: "same-origin" }).then(function(r){ return r.json(); }).then(function(res){
+    if (!res.ok) { document.getElementById("body").innerHTML = '<div class="card"><p class="empty">Нет доступа к окнам</p></div>'; return; }
+    DATA = res; DAY = res.day;
+    if (!DAY) { document.getElementById("body").innerHTML = '<div class="card"><p class="empty">Окна ещё не собирались - появятся после ближайшего сбора</p></div>'; return; }
+    var have = {}; res.rows.forEach(function(r){ have[r.mgr] = 1; });
+    var list = ORDER.filter(function(m){ return have[m]; });
+    if (!MGR || !have[MGR]) MGR = (q() && have[q()]) ? q() : list[0];
+    tabs(list); render();
+  });
+}
+function tabs(list){
+  var el = document.getElementById("tabs");
+  el.innerHTML = list.map(function(m){ return '<button type="button" data-m="' + esc(m) + '" aria-pressed="' + (m === MGR) + '">' + esc(SHOW[m] || m) + '</button>'; }).join("")
+    + '<select id="dsel" aria-label="День окна">' + DATA.days.map(function(d){ return '<option value="' + d + '"' + (d === DAY ? ' selected' : '') + '>' + d.split("-").reverse().join(".") + '</option>'; }).join("") + '</select>';
+  el.querySelectorAll("button").forEach(function(b){ b.onclick = function(){ MGR = b.dataset.m; history.replaceState(null, "", "?mgr=" + encodeURIComponent(MGR)); tabs(list); render(); }; });
+  document.getElementById("dsel").onchange = function(){ load(this.value); };
+}
+function R(m){ var o = {}; DATA.rows.forEach(function(r){ if (r.mgr === m) o[r.key] = r; }); return o; }
+function n(o, k){ return o[k] ? o[k].n : 0; }
+function goalOf(m, month){
+  var g = null; DATA.goals.forEach(function(x){ if (x.mgr === m && (!g || x.month > g.month)) g = x; });
+  return g || { goal: 137500, base: 25000, rate: 1500 };
+}
+function pctc(a, b){ return b ? Math.round(100 * a / b) : 0; }
+
+function render(){
+  var o = R(MGR), me = SHOW[MGR] || MGR;
+  var d = new Date(DAY + "T00:00:00"), y = d.getFullYear(), mo = d.getMonth(), dn = d.getDate();
+  var dim = new Date(y, mo + 1, 0).getDate(), month = DAY.slice(0, 7);
+  var G = goalOf(MGR, month), BASE = G.base, RATE = G.rate;
+  var key = "okno-goal:" + MGR + ":" + month, goal = G.goal;
+  try { var s = localStorage.getItem(key); if (s && Number(s) > 0) goal = Number(s); } catch (e) {}
+  var cond = n(o, "cond"), lost = n(o, "lost"), booked = cond + lost, ahead = n(o, "ahead");
+  var leads = n(o, "leads"), ans = n(o, "answered"), ca = n(o, "ca"), cab = n(o, "ca_booked"), cnb = n(o, "ca_nobook"), nca = n(o, "ca_notca");
+  var CONV = booked ? cond / booked : 0.8;
+  var shifts = (o.shifts && o.shifts.items) || [];
+  document.getElementById("h1").textContent = me + " - " + dn + " " + MON_GEN[mo] + ", " + WD[d.getDay()];
+  document.getElementById("sub").textContent = "Срез на 00:00 " + DAY.split("-").reverse().join(".") + " - месяц " + MON_NOM[mo] + " считается по встречам до этого дня";
+  var upd = ""; DATA.rows.forEach(function(r){ if (r.updated_at > upd) upd = r.updated_at; });
+  document.getElementById("stamp").textContent = upd ? "собрано " + new Date(upd).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+
+  function calc(){
+    var need = Math.max(0, Math.ceil((goal - BASE) / RATE)), left = Math.max(0, need - cond);
+    var daysLeft = dim - dn + 1, wdLeft = 0; for (var k = dn; k <= dim; k++) { var w = new Date(y, mo, k).getDay(); if (w !== 0 && w !== 6) wdLeft++; }
+    var shLeft = shifts.filter(function(x){ return x >= dn; });
+    var book0 = Math.ceil(left / CONV), perShift = shLeft.length ? Math.ceil(book0 / shLeft.length) : book0;
+    var passed = dn - 1, pace = passed ? cond / passed : 0, proj = Math.round(cond + pace * daysLeft);
+    var planToday = passed ? need * passed / dim : 0;
+    var gap = goal - (BASE + proj * RATE);
+    var now = BASE + cond * RATE, bonusLeft = Math.max(0, goal - now);
+    var W = Math.max(need, cond, proj, 1);
+    var pc = function(v){ return Math.min(100, 100 * v / W); };
+    var ladder = '<div class="ladder"><div class="tr">'
+      + '<span class="cap l">факт <b>' + cond + '</b></span><span class="cap e">нужно <b>' + need + '</b></span>'
+      + '<div class="fc" style="width:' + pc(cond) + '%"></div>'
+      + (passed ? '<div class="mk pace' + (pc(planToday) < 12 ? ' near' : '') + '" style="left:' + pc(planToday) + '%"><i>план на сегодня <b>' + Math.round(planToday) + '</b></i></div>' : '')
+      + (passed ? '<div class="mk' + (pc(proj) > 86 ? ' far' : '') + '" style="left:' + pc(proj) + '%"><i>прогноз <b>' + proj + '</b> - ' + pctc(proj, need) + '% цели</i></div>' : '')
+      + '</div></div>';
+    var todayShift = shifts.indexOf(dn) >= 0, nextShift = shifts.filter(function(x){ return x > dn; })[0];
+    var todayLine = todayShift
+      ? '<div class="today"><b>' + perShift + '</b> ' + plural(perShift, "клиента", "клиентов", "клиентов") + ' записать и подтвердить сегодня - это твоя смена</div>'
+      : '<div class="today">Сегодня выходной' + (nextShift ? ' - ближайшая смена ' + WD[new Date(y, mo, nextShift).getDay()] + ' ' + String(nextShift).padStart(2, "0") + "." + String(mo + 1).padStart(2, "0") + ': нужно записать <b>' + perShift + '</b>' : ' - смен до конца месяца по графику нет') + '</div>';
+    return '<div class="goal"><div>'
+      + '<div class="want"><label for="goal">Хочу в ' + MON_PREP[mo] + '</label><input id="goal" type="number" min="0" step="500" value="' + goal + '"><span class="note" style="margin:0">₽ - впиши сумму, всё ниже пересчитается</span></div>'
+      + '<div class="need">Тебе нужно ' + need + ' ' + plural(need, "проведённая встреча", "проведённые встречи", "проведённых встреч") + '<small>оклад ' + rub(BASE) + ' + ' + rub(RATE) + ' за каждую проведённую встречу в зачёт</small></div>'
+      + ladder
+      + '<div class="money"><span>Сейчас <b>' + cond + '</b> ' + plural(cond, "встреча", "встречи", "встреч") + ' - <b>' + rub(now) + '</b> (оклад + бонус ' + rub(cond * RATE) + ')</span><span>Осталось <b>' + left + '</b> ' + plural(left, "встреча", "встречи", "встреч") + ' - <b>' + rub(bonusLeft) + '</b> бонуса</span></div>'
+      + todayLine
+      + '</div><div class="pd">'
+      + '<p>До конца ' + MON_GEN[mo] + ' <b>' + daysLeft + ' ' + plural(daysLeft, "день", "дня", "дней") + '</b> - значит нужно проводить по <b>' + (left / daysLeft).toFixed(1).replace(".", ",") + '</b> в день' + (wdLeft ? ' (если только будни, их ' + wdLeft + ' - по ' + (left / wdLeft).toFixed(1).replace(".", ",") + ')' : '') + '.</p>'
+      + '<p>Каждый такой день - это ' + rub((left / daysLeft) * RATE) + ' бонуса.</p>'
+      + '<p>До зума сейчас доходят <b>' + Math.round(CONV * 100) + '%</b> назначенных, поэтому назначить нужно ещё <b>' + book0 + '</b> ' + plural(book0, "встречу", "встречи", "встреч") + ' - по <b>' + perShift + '</b> записанных и подтверждённых за ' + (shLeft.length ? '<button type="button" class="pf" data-pf="shifts">' + shLeft.length + ' ' + plural(shLeft.length, "оставшуюся смену", "оставшиеся смены", "оставшихся смен") + '</button>' : 'оставшиеся смены (в графике их нет)') + '.</p>'
+      + '<p class="note" style="margin:0 0 8px">Зумы идут все дни месяца, записываешь ты только в свои смены.</p>'
+      + (passed ? '<p>Темп: <b>' + pace.toFixed(2).replace(".", ",") + '</b> встречи в день за ' + passed + ' ' + plural(passed, "день", "дня", "дней") + '. При таком темпе к концу месяца будет около <b>' + proj + '</b> - <span class="gap ' + (gap > 0 ? 'bad' : 'ok') + '">' + (gap > 0 ? 'до цели не хватит ' + rub(gap) : 'цель берётся - и ещё ' + rub(-gap) + ' сверху') + '</span>.</p>' : '<p>Темп появится со второго дня месяца.</p>')
+      + '</div></div>';
+  }
+  var panel = document.createElement("div"); panel.className = "card"; panel.innerHTML = '<h2>Цель на ' + MON_NOM[mo] + '</h2>' + calc();
+  function bindGoal(){
+    var inp = panel.querySelector("#goal");
+    inp.oninput = function(){ var v = Number(inp.value); if (v > 0) { goal = v; try { localStorage.setItem(key, String(v)); } catch (e) {} var f = document.activeElement === inp, pos = inp.selectionStart; panel.innerHTML = '<h2>Цель на ' + MON_NOM[mo] + '</h2>' + calc(); bindGoal(); if (f) { var i2 = panel.querySelector("#goal"); i2.focus(); try { i2.setSelectionRange(pos, pos); } catch (e) {} } } };
+    panel.querySelectorAll("[data-pf]").forEach(function(b){ b.onclick = function(){ toggle(b, o); }; });
+  }
+  bindGoal();
+
+  var convs = document.createElement("div"); convs.className = "card";
+  convs.innerHTML = '<h2>Три конверсии за ' + MON_NOM[mo] + ' <small>каждая цифра - кнопка со списком сделок</small></h2><div class="convs">'
+    + '<div class="conv"><p class="cvl">Лид / первый ответ</p><p class="cvn">' + pctc(ans, leads) + '%</p><p>лидов ' + pf("leads", leads) + ' - ответили ' + pf("answered", ans) + '</p><p>лиды - «Дата вступил в чат» в ' + MON_PREP[mo] + ', ответили - «Дата взят в работу ответил» в ' + MON_PREP[mo] + ' (как отчёт amo)</p></div>'
+    + '<div class="conv"><p class="cvl">ЦА / назначено</p><p class="cvn">' + pctc(cab, ca) + '%</p><p>ЦА ' + pf("ca", ca) + ' - назначено ' + pf("ca_booked", cab) + '</p><p>ЦА без встречи ' + pf("ca_nobook", cnb) + ' - квал не ЦА ' + pf("ca_notca", nca) + ' (в конверсию не входят)</p></div>'
+    + '<div class="conv"><p class="cvl">Назначено / проведено</p><p class="cvn">' + Math.round(CONV * 100) + '%</p><p>назначено <b class="pf" style="cursor:default">' + booked + '</b> - провела ' + pf("cond", cond) + ' - сорвалось ' + pf("lost", lost) + '</p><p>впереди ' + pf("ahead", ahead) + ' ' + plural(ahead, "встреча", "встречи", "встреч") + ' с датой зума с сегодняшнего дня</p></div>'
+    + '</div><div id="proofs"></div>';
+  convs.querySelectorAll("[data-pf]").forEach(function(b){ b.onclick = function(){ toggle(b, o); }; });
+
+  var col = document.createElement("div"); col.className = "card";
+  var others = ORDER.filter(function(m){ return R(m).cond; });
+  col.innerHTML = '<h2>У коллег <small>те же цифры за ' + MON_NOM[mo] + '</small></h2><div class="wide"><table class="col"><thead><tr><th>Менеджер</th><th class="num">Проведено</th><th class="num">Сорвалось</th><th class="num">Доходят до зума</th><th class="num">Лид / ответ</th><th class="num">ЦА / назначено</th><th class="num">Впереди</th></tr></thead><tbody>'
+    + others.map(function(m){ var x = R(m), c = n(x, "cond"), l = n(x, "lost"); return '<tr><td' + (m === MGR ? ' class="me"' : '') + '>' + esc(SHOW[m] || m) + '</td><td class="num">' + c + '</td><td class="num">' + l + '</td><td class="num">' + pctc(c, c + l) + '%</td><td class="num">' + pctc(n(x, "answered"), n(x, "leads")) + '%</td><td class="num">' + pctc(n(x, "ca_booked"), n(x, "ca")) + '%</td><td class="num">' + n(x, "ahead") + '</td></tr>'; }).join("")
+    + '</tbody></table></div>';
+
+  var rules = document.createElement("div"); rules.className = "card rules";
+  rules.innerHTML = '<h2>Как считается</h2>'
+    + '<p>Все числа месяца - срез на 00:00 дня окна: встреча с зумом сегодня в факт не идёт, план и норма на смену не меняются в течение дня.</p>'
+    + '<p>Проведено - сделки с «Дата встреча проведена» в ' + MON_PREP[mo] + ', где ты стоишь в поле «1-линия ответственный» (воронки Первой и Второй линии, повторные диагностики). В зачёт идёт собственник с оборотом от 30 млн или топ-менеджер компании от 3 млрд - ведомость по критерию может отличаться от amo.</p>'
+    + '<p>Сорвалось - твои сделки на этапах «назначена», «подтверждена», «перенесена», у которых дата зума в ' + MON_PREP[mo] + ' уже прошла, а встречи не было (сделке не больше 90 дней). Назначено = проведено + сорвалось: числитель и знаменатель за один период.</p>'
+    + '<p>ЦА / назначено - сделки ' + MON_GEN[mo] + ' по дате создания, дошедшие до квала, у которых в карточке «Квалификация» = ЦА; не-ЦА в знаменатель не берутся.</p>'
+    + '<p>План считается по дням месяца, записи - по сменам из графика 1 линии. Оклад и ставка - из целей раздела; сумму «хочу» можно поменять прямо здесь, она запоминается в этом браузере.</p>';
+
+  var body = document.getElementById("body"); body.innerHTML = "";
+  body.appendChild(panel); body.appendChild(convs); body.appendChild(col); body.appendChild(rules);
+}
+function pf(key, v){ return '<button type="button" class="pf" data-pf="' + key + '" aria-expanded="false">' + v + '</button>'; }
+var TITLES = { cond: "проведённые встречи", lost: "сорвавшиеся встречи месяца", ahead: "встречи впереди", leads: "лиды месяца - «Дата вступил в чат»", answered: "ответили - «Дата взят в работу ответил»",
+  ca: "квал и ЦА, сделки месяца", ca_booked: "ЦА, встреча назначена", ca_nobook: "ЦА без назначенной встречи - это и есть работа", ca_notca: "квал, но не ЦА - в конверсию не входят", shifts: "смены до конца месяца по графику" };
+function toggle(btn, o){
+  var key = btn.dataset.pf, host = document.getElementById("proofs");
+  var open = btn.getAttribute("aria-expanded") === "true";
+  document.querySelectorAll(".pf[aria-expanded=true]").forEach(function(b){ b.setAttribute("aria-expanded", "false"); });
+  if (open) { host.innerHTML = ""; return; }
+  btn.setAttribute("aria-expanded", "true");
+  var row = o[key], items = (row && row.items) || [];
+  var me = SHOW[MGR] || MGR, html;
+  if (key === "shifts") {
+    var d = new Date(DAY + "T00:00:00"), dn = d.getDate();
+    var days = items.filter(function(x){ return x >= dn; }).map(function(x){ var dd = new Date(d.getFullYear(), d.getMonth(), x); return WD[dd.getDay()].slice(0, 2) + " " + String(x).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0"); });
+    html = '<p class="pi"><span class="lb">' + esc(days.join(", ") || "смен нет") + '</span></p><p class="pi"><a href="https://docs.google.com/spreadsheets/d/18dDX0Q3utC-gaqtVg4v4GlOnVLOa9jqGM-979GJqsig" target="_blank" rel="noopener">график 1 линии ↗</a></p>';
+  } else {
+    html = items.length ? items.map(function(it){ return '<p class="pi"><a href="' + AMO + it[0] + '" target="_blank" rel="noopener">' + it[0] + '</a>' + (it[2] ? '<span class="nm">' + esc(it[2]) + '</span>' : '') + '<span class="lb">' + esc(it[1]) + '</span></p>'; }).join("") : '<p class="empty">сделок нет</p>';
+  }
+  host.innerHTML = '<div class="pb"><p class="pt"><span>' + esc(me + " - " + (TITLES[key] || key)) + ' - ' + items.length + '</span><button type="button" id="pbx">скрыть</button></p>' + html + '</div>';
+  document.getElementById("pbx").onclick = function(){ host.innerHTML = ""; btn.setAttribute("aria-expanded", "false"); };
+  host.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+document.addEventListener("keydown", function(e){ if (e.key === "Escape") { var h = document.getElementById("proofs"); if (h) h.innerHTML = ""; document.querySelectorAll(".pf[aria-expanded=true]").forEach(function(b){ b.setAttribute("aria-expanded", "false"); }); } });
+load("");
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>

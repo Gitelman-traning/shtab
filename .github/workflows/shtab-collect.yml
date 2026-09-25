@@ -17,6 +17,10 @@ on:
         description: 'Also sync metrics registry (1 = yes)'
         required: false
         default: ''
+      okna_day:
+        description: 'Okna day, YYYY-MM-DD (empty = today MSK)'
+        required: false
+        default: ''
 
 jobs:
   collect:
@@ -39,3 +43,12 @@ jobs:
           FROM: ${{ inputs.from }}
           TO: ${{ inputs.to }}
           SYNC_METRICS: ${{ inputs.sync_metrics }}
+      # окна менеджеров Первой линии: срез на 00:00 сегодняшнего дня, прямо из amo (только чтение)
+      - run: python collector/okna.py
+        if: always()
+        env:
+          AMO_TOKEN: ${{ secrets.AMO_TOKEN }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          SHTAB_URL: ${{ secrets.SHTAB_URL }}
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
+          OKNA_DAY: ${{ inputs.okna_day }}
