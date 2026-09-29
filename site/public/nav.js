@@ -44,6 +44,7 @@
     ] },
     { id: "help", name: "Справка", icon: I.help, children: [
       { name: "Гайд и вопросы", href: "/guide", icon: I.help, sec: "guide" },
+      { name: "Воронки amoCRM", href: "/guide/voronki", icon: I.sales, sec: "guide" },
       { name: "Витрина", href: "/status", icon: I.db, sec: "status" }
     ] },
     { id: "settings", name: "Настройки", icon: I.gear, admin: true, children: [

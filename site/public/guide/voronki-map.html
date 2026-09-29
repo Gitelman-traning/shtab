@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Карта воронок amoCRM</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root{
+    --ink:#151616; --paper:#f6f4ef; --card:#fff; --line:#d9d4c8; --muted:#6b6a66;
+    --gold:#b59f76; --gold2:#d8c9a8; --red:#c0392b; --green:#2e7d4f; --robot:#4a6fa5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  header{padding:22px 24px 4px;max-width:1600px;margin:0 auto}
+  h1{margin:0 0 6px;font-size:26px;letter-spacing:.02em;text-transform:uppercase;font-weight:800}
+  .sub{color:var(--muted);max-width:900px}
+  .mock{display:inline-block;background:#fff3c4;border:1px dashed #d1b23a;color:#6b5200;font-size:12px;padding:3px 8px;border-radius:6px;margin-bottom:10px;letter-spacing:.04em}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:var(--muted)}
+  .legend span::before{content:"";display:inline-block;width:26px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px;border-radius:2px}
+  .legend .r::before{border-color:var(--robot)}
+  .legend .h::before{border-color:var(--gold)}
+  .legend .x::before{border-color:var(--red);border-top-style:dashed}
+
+  /* Доска прокручивается по горизонтали, холст — базa координат для стрелок */
+  .board{max-width:1600px;margin:8px auto 30px;padding:0 24px;overflow-x:auto;overflow-y:visible}
+  .canvas{position:relative;min-width:max-content;padding:44px 110px 150px 70px}
+  .lane{display:flex;align-items:stretch;gap:0;margin:0 0 104px;position:relative}
+  .lane:last-child{margin-bottom:0}
+  .lane-head{flex:0 0 176px;background:var(--ink);color:#fff;border-radius:12px 0 0 12px;padding:12px 14px;display:flex;flex-direction:column;justify-content:center}
+  .lane-head b{display:block;font-size:13px;text-transform:uppercase;letter-spacing:.05em;line-height:1.25}
+  .lane-head small{display:block;color:var(--gold2);font-size:11.5px;margin-top:4px;line-height:1.3}
+  .lane-head .note{display:block;font-style:normal;color:#f0b8b0;font-size:11px;margin-top:8px;line-height:1.3}
+  .stages{display:flex;gap:5px;background:var(--card);border:1px solid var(--line);border-left:0;border-radius:0 12px 12px 0;padding:10px}
+  .stage{width:112px;flex:0 0 112px;border:1px solid var(--line);border-radius:9px;padding:8px 8px 9px;font-size:12.5px;line-height:1.25;display:flex;flex-direction:column;gap:4px;background:#fff;position:relative}
+  .stage .n{font-size:10.5px;color:var(--muted)}
+  .stage .name{font-weight:600}
+  .stage .hint{font-size:11px;color:var(--muted);font-weight:400;margin-top:auto}
+  .stage.key{background:#f3efe4;border-color:#e2d8c2}
+  .stage.win{background:#e6f2ea;border-color:#bcd9c6;color:var(--green)}
+  .stage.lose{background:#f8e7e5;border-color:#e6bcb7;color:var(--red)}
+  .stage.dim{color:#9a9890;background:#fafaf8}
+  .stage.dim .name{font-weight:500}
+  .arr{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  .arr path{fill:none;stroke-width:2.5;stroke-linejoin:round}
+  .arr .ban{stroke-dasharray:7 6}
+  .stage.out{box-shadow:inset 0 -4px 0 var(--mark)} .stage.in{box-shadow:inset 0 4px 0 var(--mark)} .stage.in.out{box-shadow:inset 0 4px 0 var(--mark2), inset 0 -4px 0 var(--mark)}
+  .lbls{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+  .lbl{position:absolute;transform:translate(-50%,-50%);background:var(--paper);border:1.5px solid var(--c);color:var(--c);border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600;line-height:1.25;text-align:center;white-space:nowrap}
+  .rules{max-width:1600px;margin:0 auto 40px;padding:0 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .rules div{background:var(--ink);color:#e8e6e0;border-radius:12px;padding:14px 18px;font-size:13.5px}
+  .rules h3{margin:0 0 4px;font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--gold2)}
+  /* Подробности этапа: значок i, всплывают при наведении или касании */
+  .lock{display:inline-block;font-size:10.5px;font-weight:700;color:var(--red);background:#fff;border:1px solid #e6bcb7;border-radius:5px;padding:1px 5px;margin-top:4px;align-self:flex-start}
+  .stage .i.q{background:var(--red);color:#fff;border-color:var(--red);font-weight:700}
+  .stage.has-more{cursor:help}
+  .stage .i{position:absolute;right:7px;top:6px;width:14px;height:14px;border-radius:50%;border:1px solid var(--line);color:var(--muted);font-size:9.5px;line-height:12px;text-align:center;background:#fff}
+  .pop{display:none;position:absolute;left:0;top:calc(100% + 6px);width:250px;z-index:5;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.35;color:var(--ink);font-weight:400;box-shadow:0 6px 18px rgba(0,0,0,.12)}
+  .pop-right .pop{left:auto;right:0}
+  .stage:hover .pop,.stage.open .pop{display:block}
+  @media print{ body{background:#fff} .mock{display:none} .board{overflow:visible} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Как живёт сделка в amoCRM</h1>
+</header>
+
+<div class="board"><div class="canvas" id="canvas"></div></div>
+
+
+<script>
+/* ---------- ДАННЫЕ: дорожки и этапы. Править здесь. ---------- */
+const LANES = [
+  { id:"p1", name:"Первая линия", sub:"продажи тренинга", note:"сделки отсюда никуда не переносим — копии в другие воронки делает робот", stages:[
+    { id:"p1-raw", kind:"dim", name:"Неразобранное · чат-ИИ", hint:"техэтапы" },
+    { id:"p1-new", kind:"key", n:"1", name:"Новый лид", hint:"вход всех лидов", more:"Сюда попадают все лиды: чаты WhatsApp и Telegram, Salebot, сайт, реклама FB. Робот перед созданием ищет контакт по телефону; если в 1-й или 2-й линии уже есть открытая сделка, новая не создаётся. Взять в работу — в течение 3 минут." },
+    { id:"p1-work", n:"2", name:"Взят в работу", hint:"менеджер принял", more:"Менеджер забрал лид себе и начал связь. Первый звонок или сообщение — сразу." },
+    { id:"p1-ndz", n:"3", name:"НДЗ 1 → 4", hint:"попытки дозвона", more:"Каждая неудачная попытка дозвона — шаг на следующий НДЗ. После четвёртого — в ЗИН с причиной «Недозвон» или «5+ ндз»." },
+    { id:"p1-q", n:"4", name:"Ответил на первый вопрос", hint:"квалификация", more:"Клиент вышел на связь. Здесь заполняется поле «Квалификация» (в том числе «Не ЦА» — это значение поля, а не этап)." },
+    { id:"p1-q2", n:"5", name:"Квалифицирован, не назначили" },
+    { id:"p1-q3", n:"6", name:"Квалифицирован, прогрев" },
+    { id:"p1-meet", n:"7", name:"Встреча назначена", hint:"ждём подтверждения" },
+    { id:"p1-moved", n:"8", name:"Встреча перенесена" },
+    { id:"p1-conf", kind:"key", n:"9", name:"Встреча подтверждена", hint:"оригинал остаётся тут", more:"После подтверждения робот создаёт копию сделки во Второй линии на этапе «Назначена диагностика». Оригинал в Первой линии никуда не переезжает." },
+    { id:"p1-win", kind:"win", n:"✓", name:"Встреча проведена", hint:"успех", lock:"не переносить", more:"Финал Первой линии: диагностика состоялась. Дальше клиента ведёт Вторая линия по копии сделки. Эту сделку никуда не переносим." },
+    { id:"p1-zin", kind:"lose", n:"✕", name:"Закрыто и не реализовано", hint:"причина обязательна", lock:true, more:"Обязательно поле «Причина отказа». Если 30 дней нет результата, сделка закроется сюда сама (на 27-й день придёт задача). Робот ЗИН ставит галку и дату ЗИН и заводит сделку в «Реанимации 1 линия». Назад из ЗИН не возвращать — сторож откатит." },
+  ]},
+  { id:"p2", name:"Вторая линия", sub:"диагностика → оплата", note:"сделки отсюда никуда не переносим — в другие воронки их заводит робот", stages:[
+    { id:"p2-raw", kind:"dim", name:"Неразобранное · «иные» лиды" },
+    { id:"p2-diag", kind:"key", n:"1", name:"Назначена диагностика", hint:"вход копии", more:"Сюда робот кладёт копию сделки после подтверждения встречи в Первой линии, а также новые сделки из базы клиентов с источником «БК ЗИН 2-линия»." },
+    { id:"p2-done", n:"2", name:"Диагностика проведена · повторка" },
+    { id:"p2-com", n:"3", name:"Заявка на комитет → одобрил" },
+    { id:"p2-react", n:"4", name:"Клиент отреагировал → дата $" },
+    { id:"p2-bill", n:"5", name:"Счёт → чек → предоплата" },
+    { id:"p2-win", kind:"win", n:"✓", name:"100 % оплаты получено", lock:"не переносить", more:"Финал Второй линии: оплата получена. Эту сделку никуда не переносим." },
+    { id:"p2-zin", kind:"lose", n:"✕", name:"Прогрев / закрытие (ЗИН)", hint:"причина обязательна", lock:true, more:"Закрытие Второй линии. С причиной «Прогрев» робот заводит сделку в «Бирже лидов», с остальными причинами робот создаёт сделку в «Повторных диагностик» — базе клиентов 2-й линии. Назад из ЗИН не возвращать." },
+  ]},
+  { id:"r1", name:"Реанимация 1 линия", sub:"прогрев после ЗИН", who:"Менеджеры реанимации. Сделку создаёт робот", stages:[
+    { id:"r1-base", kind:"key", n:"1", name:"База реанимации", hint:"вход", more:"Сделку создаёт робот из ЗИН Первой линии, источник сохраняется. Здесь работают менеджеры реанимации." },
+    { id:"r1-ndz", n:"2", name:"НДЗ 1 → 3" },
+    { id:"r1-ign", n:"3", name:"Игнор" },
+    { id:"r1-ca", n:"4", name:"ЦА, не назначено" },
+    { id:"r1-win", kind:"win", n:"✓", name:"Встреча назначена", hint:"успех", more:"Клиент вернулся. Робот заводит новую сделку в Первой линии на «Новый лид» с источником «БК ЗИН 1-линия», и она идёт обычным путём." },
+    { id:"r1-zin", kind:"lose", n:"✕", name:"Закрыто и не реализовано" },
+  ]},
+  { id:"pd", name:"Повторных диагностик", sub:"база клиентов 2-й линии", who:"Полина Ахметшина. Сделку создаёт робот", stages:[
+    { id:"pd-new", kind:"key", n:"1", name:"Новый лид", hint:"вход", more:"Сделку создаёт робот после закрытия Второй линии. Ведёт Полина Ахметшина." },
+    { id:"pd-work", n:"2", name:"Лид в работе · касдев" },
+    { id:"pd-t", n:"3", name:"Касание 1 → 4" },
+    { id:"pd-ans", n:"4", name:"Клиент ответил" },
+    { id:"pd-meet", n:"5", name:"Встреча назначена" },
+    { id:"pd-conf", kind:"key", n:"6", name:"Встреча подтверждена", hint:"→ 2-я линия", more:"После подтверждения робот заводит новую сделку во Второй линии на «Назначена диагностика» с источником «БК ЗИН 2-линия». Здесь работает отдельный менеджер по той же логике, что и Первая линия. Механика может ещё поменяться." },
+    { id:"pd-warm", n:"7", name:"Прогрев" },
+    { id:"pd-win", kind:"win", n:"✓", name:"Встреча проведена", hint:"успех" },
+    { id:"pd-zin", kind:"lose", n:"✕", name:"Закрыто и не реализовано" },
+  ]},
+  { id:"bx", name:"Биржа лидов", sub:"прогрев после 2-й линии", stages:[
+    { id:"bx-raw", kind:"dim", name:"Неразобранное" },
+    { id:"bx-warm", kind:"key", n:"1", name:"Прогрев", hint:"вход", more:"Сюда робот заводит новую сделку, когда Вторую линию закрыли с причиной «Прогрев». За 60 дней так пришло 38 сделок." },
+    { id:"bx-t1", n:"2", name:"Лёгкое касание спустя 3–5 дней" },
+    { id:"bx-t2", n:"3", name:"Точечные касания раз в 1–2 недели" },
+    { id:"bx-dates", n:"4", name:"Уведомление о новых датах" },
+    { id:"bx-offer", n:"5", name:"Персональное предложение" },
+    { id:"bx-win", kind:"win", n:"✓", name:"Повторная встреча проведена", hint:"куда дальше — решается", flag:"?", more:"Открытый вопрос. Биржа — воронка менеджера Второй линии, но сейчас в ней работают мало. Варианты: после работы отправлять в Первую линию, чтобы там довели до назначения диагностики, или сразу во Вторую линию на диагностику, тогда менеджер Второй линии назначает сам." },
+    { id:"bx-zin", kind:"lose", n:"✕", name:"Закрыто и не реализовано" },
+  ]},
+];
+
+/* Стрелки: from → to, цвет, подпись. Соседние и пересекающиеся линии — разных цветов. */
+const ARROWS = [
+  { from:"p1-conf", to:"p2-diag", color:"#4a6fa5", label:"робот создаёт копию после подтверждения встречи" },
+  { from:"p1-zin",  to:"r1-base", color:"#c77d2a", label:"робот ЗИН: галка + дата ЗИН, сделка в реанимацию" },
+  { from:"r1-win",  to:"p1-new",  color:"#2a8f83", side:"left", label:"новая сделка в Первой линии, источник «БК ЗИН 1-линия»" },
+  { from:"p2-zin",  to:"pd-new",  color:"#7b5ea7", label:"закрытие 2-й линии (кроме «Прогрев») → база клиентов" },
+  { from:"p2-zin",  to:"bx-warm", color:"#c2185b", label:"причина «Прогрев» → Биржа лидов" },
+  { from:"pd-conf", to:"p2-diag", color:"#3f8f4a", label:"после подтверждения — новая сделка, источник «БК ЗИН 2-линия»" },
+  { from:"p1-zin",  to:"p1-raw",  color:"#c0392b", ban:true, label:"из ЗИН назад нельзя — ни на какой этап (только администратор)" },
+  { from:"p2-zin",  to:"p2-raw",  color:"#c0392b", ban:true, label:"из ЗИН назад нельзя — ни на какой этап (только администратор)" },
+];
+
+/* ---------- РЕНДЕР ---------- */
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function render(){
+  const c=document.getElementById("canvas");
+  c.innerHTML = LANES.map((l)=>`
+    <div class="lane" id="${l.id}">
+      <div class="lane-head"><b>${esc(l.name)}</b><small>${esc(l.sub||"")}</small>${l.note?`<em class="note">${esc(l.note)}</em>`:""}</div>
+      <div class="stages">${l.stages.map((s,i)=>`
+        <div class="stage ${s.kind||""} ${s.more?"has-more":""} ${i>=l.stages.length-3?"pop-right":""}" id="${s.id}">
+          ${s.flag?`<span class="i q">${esc(s.flag)}</span>`:(s.more?`<span class="i">i</span>`:"")}
+          ${s.n?`<span class="n">${esc(s.n)}</span>`:""}
+          <span class="name">${esc(s.name)}</span>
+          ${s.hint?`<span class="hint">${esc(s.hint)}</span>`:""}
+          ${s.lock?`<span class="lock">🔒 ${esc(s.lock===true?"назад нельзя":s.lock)}</span>`:""}
+          ${s.more?`<div class="pop">${esc(s.more)}</div>`:""}
+        </div>`).join("")}</div>
+    </div>`).join("") + `<svg class="arr" id="arr"></svg><div class="lbls" id="lbls"></div>`;
+}
+
+const NS="http://www.w3.org/2000/svg";
+function el(tag, attrs){ const e=document.createElementNS(NS,tag); for (const k in attrs) e.setAttribute(k,attrs[k]); return e; }
+function rect(id){
+  const cv=document.getElementById("canvas"), b=cv.getBoundingClientRect(), k=b.width/cv.offsetWidth||1;
+  const r=document.getElementById(id).getBoundingClientRect();
+  const x=(r.left-b.left)/k, y=(r.top-b.top)/k, w=r.width/k, h=r.height/k;
+  return {x,y,w,h,cx:x+w/2,cy:y+h/2,r:x+w,b:y+h};
+}
+function laneOf(id){ return LANES.findIndex((l)=>l.stages.some((s)=>s.id===id)); }
+function poly(pts, r=12){
+  let d=`M${pts[0][0]},${pts[0][1]}`;
+  for (let i=1;i<pts.length-1;i++){
+    const [x0,y0]=pts[i-1],[x1,y1]=pts[i],[x2,y2]=pts[i+1];
+    const l1=Math.hypot(x1-x0,y1-y0), l2=Math.hypot(x2-x1,y2-y1), rr=Math.min(r,l1/2,l2/2);
+    d+=` L${x1-(x1-x0)/l1*rr},${y1-(y1-y0)/l1*rr} Q${x1},${y1} ${x1+(x2-x1)/l2*rr},${y1+(y2-y1)/l2*rr}`;
+  }
+  const [xl,yl]=pts[pts.length-1]; return d+` L${xl},${yl}`;
+}
+function label(x,y,text,color,alignRight){
+  const d=document.createElement("div"); d.className="lbl"; d.style.setProperty("--c",color);
+  if (alignRight) d.style.transform="translate(-100%,-50%)";
+  d.innerHTML=text.split("|").map(esc).join("<br>"); d.style.left=Math.round(x)+"px"; d.style.top=Math.round(y)+"px";
+  document.getElementById("lbls").appendChild(d);
+}
+function mark(id, cls, color){
+  const e=document.getElementById(id); e.classList.add(cls);
+  e.style.setProperty(cls==="in" && e.classList.contains("out") ? "--mark2" : "--mark", color);
+}
+
+function draw(){
+  const svg=document.getElementById("arr"); svg.innerHTML=""; document.getElementById("lbls").innerHTML="";
+  document.querySelectorAll(".stage.in,.stage.out").forEach((e)=>{ e.classList.remove("in","out"); });
+  const defs=el("defs",{}); svg.appendChild(defs);
+
+  const lanes=LANES.map((l)=>rect(l.id));
+  const busBase=Math.max(...lanes.map((l)=>l.r))+26;   // вертикальная шина справа от дорожек
+  const busLeftBase=Math.min(...lanes.map((l)=>l.x))-26; // и слева — для стрелок в обход
+  let busL=0;
+  const GAP=14;                                          // отступ линий от края дорожки
+  let bus=0; const chan={};
+  // Сколько линий пройдёт по каждому коридору — чтобы разложить их равномерно
+  const need={}; const use=(k)=>{ need[k]=(need[k]||0)+1; };
+  for (const a of ARROWS){ const li=laneOf(a.from), lj=laneOf(a.to); if (li===lj) continue;
+    if (Math.abs(li-lj)===1) use(`ch${Math.min(li,lj)}`); else { const d=lj>li; use(`ch${d?li:li-1}`); use(`ch${d?lj-1:lj}`); } }
+  const chanY=(k, top, bot)=>{ const n=need[k]||1, i=(chan[k]=(chan[k]||0)+1); const span=bot-top-2*GAP; return top+GAP+span*(n===1?0.5:(i-1)/(n-1)); };
+
+  // Вертикали разных стрелок в одной колонке этапов (например «Новый лид»
+  // и «Назначена диагностика» стоят друг под другом) сливались в одну линию.
+  // Считаем, сколько концов стрелок приходится на каждую колонку, и разводим
+  // их по горизонтали с шагом 14px.
+  const colUse={}, colIdx={};
+  const colKey=(x)=>Math.round(x/10);
+  for (const a of ARROWS){ for (const id of [a.from,a.to]){ const k=colKey(rect(id).cx); colUse[k]=(colUse[k]||0)+1; } }
+  const xOf=(id)=>{ const r=rect(id), k=colKey(r.cx), n=colUse[k]||1, i=(colIdx[k]=(colIdx[k]||0)+1); return r.cx+(i-(n+1)/2)*14; };
+
+  ARROWS.forEach((a, idx)=>{
+    const m=el("marker",{id:"m"+idx, markerWidth:10, markerHeight:10, refX:8, refY:5, orient:"auto", markerUnits:"userSpaceOnUse"});
+    m.appendChild(el("path",{d:"M0,0 L10,5 L0,10 z", fill:a.color})); defs.appendChild(m);
+
+    const f={...rect(a.from)}, t={...rect(a.to)}, li=laneOf(a.from), lj=laneOf(a.to);
+    f.cx=xOf(a.from); t.cx=xOf(a.to);
+    let pts, lx, ly;
+    if (li===lj){                                   // запрет: линия вплотную над дорожкой, крестики сидят на линии
+      const y=lanes[li].y-11; pts=[[f.cx,lanes[li].y],[f.cx,y],[t.cx,y]]; lx=(f.cx+t.cx)/2; ly=y;
+      for (const st of LANES[li].stages){ if (st.id===a.from) continue; const r=rect(st.id);
+        const x=el("text",{x:r.cx, y:y+4.5, "text-anchor":"middle", "font-size":"13", "font-weight":"700", fill:a.color,
+          stroke:"#f6f4ef", "stroke-width":"4", "paint-order":"stroke"}); x.textContent="✕"; svg.appendChild(x); }
+    } else if (Math.abs(li-lj)===1){                // соседние дорожки — коридор между ними
+      const down=lj>li, top=down?lanes[li].b:lanes[lj].b, bot=down?lanes[lj].y:lanes[li].y;
+      const y=chanY(`ch${Math.min(li,lj)}`, top, bot);
+      pts=[[f.cx,down?lanes[li].b:lanes[li].y],[f.cx,y],[t.cx,y],[t.cx,down?lanes[lj].y:lanes[lj].b]]; lx=(f.cx+t.cx)/2; ly=y;
+    } else {                                        // через дорожку — по правой шине
+      const down=lj>li, bx=a.side==="left" ? busLeftBase-(busL++)*20 : busBase+(bus++)*20;
+      const kA=`ch${down?li:li-1}`, kB=`ch${down?lj-1:lj}`;
+      const yA=chanY(kA, lanes[down?li:li-1].b, lanes[down?li+1:li].y);
+      const yB=chanY(kB, lanes[down?lj-1:lj].b, lanes[down?lj:lj+1].y);
+      pts=[[f.cx,down?lanes[li].b:lanes[li].y],[f.cx,yA],[bx,yA],[bx,yB],[t.cx,yB],[t.cx,down?lanes[lj].y:lanes[lj].b]];
+      lx=a.side==="left" ? (f.cx+bx)/2 : bx-14; ly=yA; a._right=a.side!=="left";   // подпись у правой шины прижата к ней
+    }
+    svg.appendChild(el("path",{d:poly(pts), class:a.ban?"ban":"", stroke:a.color, ...(a.ban?{}:{"marker-end":`url(#m${idx})`})}));
+    label(lx, ly, a.label, a.color, a._right); a._right=false;
+    if (!a.ban){ mark(a.from,"out",a.color); mark(a.to,"in",a.color); }
+  });
+}
+// Холст ужимается под ширину окна (CSS zoom); стрелки считаются в координатах
+// холста и от масштаба не зависят. Уже 0.85 не ужимаем — включается прокрутка.
+function fit(){
+  const board=document.querySelector(".board"), cv=document.getElementById("canvas");
+  cv.style.zoom="1";
+  // Ужимаем под ширину окна, но не ниже 0.85: на телефоне остаётся
+  // горизонтальный формат и прокрутка, а не мелкий нечитаемый текст.
+  const avail=board.clientWidth-48, z=Math.max(0.85, Math.min(1, avail/cv.offsetWidth));
+  cv.style.zoom=String(z);
+  draw();
+}
+render(); window.addEventListener("load",fit); window.addEventListener("resize",fit);
+// На телефоне наведения нет — подробности раскрываются касанием по карточке
+document.getElementById("canvas").addEventListener("click",(e)=>{
+  const st=e.target.closest(".stage.has-more"); if (!st) return;
+  const was=st.classList.contains("open");
+  document.querySelectorAll(".stage.open").forEach((x)=>x.classList.remove("open"));
+  if (!was) st.classList.add("open");
+});
+</script>
+</body>
+</html>

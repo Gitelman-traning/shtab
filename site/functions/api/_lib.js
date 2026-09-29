@@ -134,7 +134,7 @@ export function sectionOf(pathname) {
   const mk = /^\/marketing\/([a-z]+)/.exec(p);
   if (mk) return "marketing." + mk[1];
   if (p.startsWith("/marketing")) return "marketing";
-  if (p === "/guide") return "guide";
+  if (p === "/guide" || p.startsWith("/guide/")) return "guide";
   if (p === "/status") return "status";
   if (p === "/users") return "users";
   if (p === "/tags") return "tags";
