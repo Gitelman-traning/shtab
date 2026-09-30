@@ -24,7 +24,8 @@
       { name: "Вторая линия", href: "/sales/l2/", sec: "sales.l2", children: [
         { name: "Встречи", href: "/sales/l2/meetings", sec: "sales.l2.okk" },
         { name: "Менеджеры", href: "/sales/l2/managers", sec: "sales.l2.okk" },
-        { name: "Сверка", href: "/sales/l2/compare", sec: "sales.l2.okk" }
+        { name: "Сверка", href: "/sales/l2/compare", sec: "sales.l2.okk" },
+        { name: "Коуч по диагностикам", href: "/sales/l2/coach", sec: "sales.l2.okk" }
       ] }
     ] },
     { id: "mkt", name: "Маркетинг", icon: I.mkt, href: "/marketing/", sec: "marketing", children: [

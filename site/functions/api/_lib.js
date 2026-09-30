@@ -127,7 +127,7 @@ export function effectivePerms(user) {
 export function sectionOf(pathname) {
   const p = pathname.replace(/\.html$/, "").replace(/\/index$/, "/");
   if (p === "/" || p === "") return "hub";
-  if (/^\/sales\/l2\/(meetings|managers|compare)/.test(p)) return "sales.l2.okk";
+  if (/^\/sales\/l2\/(meetings|managers|compare|coach)/.test(p)) return "sales.l2.okk";
   if (p.startsWith("/sales/l2")) return "sales.l2";
   if (p.startsWith("/sales/l1")) return "sales.l1";
   if (p.startsWith("/sales")) return "sales";

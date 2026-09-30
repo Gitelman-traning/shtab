@@ -184,6 +184,7 @@ def main():
         "meetings.html": "sales/l2/meetings.html",
         "managers.html": "sales/l2/managers.html",
         "compare.html": "sales/l2/compare.html",
+        "coach.html": "sales/l2/coach.html",
         "stats.html": "sales/l2/index.html",
         "guide.html": "guide.html",
     }
