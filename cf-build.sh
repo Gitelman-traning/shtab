@@ -5,6 +5,11 @@
 # PYTHON_VERSION=3.12, по желанию DOCS_TOKEN.
 set -euo pipefail
 cd "$(dirname "$0")"
+for v in SHEET_ID GOOGLE_SERVICE_ACCOUNT_JSON; do
+  if [ -z "${!v:-}" ]; then
+    echo "ОШИБКА: не задана переменная $v — добавь её в проекте Pages: Settings → Variables and Secrets → Production, затем Retry deployment"; exit 1
+  fi
+done
 ROOT="$(pwd)"
 rm -rf .okk .okk-docs
 git clone --depth 1 https://github.com/Gitelman-traning/okk.git .okk
