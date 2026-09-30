@@ -1,0 +1,63 @@
+name: Deploy site
+
+# Выкладка Штаба из GitHub, а не с ноутбука: слияние в master собирает страницы (источники, площадки, ОКК из репозитория okk)
+# и отправляет site/public в Cloudflare Pages. Нужны секреты: CLOUDFLARE_API_TOKEN (права Cloudflare Pages: Edit),
+# SHEET_ID (таблица «маркетинг» с листами ОКК), GOOGLE_SERVICE_ACCOUNT_JSON; по желанию DOCS_TOKEN — токен на чтение okk-docs
+# (оценки человека для страницы «Сверка»).
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '**.md'
+      - 'collector/**'
+      - 'schema*.sql'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: shtab
+      - uses: actions/checkout@v4
+        with:
+          repository: Gitelman-traning/okk
+          path: okk
+      - name: Private docs (optional)
+        env:
+          DOCS_TOKEN: ${{ secrets.DOCS_TOKEN }}
+        run: |
+          if [ -n "$DOCS_TOKEN" ]; then
+            git clone --depth 1 "https://x-access-token:${DOCS_TOKEN}@github.com/Gitelman-traning/okk-docs.git" okk-docs && echo "okk-docs: есть"
+          else
+            echo "okk-docs: без токена, страница «Сверка» без оценок человека"
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r okk/requirements.txt
+      - name: Build pages
+        working-directory: shtab
+        env:
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          PYTHONIOENCODING: utf-8
+        run: python build.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Deploy to Cloudflare Pages
+        working-directory: shtab/site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 4c42f9a718e4aeee45e5e2a57a9d795f
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "нет секрета CLOUDFLARE_API_TOKEN — сборка прошла, выкладка пропущена"; exit 0; fi
+          npx --yes wrangler@4 pages deploy public --project-name okk-dashboard --branch main --commit-dirty=true

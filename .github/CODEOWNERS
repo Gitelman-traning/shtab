@@ -1,0 +1,24 @@
+# Владельцы зон: их ревью обязательно для pull request в эти пути.
+# Пока все зоны на координаторе. Когда коллеги получат доступ, замени логины (@login) по зонам — по одному на строку через пробел.
+
+*                                   @Gitelman-traning
+
+# витрина, API, сборщики, миграции — координатор
+/collector/                         @Gitelman-traning
+/site/functions/                    @Gitelman-traning
+/schema*.sql                        @Gitelman-traning
+/metrics.json                       @Gitelman-traning
+/.github/                           @Gitelman-traning
+
+# общие для всех страниц файлы — координатор
+/site/public/nav.js                 @Gitelman-traning
+/site/public/ui.css                 @Gitelman-traning
+/site/public/ui.js                  @Gitelman-traning
+
+# зона маркетинга: страницы источников и площадок, шаблоны
+/site/public/marketing/             @Gitelman-traning
+/site/src/                          @Gitelman-traning
+
+# зона продаж: Первая линия (окна, менеджеры) и Вторая линия
+/site/public/sales/l1/              @Gitelman-traning
+/site/public/sales/l2/              @Gitelman-traning
