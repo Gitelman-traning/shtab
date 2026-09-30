@@ -84,7 +84,7 @@ export async function onRequestPatch({ request, env }) {
     await env.DB.prepare("UPDATE users SET role = ?, sections = ?, active = 1 WHERE login = ?").bind(role, sections, login).run();
     await audit(env, me.login, "user.approve", login, role + (sections ? " " + sections : ""));
     const u = await env.DB.prepare("SELECT tg_id FROM users WHERE login = ?").bind(login).first();
-    if (u && u.tg_id) await tgSend(env, u.tg_id, "Доступ в Штаб открыт. Войти: https://okk-dashboard.pages.dev/ — кнопка «Войти через Telegram».");
+    if (u && u.tg_id) await tgSend(env, u.tg_id, "Доступ в Штаб открыт. Войти: " + new URL(request.url).origin + "/ — кнопка «Войти через Telegram».");
     return json({ ok: true });
   }
   if (action === "reject") {

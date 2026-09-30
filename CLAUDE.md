@@ -22,8 +22,8 @@
 ## Как проверять
 - Страницу — локально: `python tools/local.py 8766` отдаёт `site/public` и проксирует `/api/*` на боевой с твоей сессией
   (токен сессии в файле `site/.session.local`, см. `tools/local.py`). Чистые адреса: `/tags` → `tags.html`, `/x/` → `x/index.html`.
-- API и миграции — только через pull request и деплой из GitHub Actions (`deploy.yml`): слияние в `master` собирает сайт и выкладывает его.
-  Локальный `wrangler pages deploy` — только у Никиты.
+- Выкладка: проект Cloudflare Pages привязан к репозиторию — слияние в `master` собирает сайт (`cf-build.sh`) и выкладывает его само.
+  Локальный `wrangler pages deploy` не нужен (остаётся у Никиты на крайний случай).
 - Миграцию к боевой базе применяет Никита: `cd site && npx wrangler d1 execute shtab --remote --yes --file ../schemaN.sql`.
 - Сборщик локально: переменные окружения как в `shtab-collect.yml`; ключи не коммитить.
 

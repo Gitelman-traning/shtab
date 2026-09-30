@@ -7,7 +7,8 @@
 <title>Штаб · Первая линия · Окно на день</title>
 <link rel="stylesheet" href="/ui.css">
 <style>
-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+#body{display:flex;flex-direction:column;gap:20px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0}
 .tabs button{border:1px solid var(--line-2);background:var(--card);color:var(--dim);border-radius:10px;padding:7px 14px;font:inherit;font-size:13px;cursor:pointer}
 .tabs button[aria-pressed=true]{background:var(--gold-soft);color:var(--gold);border-color:transparent;font-weight:600}
 .tabs select{border:1px solid var(--line-2);background:var(--card);color:var(--ink);border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;margin-left:auto}
@@ -33,7 +34,7 @@
 .money b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
 .pd{font-size:13px;line-height:1.55;margin:0}.pd p{margin:0 0 8px}.pd b{font-weight:600}
 .pd .gap.bad{color:var(--bad)}.pd .gap.ok{color:var(--ok)}
-.today{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--gold-soft);color:var(--gold);font-size:13.5px}
+.today{margin:14px 0 4px;padding:12px 14px;border-radius:12px;background:var(--gold-soft);color:var(--gold);font-size:13.5px}
 .today b{font-size:20px;font-weight:600;margin-right:4px;font-variant-numeric:tabular-nums}
 .convs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 @media (max-width:900px){.convs{grid-template-columns:1fr}}

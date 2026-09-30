@@ -186,7 +186,7 @@ export async function onRequest(context) {
       "INSERT INTO users (login, pass_hash, salt, name, role, sections, active, must_change, created_at) VALUES (?,?,?,?,'pending','',0,0,?)")
       .bind(login, await hashPassword(value, salt), salt, reg.name, now()).run();
     await audit(env, login, "register", login, reg.name);
-    await tgSend(env, env.TG_ADMIN_CHAT, "Штаб: заявка на доступ — " + reg.name + " (" + login + "). Подтвердить: https://okk-dashboard.pages.dev/users");
+    await tgSend(env, env.TG_ADMIN_CHAT, "Штаб: заявка на доступ — " + reg.name + " (" + login + "). Подтвердить: " + url.origin + "/users");
     return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка отправлена. Когда администратор подтвердит доступ, входите с этим логином и паролем." }), 202);
   }
 
@@ -214,7 +214,7 @@ export async function onRequest(context) {
         "INSERT INTO users (login, pass_hash, salt, name, role, sections, active, must_change, created_at, tg_id, tg_username, photo) VALUES (?,?,?,?,?,?,0,0,?,?,?,?)")
         .bind(login, "", "", fullName, "pending", "", now(), tgId, tg.username || "", tg.photo_url || "").run();
       await audit(env, login, "tg.request", login, fullName + (tg.username ? " @" + tg.username : ""));
-      await tgSend(env, env.TG_ADMIN_CHAT, "Штаб: заявка на доступ — " + fullName + (tg.username ? " (@" + tg.username + ")" : "") + ". Подтвердить: https://okk-dashboard.pages.dev/users");
+      await tgSend(env, env.TG_ADMIN_CHAT, "Штаб: заявка на доступ — " + fullName + (tg.username ? " (@" + tg.username + ")" : "") + ". Подтвердить: " + url.origin + "/users");
       await tgSend(env, tgId, "Заявка на доступ в Штаб отправлена. Когда администратор подтвердит, придёт сообщение.");
       return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка отправлена. Администратор подтвердит доступ, и вы сможете войти этой же кнопкой." }), 202);
     }

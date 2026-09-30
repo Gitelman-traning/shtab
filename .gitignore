@@ -11,3 +11,7 @@ site/public/mockups*.html
 # сессия для локальной проверки (tools/local.py)
 site/.session.local
 *.session.local
+
+# временные клоны при сборке в Cloudflare (cf-build.sh)
+.okk/
+.okk-docs/
