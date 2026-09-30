@@ -66,7 +66,7 @@
     + ".side .it .chev{margin-left:auto;width:14px;height:14px;transition:transform .16s}.side .grp[aria-expanded=false] .chev{transform:rotate(-90deg)}"
     + ".side .grp{font-weight:600;color:var(--ink)}.side .grp.cur{color:var(--gold)}"
     + ".side .sub{display:flex;flex-direction:column;gap:1px}.side .sub[hidden]{display:none}"
-    + ".side .l1{padding-left:26px;font-size:13px}.side .l2{padding-left:44px;font-size:12.5px}"
+    + ".side .l1{padding-left:26px;font-size:13px}.side .l2{padding-left:44px;font-size:12.5px}.side .it.l1 span,.side .it.l2 span{white-space:normal;line-height:1.25;min-width:0}"
     + ".side .row{display:flex;align-items:center}.side .row a{flex:1;min-width:0}.side .tg{flex:none;width:30px;height:30px;border:0;background:none;color:var(--faint);cursor:pointer;display:grid;place-items:center;border-radius:8px}.side .tg:hover{background:var(--soft);color:var(--ink)}"
     + ".side .tg svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6;transition:transform .16s}.side .tg[aria-expanded=false] svg{transform:rotate(-90deg)}"
     + ".side .l1 i,.side .l2 i{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5;flex:none;margin:0 5px}"
