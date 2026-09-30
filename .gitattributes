@@ -1,0 +1,2 @@
+# скрипты сборки всегда с LF, иначе bash в Cloudflare не поймёт
+*.sh text eol=lf
