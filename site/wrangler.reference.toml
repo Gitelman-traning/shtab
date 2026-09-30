@@ -1,3 +1,6 @@
+# Справочная копия. Файл wrangler.toml из репозитория убран намеренно: при его наличии сборка Cloudflare Pages берёт переменные
+# только из него и не видит переменные панели (ключ сервис-аккаунта в файл класть нельзя). Привязки D1/KV и переменные — в панели Pages.
+# Для локальных команд wrangler: npx wrangler -c wrangler.reference.toml …
 name = "okk-dashboard"
 pages_build_output_dir = "public"
 compatibility_date = "2026-08-01"
