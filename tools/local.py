@@ -9,7 +9,7 @@
 Запуск:  python tools/local.py [порт]   (по умолчанию 8766), затем открой http://localhost:8766/
 Сессия: войди на боевой сайт в браузере, скопируй значение cookie shtab_s и положи его в файл site/.session.local (одна строка).
 Файл в .gitignore, никому его не пересылай — это твой вход.
-Переменные: SHTAB_URL (боевой адрес, по умолчанию https://okk-dashboard.pages.dev), SHTAB_SESSION (вместо файла).
+Переменные: SHTAB_URL (боевой адрес, по умолчанию https://shtab-20v.pages.dev), SHTAB_SESSION (вместо файла).
 """
 import http.server
 import os
@@ -19,7 +19,7 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..", "site", "public")
-PROD = os.environ.get("SHTAB_URL", "https://okk-dashboard.pages.dev").rstrip("/")
+PROD = os.environ.get("SHTAB_URL", "https://shtab-20v.pages.dev").rstrip("/")
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8766
 
 
