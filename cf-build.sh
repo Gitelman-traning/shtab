@@ -5,6 +5,8 @@
 # PYTHON_VERSION=3.12, по желанию DOCS_TOKEN.
 set -euo pipefail
 cd "$(dirname "$0")"
+echo "переменные окружения сборки (только имена): $(env | cut -d= -f1 | grep -E '^(SHEET_ID|GOOGLE_|PYTHON_VERSION|INGEST_TOKEN|LLM_|ASK_MODEL|EDIT_MODEL|CF_PAGES)' | sort | tr '
+' ' ')"
 for v in SHEET_ID GOOGLE_SERVICE_ACCOUNT_JSON; do
   if [ -z "${!v:-}" ]; then
     echo "ОШИБКА: не задана переменная $v — добавь её в проекте Pages: Settings → Variables and Secrets → Production, затем Retry deployment"; exit 1

@@ -12,3 +12,10 @@ id = "7d847d9c74434c35a28b148f488dd3b0"
 binding = "DB"
 database_name = "shtab"
 database_id = "d0671a0c-e19a-44f6-ac76-39f8c79b499c"
+
+# несекретные переменные сборки и рантайма (секреты — только в панели Pages)
+[vars]
+SHEET_ID = "1gbj-FGKRnc5Cm4s5_qFfHpx-gHqL3Bn37FQbR8gTpuY"
+PYTHON_VERSION = "3.12"
+ASK_MODEL = "anthropic/claude-sonnet-5"
+EDIT_MODEL = "anthropic/claude-sonnet-5"
