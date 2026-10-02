@@ -123,7 +123,7 @@ ${STYLE}</head><body>
   ${tgBot && !setup ? `<div class="or"><span>или</span></div>
   <div class="tg"><script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="${tgBot}" data-size="large" data-userpic="false" data-radius="6" data-auth-url="/__tg" data-request-access="write"></script></div>
   <p class="hint">Через Telegram: первый вход создаёт заявку, администратор подтверждает доступ.</p>` : ""}
-  ${setup ? "" : `<p class="hint" style="text-align:center">Нет доступа? <a href="/__register" style="color:var(--accent)">Зарегистрироваться</a></p>`}
+  ${setup ? "" : `<p class="hint" style="text-align:center">Нет доступа? Нажмите «Войти через Telegram» — администратор подтвердит заявку.</p>`}
 </form></body></html>`;
 }
 
@@ -173,6 +173,8 @@ export async function onRequest(context) {
 
   // самостоятельная регистрация: заявка ждёт подтверждения администратора
   if (url.pathname === "/__register") {
+    // решение 02.10.2026: новые сотрудники входят только через Telegram; регистрация с паролем закрыта, старые пароли работают
+    if (env.ALLOW_PASSWORD_REGISTER !== "1") return Response.redirect(url.origin + "/", 302);
     if (request.method !== "POST") return html(registerPage("", {}, env.TG_BOT_NAME), 200);
     if (!env.DB) return html(registerPage("База пользователей не подключена."), 500);
     const vals = { login, name: reg.name };
