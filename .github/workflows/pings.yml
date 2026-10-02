@@ -1,0 +1,106 @@
+name: Pings (second line)
+
+# Пинги Второй линии, полуручной режим: бот готовит текст, менеджер отправляет клиенту сам.
+# Три шага, и код менеджера (репозиторий pings-bot) выполняется в шаге БЕЗ секретов:
+#   prepare  — наш сборщик читает amo (только GET) и пишет обезличенных кандидатов;
+#   plan     — логика pings-bot на ОДОБРЕННОМ коммите (переменная PINGS_BOT_REF) превращает кандидатов в задания на текст;
+#   deliver  — наш код зовёт модель, подставляет имя и шлёт черновик менеджеру в Telegram, журнал — в витрину Штаба.
+# Новый код менеджера попадает в работу только когда координатор меняет PINGS_BOT_REF на проверенный коммит.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'      # будни, 09:00 МСК
+  workflow_dispatch:
+    inputs:
+      manager:
+        description: 'Manager key'
+        required: false
+        default: 'krotov'
+      dry:
+        description: 'Dry run: drafts only to artifact, nothing to Telegram (1 = yes)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests
+      - run: python collector/pings.py prepare "${{ inputs.manager || 'krotov' }}" candidates.json
+        env:
+          AMO_TOKEN: ${{ secrets.AMO_TOKEN }}
+          SHTAB_URL: ${{ secrets.SHTAB_URL }}
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidates
+          path: candidates.json
+          retention-days: 1
+
+  plan:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Code of the manager (approved commit only)
+        uses: actions/checkout@v4
+        with:
+          repository: Gitelman-traning/pings-bot
+          ref: ${{ vars.PINGS_BOT_REF }}
+          ssh-key: ${{ secrets.PINGS_BOT_DEPLOY_KEY }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidates
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # здесь нет ни одного секрета в окружении: только кандидаты (обезличены) и код менеджера
+      - run: python -m bot.plan candidates.json plan.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plan
+          path: plan.json
+          retention-days: 1
+
+  deliver:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: plan
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests
+      - run: python collector/pings.py deliver plan.json ${{ inputs.dry == '1' && '--dry' || '' }}
+        env:
+          AMO_TOKEN: ${{ secrets.AMO_TOKEN }}
+          SHTAB_URL: ${{ secrets.SHTAB_URL }}
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          PINGS_DRAFTS: drafts.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drafts
+          path: drafts.json
+          if-no-files-found: ignore
+          retention-days: 3

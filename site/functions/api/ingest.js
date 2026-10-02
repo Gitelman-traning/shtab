@@ -16,7 +16,7 @@ export async function onRequestPost({ request, env }) {
   const points = Array.isArray(body.points) ? body.points : [];
   const plans = Array.isArray(body.plans) ? body.plans : [];
   const collector = String(body.collector || "unknown").slice(0, 60);
-  if (!points.length && !plans.length && !(Array.isArray(body.okna) && body.okna.length) && !(Array.isArray(body.goals) && body.goals.length)) return bad("пустая пачка");
+  if (!points.length && !plans.length && !(Array.isArray(body.okna) && body.okna.length) && !(Array.isArray(body.goals) && body.goals.length) && !(Array.isArray(body.pings) && body.pings.length)) return bad("пустая пачка");
 
   const stamp = now();
   const stmt = env.DB.prepare(
@@ -61,6 +61,19 @@ export async function onRequestPost({ request, env }) {
       batch.push(os.bind(String(r.day), String(r.mgr).slice(0, 40), String(r.key).slice(0, 40), Number(r.n) || items.length, JSON.stringify(items), stamp));
     }
     for (let i = 0; i < batch.length; i += 20) { await env.DB.batch(batch.slice(i, i + 20)); written += Math.min(20, batch.length - i); }
+  }
+  // журнал пингов Второй линии (collector/pings.py)
+  const pings = Array.isArray(body.pings) ? body.pings : [];
+  if (pings.length) {
+    const ps2 = env.DB.prepare(
+      "INSERT INTO pings (day, manager, deal, text, reason, updated_at) VALUES (?,?,?,?,?,?) " +
+      "ON CONFLICT(day, manager, deal) DO UPDATE SET text = excluded.text, reason = excluded.reason, updated_at = excluded.updated_at");
+    const batch = [];
+    for (const r of pings.slice(0, 200)) {
+      if (!r || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.day || "")) || !r.manager || !Number(r.deal)) continue;
+      batch.push(ps2.bind(String(r.day), String(r.manager).slice(0, 40), Number(r.deal), String(r.text || "").slice(0, 2000), String(r.reason || "").slice(0, 200), stamp));
+    }
+    if (batch.length) { await env.DB.batch(batch); written += batch.length; }
   }
   const goals = Array.isArray(body.goals) ? body.goals : [];
   if (goals.length) {
