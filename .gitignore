@@ -15,3 +15,4 @@ site/.session.local
 # временные клоны при сборке в Cloudflare (cf-build.sh)
 .okk/
 .okk-docs/
+.doppler.json

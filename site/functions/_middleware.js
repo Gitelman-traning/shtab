@@ -11,6 +11,7 @@
  * После сброса первый вошедший задаёт новый.
  */
 
+import { loadSecrets } from "./_secrets.js";
 import { currentUser, createSession, dropSession, verifyPassword, hashPassword, randomId, audit, tgVerify, tgSend, now, level, sectionOf } from "./api/_lib.js";
 
 const RE_LOGIN = /^[a-z0-9._-]{3,32}$/;
@@ -151,6 +152,7 @@ function letIn(token) {
 export async function onRequest(context) {
   const { request, env, next } = context;
   if (!env.OKK_KV) return new Response("Хранилище пароля не подключено", { status: 500 });
+  await loadSecrets(env, context);   // секреты из Doppler (если задан DOPPLER_TOKEN) — для всех маршрутов, включая /api/*
 
   const url = new URL(request.url);
   // API витрины Штаба проверяет доступ сам: токен сборщика или персональная сессия
