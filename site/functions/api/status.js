@@ -9,5 +9,5 @@ export async function onRequestGet({ request, env }) {
   const coverage = await env.DB.prepare(
     "SELECT metric, ptype, COUNT(*) AS n, MIN(period) AS first, MAX(period) AS last, MAX(asof) AS asof, MAX(updated_at) AS updated " +
     "FROM points GROUP BY metric, ptype ORDER BY metric").all();
-  return json({ ok: true, user: { login: user.login, role: user.role }, runs: runs.results || [], coverage: coverage.results || [] });
+  return json({ ok: true, user: { login: user.login, role: user.role }, secrets: env.SECRETS_SOURCE || "panel", runs: runs.results || [], coverage: coverage.results || [] });
 }

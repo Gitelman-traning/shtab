@@ -44,6 +44,6 @@ export async function loadSecrets(env, ctx) {
   } else {
     mem = { at: nowS, data, stale: data };
   }
-  if (data) for (const [k, v] of Object.entries(data)) env[k] = v;
+  if (data) { for (const [k, v] of Object.entries(data)) env[k] = v; env.SECRETS_SOURCE = "doppler:" + Object.keys(data).length; }
   return env;
 }
