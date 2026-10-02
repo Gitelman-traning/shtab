@@ -4,8 +4,14 @@ import { json, bad, canRead, currentUser, hashPassword, verifyPassword, randomId
 export async function onRequestGet({ request, env }) {
   const user = await canRead(request, env);
   if (!user) return bad("нет доступа", 401);
+  // админу — сколько заявок на доступ ждут подтверждения (бейдж в меню «Пользователи»)
+  let pending = 0;
+  if (user.role === "admin" && user.login !== "collector") {
+    const r = await env.DB.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'pending'").first();
+    pending = (r && r.n) || 0;
+  }
   return json({ ok: true, user: { login: user.login, name: user.name || "", role: user.role, sections: user.sections || "",
-    personal: user.login !== "shared" && user.login !== "collector", must_change: !!user.must_change, perms: effectivePerms(user) } });
+    personal: user.login !== "shared" && user.login !== "collector", must_change: !!user.must_change, perms: effectivePerms(user) }, pending });
 }
 
 export async function onRequestPut({ request, env }) {

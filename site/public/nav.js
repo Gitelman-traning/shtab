@@ -70,7 +70,7 @@
     + ".side .row{display:flex;align-items:center}.side .row a{flex:1;min-width:0}.side .tg{flex:none;width:30px;height:30px;border:0;background:none;color:var(--faint);cursor:pointer;display:grid;place-items:center;border-radius:8px}.side .tg:hover{background:var(--soft);color:var(--ink)}"
     + ".side .tg svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6;transition:transform .16s}.side .tg[aria-expanded=false] svg{transform:rotate(-90deg)}"
     + ".side .l1 i,.side .l2 i{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5;flex:none;margin:0 5px}"
-    + ".side .grow{flex:1}"
+    + ".side .grow{flex:1}.side .nav-pend{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;font-weight:600;display:inline-grid;place-items:center;font-style:normal}.side .nav-pend+.chev{margin-left:6px}"
     + ".side .collapse{display:flex;align-items:center;gap:11px;padding:10px;border-radius:9px;background:none;border:0;color:var(--faint);font-family:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap;width:100%;text-align:left}"
     + ".side .collapse svg{flex:none;width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;transition:transform .16s}:root[data-menu=mini] .side .collapse svg{transform:rotate(180deg)}"
     + ":root[data-menu=mini] .side .brand b,:root[data-menu=mini] .side .brand span,:root[data-menu=mini] .side .it span,:root[data-menu=mini] .side .chev,:root[data-menu=mini] .side .sub,:root[data-menu=mini] .side .collapse span{display:none}"
@@ -158,6 +158,12 @@
   fetch("/api/me", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (m) {
     var u = m && m.ok && m.user;
     if (u && u.role === "admin") document.querySelectorAll("[data-admin]").forEach(function (a) { a.hidden = false; });
+    // заявки на доступ: бейдж у пункта «Пользователи» и у группы «Настройки», чтобы не пропустить, если бот молчит
+    if (u && u.role === "admin" && m.pending > 0) {
+      var badge = '<b class="nav-pend" title="заявки на доступ ждут подтверждения">' + m.pending + '</b>';
+      side.querySelectorAll('a[href="/users"]').forEach(function (a) { a.insertAdjacentHTML("beforeend", badge); });
+      var g = side.querySelector('button[data-grp="settings"] .chev'); if (g) g.insertAdjacentHTML("beforebegin", badge);
+    }
     // закрытые разделы убираем из меню (уровень 0); группа без единого открытого пункта тоже прячется
     var P = (u && u.perms) || {};
     document.querySelectorAll("[data-sec]").forEach(function (el) { var s = el.getAttribute("data-sec"); if (P[s] === 0) el.hidden = true; });

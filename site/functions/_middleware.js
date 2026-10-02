@@ -102,7 +102,7 @@ function page({ setup, message, tgBot }) {
   const title = setup ? "Придумайте пароль" : "Вход";
   const hint = setup
     ? "Пароль ещё не задан. Тот, что вы введёте, станет общим для всех, кто открывает дашборд."
-    : "Страница закрыта: внутри данные компании. Логин один на всех, пароль общий.";
+    : "Страница закрыта: внутри данные компании. Входите по своему логину и паролю или через Telegram.";
   const action = setup ? "/__setup" : "/__login";
   const button = setup ? "Сохранить пароль" : "Войти";
   const autocomplete = setup ? "new-password" : "current-password";
