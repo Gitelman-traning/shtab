@@ -16,7 +16,8 @@ export async function onRequestPost({ request, env }) {
   const points = Array.isArray(body.points) ? body.points : [];
   const plans = Array.isArray(body.plans) ? body.plans : [];
   const collector = String(body.collector || "unknown").slice(0, 60);
-  if (!points.length && !plans.length && !(Array.isArray(body.okna) && body.okna.length) && !(Array.isArray(body.goals) && body.goals.length) && !(Array.isArray(body.pings) && body.pings.length)) return bad("пустая пачка");
+  const has = (k) => Array.isArray(body[k]) && body[k].length;
+  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases")) return bad("пустая пачка");
 
   const stamp = now();
   const stmt = env.DB.prepare(
@@ -74,6 +75,40 @@ export async function onRequestPost({ request, env }) {
       batch.push(ps2.bind(String(r.day), String(r.manager).slice(0, 40), Number(r.deal), String(r.text || "").slice(0, 2000), String(r.reason || "").slice(0, 200), stamp));
     }
     if (batch.length) { await env.DB.batch(batch); written += batch.length; }
+  }
+  // подготовка к встрече (collector/prep.py): одна строка на сделку, перезаписывается целиком
+  const prep = Array.isArray(body.prep) ? body.prep : [];
+  if (prep.length) {
+    const s = (v, n = 200) => String(v == null ? "" : v).slice(0, n);
+    const st = env.DB.prepare(
+      "INSERT INTO prep (deal, contact, meet_at, manager, client, company, niche, turn, staff, geo, quiz_url, status, facts, sources, cases, brief, model, tokens_in, tokens_out, searches, amo_url, error, created_at, updated_at) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
+      "ON CONFLICT(deal) DO UPDATE SET contact = excluded.contact, meet_at = excluded.meet_at, manager = excluded.manager, client = excluded.client, company = excluded.company, niche = excluded.niche, turn = excluded.turn, staff = excluded.staff, geo = excluded.geo, quiz_url = excluded.quiz_url, " +
+      "status = excluded.status, facts = CASE WHEN excluded.status = 'ready' THEN excluded.facts ELSE prep.facts END, sources = CASE WHEN excluded.status = 'ready' THEN excluded.sources ELSE prep.sources END, " +
+      "cases = CASE WHEN excluded.status = 'ready' THEN excluded.cases ELSE prep.cases END, brief = CASE WHEN excluded.status = 'ready' THEN excluded.brief ELSE prep.brief END, " +
+      "model = excluded.model, tokens_in = excluded.tokens_in, tokens_out = excluded.tokens_out, searches = excluded.searches, amo_url = excluded.amo_url, error = excluded.error, updated_at = excluded.updated_at");
+    for (const r of prep.slice(0, 50)) {
+      if (!r || !Number(r.deal)) continue;
+      const status = ["ready", "error", "queued"].includes(r.status) ? r.status : "ready";
+      await st.bind(Number(r.deal), Number(r.contact) || null, s(r.meet_at, 20), s(r.manager, 80), s(r.client, 80), s(r.company), s(r.niche), s(r.turn, 20), s(r.staff, 20), s(r.geo, 120), s(r.quiz_url, 300),
+        status, s(r.facts, 60000), JSON.stringify(Array.isArray(r.sources) ? r.sources.slice(0, 60) : []), JSON.stringify(Array.isArray(r.cases) ? r.cases.slice(0, 10) : []), s(r.brief, 80000),
+        s(r.model, 60), Number(r.tokens_in) || 0, Number(r.tokens_out) || 0, Number(r.searches) || 0, s(r.amo_url, 200), s(r.error, 300), stamp, stamp).run();
+      written++;
+    }
+  }
+  // база участников для подбора кейсов (prep.py cases)
+  const cases = Array.isArray(body.prep_cases) ? body.prep_cases : [];
+  if (cases.length) {
+    const s = (v, n = 120) => String(v == null ? "" : v).slice(0, n);
+    const cs = env.DB.prepare(
+      "INSERT INTO prep_cases (deal, pipeline, name, company, niche, sphere, turn, staff, site, role, city, country, paid_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
+      "ON CONFLICT(deal) DO UPDATE SET pipeline = excluded.pipeline, name = excluded.name, company = excluded.company, niche = excluded.niche, sphere = excluded.sphere, turn = excluded.turn, staff = excluded.staff, site = excluded.site, role = excluded.role, city = excluded.city, country = excluded.country, paid_at = excluded.paid_at, updated_at = excluded.updated_at");
+    const batch = [];
+    for (const r of cases.slice(0, 200)) {
+      if (!r || !Number(r.deal)) continue;
+      batch.push(cs.bind(Number(r.deal), Number(r.pipeline) || null, s(r.name), s(r.company), s(r.niche), s(r.sphere), s(r.turn, 20), s(r.staff, 20), s(r.site), s(r.role, 60), s(r.city), s(r.country), s(r.paid_at, 10), stamp));
+    }
+    for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); }
   }
   const goals = Array.isArray(body.goals) ? body.goals : [];
   if (goals.length) {

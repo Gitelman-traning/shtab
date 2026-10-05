@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Подготовка к встрече</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+main[hidden]{display:none}
+.btn{font-family:inherit;font-size:12.5px;font-weight:500;background:var(--soft);border:0;color:var(--ink);padding:7px 12px;border-radius:9px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{background:var(--line-2)} .btn.gold{background:var(--gold-soft);color:var(--gold)} .btn.ghost{background:none;color:var(--dim)} .btn[disabled]{opacity:.5;cursor:default}
+.bar-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input[type=text],input[type=number],select,textarea{font-family:inherit;font-size:13px;background:var(--soft);border:1px solid transparent;color:var(--ink);padding:7px 10px;border-radius:9px}
+input:focus,select:focus,textarea:focus{border-color:var(--gold-b);outline:0} textarea{width:100%;min-height:70px;resize:vertical}
+.st{font-size:10.5px;padding:2px 8px;border-radius:7px;background:var(--soft);color:var(--dim);white-space:nowrap}
+.st.ready{background:var(--ok-bg);color:var(--ok)} .st.queued{background:var(--mid-bg);color:var(--mid)} .st.error{background:var(--bad-bg);color:var(--bad)}
+tr.row{cursor:pointer} tr.row:hover td{background:var(--zebra)} td .sub{display:block;font-size:11.5px;color:var(--faint)}
+.head{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.head .who{flex:1;min-width:240px} .head .who h2{margin:0 0 4px;font-size:18px} .head .meta{font-size:12.5px;color:var(--dim);line-height:1.7}
+.cheat{background:var(--gold-soft);border-radius:16px;padding:18px 20px}
+.cheat h2{margin:0 0 10px;font-size:15px;color:var(--gold)} .cheat ul{margin:0;padding-left:18px} .cheat li{margin:4px 0} .cheat li b{color:var(--ink)}
+details.sec{border-top:1px solid var(--line)} details.sec:first-of-type{border-top:0}
+details.sec summary{cursor:pointer;padding:11px 0;font-weight:600;font-size:13.5px;list-style:none;display:flex;gap:10px;align-items:baseline}
+details.sec summary::-webkit-details-marker{display:none} details.sec summary::before{content:"▸";color:var(--faint);font-size:11px;width:12px;flex:none}
+details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:var(--faint);font-weight:500;font-variant-numeric:tabular-nums;width:22px;flex:none}
+.md{font-size:13.5px;line-height:1.6;padding:0 0 14px 22px} .md p{margin:6px 0} .md ul,.md ol{margin:6px 0;padding-left:20px} .md li{margin:3px 0}
+.md h4,.md h5{margin:12px 0 4px;font-size:13px} .md hr{border:0;border-top:1px solid var(--line);margin:10px 0} .md code{background:var(--soft);padding:0 4px;border-radius:4px}
+.md blockquote{margin:6px 0;padding:4px 12px;border-left:3px solid var(--gold-a);color:var(--dim)}
+.cases{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.case{background:var(--soft);border-radius:12px;padding:12px 14px;font-size:12.5px} .case b{display:block;font-size:13.5px;margin-bottom:4px} .case .g{margin-top:6px;white-space:pre-wrap;color:var(--dim)} .case .why{color:var(--ink)}
+.src{font-size:12px;color:var(--dim);columns:2;column-gap:20px} .src a{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:2px 0}
+@media (max-width:800px){.src{columns:1}}
+.fb{display:flex;gap:10px;flex-wrap:wrap;align-items:center} .fb .was{font-size:12px;color:var(--faint)}
+.hint{font-size:12px;color:var(--faint)}
+.msg{font-size:12.5px;color:var(--dim);padding:8px 0}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Отдел продаж · Вторая линия · <b>Подготовка к встрече</b></div><h1>Подготовка диагноста к встрече</h1><p class="sub">Досье по собственнику, гипотеза об ограничителе роста, три вопроса, похожие участники из базы и шпаргалка на 30 секунд — к каждой подтверждённой диагностике</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main id="list">
+  <div class="card">
+    <div class="bar-row">
+      <select id="f-mgr"><option value="">Все диагносты</option></select>
+      <select id="f-st"><option value="">Все статусы</option><option value="ready">готово</option><option value="queued">в очереди</option><option value="error">ошибка</option></select>
+      <span class="spacer" style="flex:1"></span>
+      <input type="number" id="add-deal" placeholder="id сделки amo" style="width:150px">
+      <button class="btn gold" id="add-btn" type="button">Подготовить</button>
+    </div>
+    <p class="hint" style="margin:10px 0 0">Сделки Первой линии, которые попали на этап «Встреча подтверждена», попадают сюда сами (прогон каждые 30 минут днём). По id можно поставить любую сделку. Подготовка занимает 3–6 минут.</p>
+  </div>
+  <div class="card wide"><h2>Встречи <small id="list-sub"></small></h2><div id="rows"><p class="empty">Загружаю…</p></div></div>
+  <footer>Участники для кейсов — купившие клиенты из amoCRM (<span id="cases-n">—</span>); когда появится таблица «Участники тренинга НИШИ», база расширится. Подготовка считается моделью с веб-поиском; цифры без источника — гипотезы, их надо проверить на встрече.</footer>
+</main>
+<main id="detail" hidden>
+  <div class="bar-row"><a class="btn ghost" href="#">← К списку</a><span class="spacer" style="flex:1"></span><a class="btn" id="d-amo" target="_blank" rel="noopener">Сделка в amo ↗</a><a class="btn" id="d-quiz" target="_blank" rel="noopener" hidden>Анкета клиента ↗</a><button class="btn" id="d-recalc" type="button">Пересчитать</button></div>
+  <div class="card head"><div class="who"><h2 id="d-title">—</h2><div class="meta" id="d-meta"></div></div><div class="meta" id="d-tech"></div></div>
+  <div class="cheat" id="d-cheat" hidden><h2>Шпаргалка на 30 секунд</h2><div id="d-cheat-body"></div></div>
+  <div class="card" id="d-sections-card"><h2>Подготовка <small>раскрой нужный раздел</small></h2><div id="d-sections"></div></div>
+  <div class="card" id="d-cases-card"><h2>Участники из базы <small>похожие по бизнесу, с проверкой роста</small></h2><div class="cases" id="d-cases"></div></div>
+  <div class="card"><h2>Досье по открытым источникам <small>факты с источниками и гипотезы</small></h2><details class="sec" open><summary>Текст досье</summary><div class="md" id="d-facts"></div></details><details class="sec"><summary>Источники</summary><div class="src" id="d-src"></div></details></div>
+  <div class="card"><h2>Была ли подготовка полезна?</h2><div class="fb"><button class="btn" data-useful="1" type="button">Полезно</button><button class="btn" data-useful="0" type="button">Не полезно</button><span class="was" id="fb-was"></span></div><textarea id="fb-comment" placeholder="Что было лишним, чего не хватило, где ошиблась — это пойдёт в правку промпта" style="margin-top:10px"></textarea><div class="msg" id="fb-msg"></div></div>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var H = { "Content-Type": "application/json" };
+function api(q){ return fetch("/api/prep" + (q ? "?" + q : ""), { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
+function post(body){ return fetch("/api/prep", { method: "POST", headers: H, credentials: "same-origin", body: JSON.stringify(body) }).then(function(r){ return r.json(); }); }
+var ST = { ready: "готово", queued: "в очереди", error: "ошибка" };
+var ROWS = [];
+
+// ---------- markdown → html (заголовки, списки, жирный, ссылки) ----------
+function inline(s){
+  s = esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return s.replace(/(^|[\s(])((https?:\/\/)[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+}
+function md(text){
+  var out = [], list = null, para = [];
+  function flushP(){ if (para.length) { out.push("<p>" + inline(para.join(" ")) + "</p>"); para = []; } }
+  function flushL(){ if (list) { out.push("</" + list + ">"); list = null; } }
+  String(text || "").split(/\r?\n/).forEach(function(line){
+    var t = line.trim();
+    if (!t) { flushP(); flushL(); return; }
+    var m;
+    if ((m = t.match(/^(#{1,6})\s+(.*)$/))) { flushP(); flushL(); out.push("<h" + Math.min(6, m[1].length + 2) + ">" + inline(m[2].replace(/^#+\s*/, "")) + "</h" + Math.min(6, m[1].length + 2) + ">"); return; }
+    if (/^(---|\*\*\*|___)$/.test(t)) { flushP(); flushL(); out.push("<hr>"); return; }
+    if ((m = t.match(/^[-*•□]\s+(.*)$/))) { flushP(); if (list !== "ul") { flushL(); out.push("<ul>"); list = "ul"; } out.push("<li>" + inline(m[1]) + "</li>"); return; }
+    if ((m = t.match(/^\d+[.)]\s+(.*)$/))) { flushP(); if (list !== "ol") { flushL(); out.push("<ol>"); list = "ol"; } out.push("<li>" + inline(m[1]) + "</li>"); return; }
+    if ((m = t.match(/^>\s?(.*)$/))) { flushP(); flushL(); out.push("<blockquote>" + inline(m[1]) + "</blockquote>"); return; }
+    if (list) flushL();
+    para.push(t);
+  });
+  flushP(); flushL();
+  return out.join("\n");
+}
+// текст подготовки → разделы по «## N. НАЗВАНИЕ»
+function sections(brief){
+  var parts = [], cur = { n: 0, title: "", body: [] };
+  String(brief || "").split(/\r?\n/).forEach(function(line){
+    var m = line.match(/^##\s+(\d+)\.\s*(.+?)\s*$/);
+    if (m) { if (cur.body.join("").trim() || cur.n) parts.push(cur); cur = { n: Number(m[1]), title: m[2], body: [] }; }
+    else cur.body.push(line);
+  });
+  parts.push(cur);
+  return parts.filter(function(p){ return p.n || p.body.join("").trim(); });
+}
+
+// ---------- список ----------
+function dateLabel(s){ if (!s) return "<span class='sub'>дата встречи не указана</span>"; var d = s.slice(0,10).split("-"); return d[2] + "." + d[1] + "." + d[0] + (s.length > 10 ? " <span class='sub'>" + s.slice(11) + " МСК</span>" : ""); }
+function renderList(){
+  var mgr = document.getElementById("f-mgr").value, st = document.getElementById("f-st").value;
+  var rows = ROWS.filter(function(r){ return (!mgr || r.manager === mgr) && (!st || r.status === st); });
+  document.getElementById("list-sub").textContent = rows.length ? rows.length + " из " + ROWS.length : "";
+  if (!rows.length) { document.getElementById("rows").innerHTML = '<p class="empty">Подготовок пока нет. Сделка попадёт сюда, когда встреча будет подтверждена, или поставьте её по id сделки выше.</p>'; return; }
+  document.getElementById("rows").innerHTML = '<table><thead><tr><th>Встреча</th><th>Клиент</th><th>Бизнес</th><th>Диагност</th><th>Подготовка</th><th></th></tr></thead><tbody>'
+    + rows.map(function(r){
+      var biz = [r.niche, r.turn ? r.turn + " млн ₽" : "", r.staff ? r.staff + " чел" : "", r.geo].filter(Boolean).join(" · ");
+      var status = '<span class="st ' + r.status + '">' + (ST[r.status] || r.status) + '</span>' + (r.status === "error" && r.error ? '<span class="sub">' + esc(r.error.slice(0, 90)) + '</span>' : "");
+      return '<tr class="row" data-deal="' + r.deal + '"><td>' + dateLabel(r.meet_at) + '</td><td>' + esc(r.client || "—") + (r.company ? '<span class="sub">' + esc(r.company) + '</span>' : '') + '</td><td>' + (esc(biz) || '<span class="sub">поля не заполнены</span>') + '</td><td>' + esc(r.manager || "—") + '</td><td>' + status + '</td><td class="num"><a class="btn ghost" href="' + esc(r.amo_url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">amo ↗</a></td></tr>';
+    }).join("") + '</tbody></table>';
+  Array.prototype.forEach.call(document.querySelectorAll("tr.row"), function(tr){ tr.addEventListener("click", function(){ location.hash = "deal=" + tr.getAttribute("data-deal"); }); });
+}
+function loadList(){
+  api("days=21").then(function(res){
+    if (!res.ok) { document.getElementById("rows").innerHTML = '<p class="empty">' + esc(res.error || "нет доступа") + '</p>'; return; }
+    ROWS = res.rows || [];
+    document.getElementById("cases-n").textContent = res.cases ? res.cases + " компаний" : "база пуста";
+    var last = ROWS.map(function(r){ return r.updated_at || ""; }).sort().pop();
+    document.getElementById("stamp").textContent = last ? "обновлено " + last.slice(0, 16).replace("T", " ") + " UTC" : "";
+    var sel = document.getElementById("f-mgr"), cur = sel.value, mgrs = {};
+    ROWS.forEach(function(r){ if (r.manager) mgrs[r.manager] = 1; });
+    sel.innerHTML = '<option value="">Все диагносты</option>' + Object.keys(mgrs).sort().map(function(m){ return '<option' + (m === cur ? " selected" : "") + '>' + esc(m) + '</option>'; }).join("");
+    renderList();
+  });
+}
+document.getElementById("f-mgr").addEventListener("change", renderList);
+document.getElementById("f-st").addEventListener("change", renderList);
+document.getElementById("add-btn").addEventListener("click", function(){
+  var d = Number(document.getElementById("add-deal").value);
+  if (!d) return;
+  this.disabled = true;
+  post({ action: "recalc", deal: d }).then(function(res){ document.getElementById("add-btn").disabled = false; if (res.ok) { document.getElementById("add-deal").value = ""; loadList(); } else alert(res.error || "не получилось"); });
+});
+
+// ---------- карточка ----------
+var CUR = null;
+function showDetail(deal){
+  document.getElementById("list").hidden = true; document.getElementById("detail").hidden = false;
+  window.scrollTo(0, 0);
+  api("deal=" + deal).then(function(res){
+    if (!res.ok) { document.getElementById("d-title").textContent = res.error || "нет данных"; return; }
+    var r = res.row; CUR = r;
+    document.getElementById("d-title").textContent = (r.client || "Клиент") + (r.company ? " · " + r.company : "");
+    var meta = [r.meet_at ? "Встреча " + r.meet_at.replace(/^(\d+)-(\d+)-(\d+)/, "$3.$2.$1") + " МСК" : "Дата встречи не указана", r.manager ? "Диагност: " + r.manager : "",
+      [r.niche, r.turn ? "оборот " + r.turn + " млн ₽" : "", r.staff ? r.staff + " сотрудников" : "", r.geo].filter(Boolean).join(" · ")].filter(Boolean);
+    document.getElementById("d-meta").innerHTML = meta.map(esc).join("<br>");
+    document.getElementById("d-tech").innerHTML = '<span class="st ' + r.status + '">' + (ST[r.status] || r.status) + '</span>' + (r.status === "error" ? "<br>" + esc(r.error) : "")
+      + (r.updated_at ? "<br>обновлено " + esc(r.updated_at.slice(0, 16).replace("T", " ")) + " UTC" : "") + (r.model ? "<br>" + esc(r.model) + " · " + (r.tokens_in + r.tokens_out).toLocaleString("ru") + " токенов · " + r.searches + " поисков" : "");
+    document.getElementById("d-amo").href = r.amo_url || ("https://pavelgitelman.amocrm.ru/leads/detail/" + r.deal);
+    var q = document.getElementById("d-quiz"); q.hidden = !r.quiz_url; if (r.quiz_url) q.href = r.quiz_url;
+    var secs = sections(r.brief), cheat = secs.filter(function(s){ return s.n === 16; })[0];
+    document.getElementById("d-cheat").hidden = !cheat;
+    if (cheat) document.getElementById("d-cheat-body").innerHTML = md(cheat.body.join("\n"));
+    var rest = secs.filter(function(s){ return s.n !== 16; });
+    document.getElementById("d-sections").innerHTML = rest.length ? rest.map(function(s, i){
+      return '<details class="sec"' + (i < 1 ? " open" : "") + '><summary><span class="n">' + (s.n || "") + '</span>' + esc(s.title || "Вступление") + '</summary><div class="md">' + md(s.body.join("\n")) + '</div></details>';
+    }).join("") : '<p class="empty">' + (r.status === "queued" ? "Подготовка ещё считается — страница обновится сама." : "Текста подготовки нет.") + '</p>';
+    document.getElementById("d-cases").innerHTML = (r.cases || []).length ? r.cases.map(function(c){
+      var line = [c.niche || c.sphere, c.turn ? c.turn + " млн ₽" : "", c.staff ? c.staff + " чел" : "", [c.city, c.country].filter(Boolean).join(", "), c.paid_at ? "тренинг " + c.paid_at.slice(0, 7) : ""].filter(Boolean).join(" · ");
+      return '<div class="case"><b>' + esc(c.company || c.name || "участник " + c.deal) + '</b>' + esc(line) + (c.site ? ' · ' + inline(c.site) : "") + '<div class="why">' + esc(c.why || "") + '</div><div class="g">' + inline(c.growth || "") + '</div><a class="btn ghost" style="margin-top:6px" href="https://pavelgitelman.amocrm.ru/leads/detail/' + c.deal + '" target="_blank" rel="noopener">сделка участника ↗</a></div>';
+    }).join("") : '<p class="empty">Участники не подобраны.</p>';
+    document.getElementById("d-facts").innerHTML = md(r.facts) || '<p class="empty">Досье нет.</p>';
+    document.getElementById("d-src").innerHTML = (r.sources || []).length ? r.sources.map(function(s){ return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.title || s.url) + '</a>'; }).join("") : '<span class="empty">Источники не зафиксированы.</span>';
+    var mine = (res.feedback || []).filter(function(f){ return f.login === res.me; })[0];
+    document.getElementById("fb-was").textContent = mine ? "вы отметили: " + (mine.useful ? "полезно" : "не полезно") : ((res.feedback || []).length ? (res.feedback.length + " отзывов") : "");
+    document.getElementById("fb-comment").value = mine ? mine.comment : "";
+    document.getElementById("fb-msg").textContent = "";
+    if (r.status === "queued") setTimeout(function(){ if (CUR && CUR.deal === r.deal && !document.getElementById("detail").hidden) showDetail(r.deal); }, 45000);
+  });
+}
+Array.prototype.forEach.call(document.querySelectorAll(".fb button"), function(b){
+  b.addEventListener("click", function(){
+    if (!CUR) return;
+    post({ action: "feedback", deal: CUR.deal, useful: b.getAttribute("data-useful") === "1", comment: document.getElementById("fb-comment").value })
+      .then(function(res){ document.getElementById("fb-msg").textContent = res.ok ? "Спасибо, записано." : (res.error || "не получилось"); if (res.ok) document.getElementById("fb-was").textContent = "вы отметили: " + (b.getAttribute("data-useful") === "1" ? "полезно" : "не полезно"); });
+  });
+});
+document.getElementById("d-recalc").addEventListener("click", function(){
+  if (!CUR) return;
+  var btn = this; btn.disabled = true;
+  post({ action: "recalc", deal: CUR.deal }).then(function(res){ btn.disabled = false; if (res.ok) showDetail(CUR.deal); else alert(res.error || "не получилось"); });
+});
+function route(){
+  var m = location.hash.match(/deal=(\d+)/);
+  if (m) showDetail(Number(m[1]));
+  else { document.getElementById("detail").hidden = true; document.getElementById("list").hidden = false; CUR = null; loadList(); }
+}
+window.addEventListener("hashchange", route);
+route();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>
