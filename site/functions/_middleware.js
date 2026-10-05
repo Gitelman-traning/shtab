@@ -19,7 +19,7 @@ const RE_LOGIN = /^[a-z0-9._-]{3,32}$/;
 function registerPage(message, values = {}, tgBot = "") {
   const v = (k) => String(values[k] || "").replace(/"/g, "&quot;");
   const note = message ? `<p class="err">${message}</p>` : `<p class="hint">Заявка уйдёт администратору. После подтверждения войдёте с этим логином и паролем.</p>`;
-  return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Штаб · Регистрация</title>
@@ -107,7 +107,7 @@ function page({ setup, message, tgBot }) {
   const button = setup ? "Сохранить пароль" : "Войти";
   const autocomplete = setup ? "new-password" : "current-password";
   const note = message ? `<p class="err">${message}</p>` : `<p class="hint">${hint}</p>`;
-  return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Штаб · Вход</title>
@@ -163,6 +163,8 @@ export async function onRequest(context) {
 
   // API витрины Штаба проверяет доступ сам: токен сборщика или персональная сессия
   if (url.pathname.startsWith("/api/")) return next();
+  // иконка вкладки — без входа, иначе на странице входа её нет
+  if (/^\/(favicon(-\d+)?\.(ico|png)|apple-touch-icon\.png)$/.test(url.pathname)) return next();
 
   const stored = await env.OKK_KV.get(KEY);
   // тело читаем только у форм входа: иначе запрос уйдёт дальше уже «пустым»
@@ -255,7 +257,7 @@ export async function onRequest(context) {
   if (personal) {
     const sec = sectionOf(url.pathname);
     if (sec && level(personal, sec) === 0) {
-      return html(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>Штаб · Раздел закрыт</title>${STYLE}</head><body>
+      return html(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>Штаб · Раздел закрыт</title>${STYLE}</head><body>
 <form onsubmit="return false"><div class="mark">12</div><h1>Раздел закрыт</h1><p class="hint">У вашего аккаунта нет доступа к этому разделу. Если он нужен по работе — напишите администратору.</p><p class="hint"><a href="/" style="color:var(--accent)">На общий экран</a> · <a href="/__logout" style="color:var(--accent)">Выйти</a></p></form></body></html>`, 403);
     }
     const response = await next();
