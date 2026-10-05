@@ -106,7 +106,7 @@ function render(){
     '<div class="kpi"><span class="nm">Потрачено за месяц</span><span class="v">' + rub(spent) + '</span><span class="row"><span>план на месяц</span><b>' + rub(planTotal) + '</b></span><span class="row"><span>остаток плана</span><b>' + rub(planTotal - spent) + '</b></span></div>'
     + '<div class="kpi"><span class="nm">Подписки</span><span class="v">' + rub(fixed) + '</span><span class="row"><span>по плану</span><b>' + rub(plan.filter(function(p){ return p.kind === "fixed"; }).reduce(function(a, p){ return a + p.monthly_rub; }, 0)) + '</b></span></div>'
     + '<div class="kpi"><span class="nm">Модели и сервисы</span><span class="v">' + rub(spent - fixed) + '</span><span class="row"><span>лимит</span><b>' + rub(limitTotal) + '</b></span><span class="row"><span>записей</span><b>' + rows.filter(function(r){ return r.kind === "spend"; }).length + '</b></span></div>'
-    + '<div class="kpi"><span class="nm">Пополнения</span><span class="v">' + rub(topup) + '</span><span class="row"><span>баланс по нашим записям</span><b>' + rub(topup - (spent - fixed)) + '</b></span></div>';
+    + '<div class="kpi"><span class="nm">Пополнения за месяц</span><span class="v">' + rub(topup) + '</span>' + balances() + '</div>';
   var services = Object.keys(by).sort(function(a, b){ return by[b].spend - by[a].spend; });
   plan.forEach(function(p){ if (!by[p.service]) services.push(p.service); });
   document.getElementById("bysub").textContent = MON[+CUR.slice(5, 7) - 1] + " " + CUR.slice(0, 4);
@@ -125,6 +125,11 @@ function render(){
   document.querySelectorAll("#plan [data-save]").forEach(function(b){ b.onclick = function(){ var inp = document.querySelector('#plan input[data-s="' + b.dataset.save.replace(/"/g, '\\"') + '"]'); api("POST", "", { plan: { service: b.dataset.save, monthly_rub: Number(inp.value), kind: inp.dataset.k, note: inp.dataset.n } }).then(function(r){ msg("planmsg", r.ok ? "сохранено" : r.error, !r.ok); load(CUR); }); }; });
   var last = ""; rows.forEach(function(r){ if (r.day > last) last = r.day; });
   document.getElementById("stamp").textContent = last ? "последняя запись " + last.split("-").reverse().join(".") : "";
+}
+function balances(){
+  // остаток по нашим записям за всё время (12 месяцев): пополнения минус траты, по сервисам, где были пополнения
+  var acc = {}; (DATA.months || []).forEach(function(r){ var a = acc[r.service] = acc[r.service] || { t: 0, s: 0 }; if (r.kind === "topup") a.t += r.amount; else if (r.kind === "spend") a.s += r.amount; });
+  return Object.keys(acc).filter(function(k){ return acc[k].t > 0; }).map(function(k){ var b = acc[k].t - acc[k].s; return '<span class="row"><span>остаток ' + esc(k) + ' по записям</span><b' + (b < 0 ? ' style="color:var(--bad)"' : '') + '>' + rub(b) + '</b></span>'; }).join("") || '<span class="row"><span>пополнений пока не было</span></span>';
 }
 function msg(id, t, bad){ var e = document.getElementById(id); e.textContent = t || ""; e.className = "msg" + (bad ? " bad" : ""); }
 document.getElementById("add").onsubmit = function(e){ e.preventDefault(); var f = e.target, b = { day: f.day.value, service: f.service.value, item: f.item.value, amount: Number(f.amount.value), kind: f.kind.value };
