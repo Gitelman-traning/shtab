@@ -451,19 +451,25 @@ def cmd_growth(limit, cases_path, out, max_age_days=90):
     # кого проверять: тренинг старше полугода (у свежих «сейчас» = «тогда»), есть название компании или сайт,
     # название не похоже на ФИО без сайта (искать нечего), нет свежей проверки
     young = (dt.datetime.now(MSK) - dt.timedelta(days=180)).strftime("%Y-%m-%d")
-    person = re.compile(r"^[А-ЯЁA-Z][а-яёa-z]+(\s[А-ЯЁA-Z][а-яёa-z]+){1,2}$")
-    skipped = {"свежие": 0, "без компании": 0, "ФИО без сайта": 0}
-    todo = []
+    # ФИО: два-три слова буквами без правовой формы (ООО, ИП, ТОО, ОсОО, LLC…), в любом регистре
+    person = re.compile(r"^[А-ЯЁA-Za-zа-яё\-]+(\s[А-ЯЁA-Za-zа-яё\-]+){1,2}$")
+    legal = re.compile(r"\b(ООО|ОАО|ЗАО|АО|ПАО|ИП|ТОО|ОсОО|ОДО|LLC|LLP|Ltd|Inc|GmbH|FZ|FZE|FZCO)\b|[«\"“]|\.(ru|com|kz|by|ua|ae|io)\b", re.I)
+    skipped = {"свежие": 0, "без компании": 0, "ФИО без сайта": 0, "дубль компании": 0}
+    todo, seen = [], set()
     for c in cases:
         if (c.get("checked_at") or "") >= cutoff and c.get("result"):
             continue
+        key = re.sub(r"\W+", "", (c.get("company") or c.get("site") or "").lower())
         if (c.get("paid_at") or "") >= young:
             skipped["свежие"] += 1
         elif not (c.get("company") or c.get("site")):
             skipped["без компании"] += 1
-        elif c.get("company") and not c.get("site") and person.match(c["company"].strip()):
+        elif c.get("company") and not c.get("site") and person.match(c["company"].strip()) and not legal.search(c["company"]):
             skipped["ФИО без сайта"] += 1
+        elif key in seen:
+            skipped["дубль компании"] += 1     # одна компания — несколько сделок: проверяем один раз, результат копируется ниже
         else:
+            seen.add(key)
             todo.append(c)
     todo.sort(key=lambda c: c.get("paid_at") or "", reverse=True)     # сначала те, у кого прошло полгода-год: динамика уже видна
     log("участников в базе %d, к проверке %d, пропущено: %s; за прогон не больше %d" % (
@@ -473,7 +479,11 @@ def cmd_growth(limit, cases_path, out, max_age_days=90):
         try:
             g, _, u = alumni_growth(c)
             add_usage(usage, u, cheap=True)
-            rows.append({"deal": c["deal"], "result": g[:3000], "checked_at": dt.datetime.now(MSK).strftime("%Y-%m-%d")})
+            today = dt.datetime.now(MSK).strftime("%Y-%m-%d")
+            key = re.sub(r"\W+", "", (c.get("company") or c.get("site") or "").lower())
+            for x in cases:     # та же компания в других сделках получает тот же результат
+                if re.sub(r"\W+", "", (x.get("company") or x.get("site") or "").lower()) == key and not ((x.get("checked_at") or "") >= cutoff and x.get("result")):
+                    rows.append({"deal": x["deal"], "result": g[:3000], "checked_at": today})
             done += 1
         except Exception as e:
             log("участник %d: ОШИБКА %s" % (c["deal"], str(e)[:120]))
