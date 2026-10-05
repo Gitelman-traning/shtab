@@ -1,6 +1,13 @@
 /* Общее меню Штаба: аккордеон по отделам, активный пункт по адресу, виджет аккаунта в шапке.
    На странице: <aside class="side" id="side"></aside> внутри .layout и <script src="/nav.js"></script> в конце body. */
 (function () {
+  // иконка вкладки «HQ» для всех страниц Штаба (ставится здесь, чтобы не править каждую страницу)
+  if (!document.querySelector('link[rel="icon"]')) {
+    var h = document.head;
+    [["icon", "/favicon.ico", "", "any"], ["icon", "/favicon-32.png", "image/png", "32x32"], ["apple-touch-icon", "/apple-touch-icon.png", "", ""]].forEach(function (x) {
+      var l = document.createElement("link"); l.rel = x[0]; l.href = x[1]; if (x[2]) l.type = x[2]; if (x[3]) l.setAttribute("sizes", x[3]); h.appendChild(l);
+    });
+  }
   var I = {
     hub: '<svg viewBox="0 0 20 20"><path d="M3 3h6v6H3V3zM11 3h6v4h-6V3zM11 9h6v8h-6V9zM3 11h6v6H3v-6z" stroke-linejoin="round"/></svg>',
     sales: '<svg viewBox="0 0 20 20"><path d="M3 16l4-6 3 3 3-5 4 2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 4v12h14" stroke-linecap="round"/></svg>',
