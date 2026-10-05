@@ -163,7 +163,7 @@ def shtab(method, path, body=None, params=None):
 
 def claude(system, user, search_uses=0, max_tokens=4000):
     """Anthropic Messages через ProxyAPI. search_uses>0 включает серверный веб-поиск. → (text, sources, usage)"""
-    body = {"model": MODEL, "max_tokens": max_tokens, "system": system,
+    body = {"model": MODEL, "max_tokens": max_tokens, "system": system, "thinking": {"type": "disabled"},
             "messages": [{"role": "user", "content": user}]}
     if search_uses:
         body["tools"] = [{"type": "web_search_20250305", "name": "web_search", "max_uses": search_uses}]
@@ -193,6 +193,8 @@ def claude(system, user, search_uses=0, max_tokens=4000):
         u = j.get("usage") or {}
         usage = {"in": u.get("input_tokens", 0), "out": u.get("output_tokens", 0),
                  "search": ((u.get("server_tool_use") or {}).get("web_search_requests", 0))}
+        if j.get("stop_reason") == "max_tokens":
+            log("  ВНИМАНИЕ: ответ модели обрезан по лимиту %d токенов" % max_tokens)
         return "".join(text).strip(), sources, usage
     raise RuntimeError("модель не ответила (%s)" % last)
 
@@ -306,9 +308,9 @@ PICK_SYS = """Ты подбираешь из базы участников тр�
 тип продукта, масштаб (оборот и штат), управленческую сложность (несколько точек, филиалы, сезонность, производство + продажи),
 страну. Пример: для цветочной сети подходят не только цветочные компании, а рестораны, fashion-ритейл, сервисные сети с похожим
 масштабом и той же проблемой управления.
-Выбирай только из переданного списка, по id. Ответь строго JSON без пояснений:
-{"cases":[{"deal":<id>,"why":"<1–2 предложения, чем похож>"}, ...5 штук]}
-Если похожих мало — всё равно выбери 5 ближайших и честно напиши в why, что сходство частичное."""
+Выбирай только из переданного списка, по id. Ответь ровно пятью строками без заголовков и пояснений, каждая строка:
+<id> | <1–2 предложения, чем похож>
+Если похожих мало — всё равно выбери 5 ближайших и честно напиши, что сходство частичное."""
 
 
 def cases_lines(cases):
@@ -337,19 +339,17 @@ def pick_cases(ctx, facts, cases):
     user = "%s\n\nДосье по открытым источникам:\n%s\n\nБаза участников (id | компания | ниша | оборот | штат | география | сайт | когда):\n%s" % (
         card_text(ctx), facts[:6000], cases_lines(cases))
     text, _, usage = claude(PICK_SYS, user, max_tokens=1500)
-    m = re.search(r"\{.*\}", text.replace("```json", "").replace("```", ""), re.S)
+    by_id = {int(c["deal"]): c for c in cases}
     picked = []
-    if m:
-        try:
-            by_id = {int(c["deal"]): c for c in cases}
-            for it in json.loads(m.group(0)).get("cases") or []:
-                c = by_id.get(int(str(it.get("deal") or "0").strip()))
-                if c and c["deal"] not in [p["deal"] for p in picked]:
-                    picked.append(dict(c, why=str(it.get("why") or "")[:400]))
-        except (ValueError, TypeError, AttributeError) as e:
-            log("  подбор участников: не разобрал ответ (%s): %s" % (e, text[:200].replace("\n", " ")))
-    else:
-        log("  подбор участников: модель ответила не JSON: %s" % text[:200].replace("\n", " "))
+    for line in text.splitlines():
+        m = re.match(r"\s*\**\s*(\d{6,})\s*\**\s*[|:\-–—]\s*(.+)$", line.strip())
+        if not m:
+            continue
+        c = by_id.get(int(m.group(1)))
+        if c and c["deal"] not in [p["deal"] for p in picked]:
+            picked.append(dict(c, why=m.group(2).strip()[:400]))
+    if not picked:
+        log("  подбор участников: не нашёл id в ответе: %s" % text[:200].replace("\n", " "))
     return picked[:5], usage
 
 
@@ -381,7 +381,7 @@ def build_brief(ctx, facts, picked, prompt):
             i, cases_lines([c]), "", c.get("why", ""), c.get("growth") or "не проверялось"))
     user = "%s\n\n# ДОСЬЕ ПО ОТКРЫТЫМ ИСТОЧНИКАМ\n%s\n\n# УЧАСТНИКИ ИЗ БАЗЫ (подобраны по сходству)\n%s" % (
         card_text(ctx), facts, "\n\n".join(cases_txt) or "Подходящих участников в базе не нашлось.")
-    return claude(prompt, user, max_tokens=7000)
+    return claude(prompt, user, max_tokens=10000)
 
 
 # ---------- команды ----------
@@ -452,14 +452,18 @@ def targets(deal, known, queued):
     return out[:MAX_PER_RUN]
 
 
-def process(deal, cases, prompt, dry, out_path):
+def process(deal, cases, prompt, dry, out_path, facts_path=None):
     t0 = time.time()
     usage = {}
     ctx = lead_context(deal)
     log("сделка %d: контекст собран (%d полей, %d заметок), диагност %s" % (deal, len(ctx["card"]), len(ctx["notes"]), ctx["manager"]))
-    facts, sources, u = research_company(ctx)
-    add_usage(usage, u)
-    log("  исследование: %d символов, %d источников, поисков %d" % (len(facts), len(sources), u["search"]))
+    if facts_path:
+        facts, sources = open(facts_path, encoding="utf-8").read(), []
+        log("  досье взято из файла %s (%d символов)" % (facts_path, len(facts)))
+    else:
+        facts, sources, u = research_company(ctx)
+        add_usage(usage, u)
+        log("  исследование: %d символов, %d источников, поисков %d" % (len(facts), len(sources), u["search"]))
     picked, u = pick_cases(ctx, facts, cases)
     add_usage(usage, u)
     log("  участников подобрано: %d" % len(picked))
@@ -473,7 +477,8 @@ def process(deal, cases, prompt, dry, out_path):
             log("  рост участника %d: %s" % (c["deal"], str(e)[:100]))
     brief, _, u = build_brief(ctx, facts, picked, prompt)
     add_usage(usage, u)
-    log("  подготовка: %d символов, всего токенов %d/%d, поисков %d, %d сек" % (len(brief), usage["in"], usage["out"], usage["search"], time.time() - t0))
+    log("  подготовка: %d символов, всего токенов %d/%d, поисков %d, %d сек, ≈ %.0f ₽" % (
+        len(brief), usage["in"], usage["out"], usage["search"], time.time() - t0, usage["in"] * 600 / 1e6 + usage["out"] * 3030 / 1e6))
     row = {"deal": deal, "contact": ctx["contact"], "meet_at": ctx["meet_at"], "manager": ctx["manager"], "client": ctx["card"].get("Имя", ""),
            "company": ctx["company"], "niche": ctx["niche"], "turn": ctx["turn"], "staff": ctx["staff"],
            "geo": ", ".join(x for x in (ctx["city"], ctx["country"]) if x), "quiz_url": ctx["quiz_url"],
@@ -492,7 +497,7 @@ def process(deal, cases, prompt, dry, out_path):
     return row
 
 
-def cmd_run(deal, dry, out_path, cases_path):
+def cmd_run(deal, dry, out_path, cases_path, facts_path=None):
     prompt = open(os.path.join(os.path.dirname(__file__), "prep_prompt.md"), encoding="utf-8").read()
     known, queued = set(), []
     if URL and STOKEN and not cases_path:
@@ -511,7 +516,7 @@ def cmd_run(deal, dry, out_path, cases_path):
     done, failed = 0, 0
     for d in ids:
         try:
-            process(d, cases, prompt, dry, out_path if deal else None)
+            process(d, cases, prompt, dry, out_path if deal else None, facts_path if deal else None)
             done += 1
         except Exception as e:
             failed += 1
@@ -533,6 +538,7 @@ def main():
     ap.add_argument("--dry", action="store_true")
     ap.add_argument("--out")
     ap.add_argument("--cases")
+    ap.add_argument("--facts", help="готовое досье из файла (пропустить веб-исследование, только для --deal)")
     a = ap.parse_args()
     if not AMO_TOKEN:
         sys.exit("нет AMO_TOKEN")
@@ -541,7 +547,7 @@ def main():
     else:
         if not LLM_KEY:
             sys.exit("нет LLM_API_KEY")
-        cmd_run(a.deal, a.dry, a.out, a.cases)
+        cmd_run(a.deal, a.dry, a.out, a.cases, a.facts)
 
 
 if __name__ == "__main__":
