@@ -14,7 +14,7 @@
   4. diagnostic_builder — сборка подготовки по промпту collector/prep_prompt.md (16 разделов).
 
 Окружение: AMO_TOKEN (чтение), SHTAB_URL + SHTAB_TOKEN (витрина), LLM_API_KEY (ProxyAPI, Anthropic Messages с web_search).
-Необязательно: PREP_MODEL (claude-sonnet-5), PREP_ANTHROPIC_BASE (https://api.proxyapi.ru/anthropic), PREP_MAX (сделок за прогон, 10).
+Необязательно: PREP_MODEL (claude-sonnet-5), PREP_MODEL_GROWTH (claude-haiku-4-5, шаг 3), PREP_ANTHROPIC_BASE (https://api.proxyapi.ru/anthropic), PREP_MAX (сделок за прогон, 10).
 В модель не уходят телефоны, почты, мессенджер-id; в журнал — только id сделок.
 """
 import argparse
@@ -36,6 +36,7 @@ STOKEN = os.environ.get("SHTAB_TOKEN", "").strip()
 LLM_KEY = os.environ.get("LLM_API_KEY", "").strip()
 LLM_BASE = os.environ.get("PREP_ANTHROPIC_BASE", "https://api.proxyapi.ru/anthropic").rstrip("/")
 MODEL = os.environ.get("PREP_MODEL", "claude-sonnet-5")
+MODEL_GROWTH = os.environ.get("PREP_MODEL_GROWTH", "claude-haiku-4-5")   # рост выпускников: задача простая, модель дешёвая
 MAX_PER_RUN = int(os.environ.get("PREP_MAX", "10"))
 
 L1 = 8733326                      # Первая линия
@@ -161,9 +162,9 @@ def shtab(method, path, body=None, params=None):
 
 # ---------- модель ----------
 
-def claude(system, user, search_uses=0, max_tokens=4000):
+def claude(system, user, search_uses=0, max_tokens=4000, model=None):
     """Anthropic Messages через ProxyAPI. search_uses>0 включает серверный веб-поиск. → (text, sources, usage)"""
-    body = {"model": MODEL, "max_tokens": max_tokens, "system": system, "thinking": {"type": "disabled"},
+    body = {"model": model or MODEL, "max_tokens": max_tokens, "system": system, "thinking": {"type": "disabled"},
             "messages": [{"role": "user", "content": user}]}
     if search_uses:
         body["tools"] = [{"type": "web_search_20250305", "name": "web_search", "max_uses": search_uses}]
@@ -199,9 +200,11 @@ def claude(system, user, search_uses=0, max_tokens=4000):
     raise RuntimeError("модель не ответила (%s)" % last)
 
 
-def add_usage(total, u):
+def add_usage(total, u, cheap=False):
     for k in ("in", "out", "search"):
         total[k] = total.get(k, 0) + (u.get(k) or 0)
+    # оценка в рублях: Sonnet 600/3030 ₽ за 1M, Haiku 200/1010 ₽ за 1M (ProxyAPI, ориентир)
+    total["rub"] = total.get("rub", 0) + ((u.get("in") or 0) * (200 if cheap else 600) + (u.get("out") or 0) * (1010 if cheap else 3030)) / 1e6
 
 
 # ---------- контекст сделки ----------
@@ -369,7 +372,7 @@ def alumni_growth(case):
     desc = cases_lines([case])
     user = "Участник тренинга: %s\nГод тренинга: %s\nЧто известно на момент тренинга — из карточки CRM выше. Найди текущее состояние компании." % (
         desc, (case.get("paid_at") or "")[:4] or "неизвестен")
-    return claude(GROWTH_SYS, user, search_uses=4, max_tokens=900)
+    return claude(GROWTH_SYS, user, search_uses=4, max_tokens=900, model=MODEL_GROWTH)
 
 
 # ---------- шаг 4: сборка подготовки ----------
@@ -452,7 +455,7 @@ def targets(deal, known, queued):
     return out[:MAX_PER_RUN]
 
 
-def process(deal, cases, prompt, dry, out_path, facts_path=None):
+def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=None):
     t0 = time.time()
     usage = {}
     ctx = lead_context(deal)
@@ -464,21 +467,29 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None):
         facts, sources, u = research_company(ctx)
         add_usage(usage, u)
         log("  исследование: %d символов, %d источников, поисков %d" % (len(facts), len(sources), u["search"]))
-    picked, u = pick_cases(ctx, facts, cases)
-    add_usage(usage, u)
-    log("  участников подобрано: %d" % len(picked))
-    for c in picked:
-        try:
-            g, gs, u = alumni_growth(c)
-            add_usage(usage, u)
-            c["growth"], c["sources"] = g, gs
-        except Exception as e:
-            c["growth"] = "не проверено (ошибка поиска)"
-            log("  рост участника %d: %s" % (c["deal"], str(e)[:100]))
+    if picked_path and os.path.exists(picked_path):
+        picked = json.load(open(picked_path, encoding="utf-8"))
+        log("  участники с проверкой роста взяты из файла %s (%d)" % (picked_path, len(picked)))
+    else:
+        picked, u = pick_cases(ctx, facts, cases)
+        add_usage(usage, u)
+        log("  участников подобрано: %d" % len(picked))
+        for c in picked:
+            try:
+                g, gs, u = alumni_growth(c)
+                add_usage(usage, u, cheap=True)
+                c["growth"], c["sources"] = g, gs
+            except Exception as e:
+                c["growth"] = "не проверено (ошибка поиска)"
+                log("  рост участника %d: %s" % (c["deal"], str(e)[:100]))
+        if out_path:   # промежуточный результат, чтобы при сбое сборки не платить за подбор и рост заново
+            with open(out_path + ".picked.json", "w", encoding="utf-8") as f:
+                json.dump(picked, f, ensure_ascii=False, indent=1)
+        log("  рост участников проверен, расход пока ≈ %.0f ₽" % usage.get("rub", 0))
     brief, _, u = build_brief(ctx, facts, picked, prompt)
     add_usage(usage, u)
     log("  подготовка: %d символов, всего токенов %d/%d, поисков %d, %d сек, ≈ %.0f ₽" % (
-        len(brief), usage["in"], usage["out"], usage["search"], time.time() - t0, usage["in"] * 600 / 1e6 + usage["out"] * 3030 / 1e6))
+        len(brief), usage["in"], usage["out"], usage["search"], time.time() - t0, usage.get("rub", 0)))
     row = {"deal": deal, "contact": ctx["contact"], "meet_at": ctx["meet_at"], "manager": ctx["manager"], "client": ctx["card"].get("Имя", ""),
            "company": ctx["company"], "niche": ctx["niche"], "turn": ctx["turn"], "staff": ctx["staff"],
            "geo": ", ".join(x for x in (ctx["city"], ctx["country"]) if x), "quiz_url": ctx["quiz_url"],
@@ -497,7 +508,7 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None):
     return row
 
 
-def cmd_run(deal, dry, out_path, cases_path, facts_path=None):
+def cmd_run(deal, dry, out_path, cases_path, facts_path=None, picked_path=None):
     prompt = open(os.path.join(os.path.dirname(__file__), "prep_prompt.md"), encoding="utf-8").read()
     known, queued = set(), []
     if URL and STOKEN and not cases_path:
@@ -516,7 +527,7 @@ def cmd_run(deal, dry, out_path, cases_path, facts_path=None):
     done, failed = 0, 0
     for d in ids:
         try:
-            process(d, cases, prompt, dry, out_path if deal else None, facts_path if deal else None)
+            process(d, cases, prompt, dry, out_path if deal else None, facts_path if deal else None, picked_path if deal else None)
             done += 1
         except Exception as e:
             failed += 1
@@ -539,6 +550,7 @@ def main():
     ap.add_argument("--out")
     ap.add_argument("--cases")
     ap.add_argument("--facts", help="готовое досье из файла (пропустить веб-исследование, только для --deal)")
+    ap.add_argument("--picked", help="готовые участники с ростом из файла *.picked.json (только для --deal)")
     a = ap.parse_args()
     if not AMO_TOKEN:
         sys.exit("нет AMO_TOKEN")
@@ -547,7 +559,7 @@ def main():
     else:
         if not LLM_KEY:
             sys.exit("нет LLM_API_KEY")
-        cmd_run(a.deal, a.dry, a.out, a.cases, a.facts)
+        cmd_run(a.deal, a.dry, a.out, a.cases, a.facts, a.picked)
 
 
 if __name__ == "__main__":
