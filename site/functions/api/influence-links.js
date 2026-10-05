@@ -233,7 +233,9 @@ async function workTables(env, sa, steps) {
 }
 
 // ---------- уведомления ----------
-const adminChat = (env) => env.GO_TG_CHAT_ID || env.TG_ADMIN_CHAT || "";
+// Канал «Ссылка Инфлюенсе», пишет бот авторизации Штаба (TG_BOT_TOKEN). GO_TG_CHAT_ID — переопределить.
+const NOTIFY_CHAT = "-1004463070368";
+const adminChat = (env) => env.GO_TG_CHAT_ID || NOTIFY_CHAT;
 async function tgOfLogin(env, login) {
   if (!login) return null;
   const r = await env.DB.prepare("SELECT tg_id FROM users WHERE login = ?").bind(login).first();
@@ -351,13 +353,18 @@ export async function onRequestPost({ request, env }) {
     if (after) await updateCells(sa, after.row, { "Рабочие таблицы": wt.failed.length ? "ошибка: " + wt.failed.join("; ") : "записано: " + wt.done.join("; ") });
     if (wt.failed.length) await tgSend(env, adminChat(env), `Инфлюенс ${tag}: не удалось записать в рабочие таблицы — ${wt.failed.join("; ")}`);
 
-    if (waiting.length) {
-      const lines = [`Инфлюенс: заявка на ссылки ${tag}`, `Блогер: ${who}`, `Запросил: ${by}`,
-        wa ? `WA (${waLen}): ${wa}` : "", bot ? `TG-бот: ${bot}` : "",
-        phrase ? `TG-входящее — нужна ссылка Telegram Business и блок в триггерах amo.\nФраза: «${phrase}»\nИсточник: интеграции · Тег: ${tag}` : "",
-        circle.startsWith("нужен") ? `Кружок Паши в ветку бота — ${circle.slice(7)}` : "",
-        `Выдать: ${new URL(request.url).origin}/marketing/influence/links/`].filter(Boolean);
-      await tgSend(env, adminChat(env), lines.join("\n"));
+    // Каждая заявка — в канал: что выдано сразу и что ждёт администратора.
+    {
+      const TN = { wa: "WhatsApp", bot: "TG-бот", tgin: "TG-входящее" };
+      const msg = [(waiting.length ? "🟡 Ждёт: " + waiting.join(", ") : "🟢 Выдано") + " · " + types.map((t) => TN[t]).join(", ") + " · " + tag,
+        "Блогер: " + who,
+        "Заказчик: " + customer + (user.name && user.name !== customer ? " (оформил " + user.name + ")" : ""),
+        wa ? "WA (" + waLen + " зн.): «" + waText + "»\n" + wa : "",
+        bot ? "TG-бот: " + bot : "",
+        phrase ? "TG-входящее — нужна ссылка Telegram Business и блок в триггерах amo.\nФраза: «" + phrase + "»\nИсточник: интеграции · Тег: " + tag : "",
+        circle.startsWith("нужен") ? "Кружок Паши в ветку бота — " + circle.slice(7) : "",
+        waiting.length ? "Выдать: " + new URL(request.url).origin + "/marketing/influence/links/" : ""].filter(Boolean);
+      await tgSend(env, adminChat(env), msg.join("\n"));
     }
     return json({ ok: true, tag, wa, waLen, bot, waiting, tables: wt.failed.length ? "ошибка" : "ok" });
   }
