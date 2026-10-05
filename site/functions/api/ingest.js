@@ -17,7 +17,7 @@ export async function onRequestPost({ request, env }) {
   const plans = Array.isArray(body.plans) ? body.plans : [];
   const collector = String(body.collector || "unknown").slice(0, 60);
   const has = (k) => Array.isArray(body[k]) && body[k].length;
-  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("expenses")) return bad("пустая пачка");
+  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("expenses")) return bad("пустая пачка");
 
   const stamp = now();
   const stmt = env.DB.prepare(
@@ -124,6 +124,17 @@ export async function onRequestPost({ request, env }) {
         String(r.note || "").slice(0, 500), "collector:" + collector, r.ref ? String(r.ref).slice(0, 200) : null, "collector:" + collector, stamp));
     }
     for (let i = 0; i < batch.length; i += 20) { await env.DB.batch(batch.slice(i, i + 20)); written += Math.min(20, batch.length - i); }
+  }
+  // база «было → стало»: результат проверки роста участника (prep.py growth), ночная пересборка базы его не трогает
+  const growth = Array.isArray(body.prep_growth) ? body.prep_growth : [];
+  if (growth.length) {
+    const gs2 = env.DB.prepare("UPDATE prep_cases SET result = ?, checked_at = ?, updated_at = ? WHERE deal = ?");
+    const batch = [];
+    for (const r of growth.slice(0, 200)) {
+      if (!r || !Number(r.deal)) continue;
+      batch.push(gs2.bind(String(r.result || "").slice(0, 3000), String(r.checked_at || stamp.slice(0, 10)).slice(0, 10), stamp, Number(r.deal)));
+    }
+    for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); }
   }
   const goals = Array.isArray(body.goals) ? body.goals : [];
   if (goals.length) {

@@ -14,7 +14,7 @@ export async function onRequestGet({ request, env }) {
     if (!hasIngestToken(request, env)) return bad("нет доступа", 401);
     const q = await env.DB.prepare("SELECT deal FROM prep WHERE status = 'queued'").all();
     const k = await env.DB.prepare("SELECT deal FROM prep WHERE status != 'queued'").all();
-    const c = await env.DB.prepare("SELECT deal, pipeline, name, company, niche, sphere, turn, staff, site, role, city, country, paid_at, result FROM prep_cases").all();
+    const c = await env.DB.prepare("SELECT deal, pipeline, name, company, niche, sphere, turn, staff, site, role, city, country, paid_at, result, checked_at FROM prep_cases").all();
     return json({ ok: true, queued: (q.results || []).map((r) => r.deal), known: (k.results || []).map((r) => r.deal), cases: c.results || [] });
   }
   const user = await canRead(request, env);
@@ -35,8 +35,8 @@ export async function onRequestGet({ request, env }) {
   const rows = await env.DB.prepare(
     "SELECT " + LIST_COLS + " FROM prep WHERE (meet_at >= ? AND meet_at <= ?) OR status != 'ready' OR meet_at = '' ORDER BY meet_at DESC, updated_at DESC LIMIT 300")
     .bind(from, to).all();
-  const cases = await env.DB.prepare("SELECT COUNT(*) AS n FROM prep_cases").first();
-  return json({ ok: true, rows: rows.results || [], cases: (cases && cases.n) || 0, me: user.login });
+  const cases = await env.DB.prepare("SELECT COUNT(*) AS n, SUM(CASE WHEN result != '' THEN 1 ELSE 0 END) AS checked FROM prep_cases").first();
+  return json({ ok: true, rows: rows.results || [], cases: (cases && cases.n) || 0, checked: (cases && cases.checked) || 0, me: user.login });
 }
 
 export async function onRequestPost({ request, env }) {

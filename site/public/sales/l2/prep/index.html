@@ -139,7 +139,7 @@ function loadList(){
   api("days=21").then(function(res){
     if (!res.ok) { document.getElementById("rows").innerHTML = '<p class="empty">' + esc(res.error || "нет доступа") + '</p>'; return; }
     ROWS = res.rows || [];
-    document.getElementById("cases-n").textContent = res.cases ? res.cases + " компаний" : "база пуста";
+    document.getElementById("cases-n").textContent = res.cases ? res.cases + " компаний, рост проверен у " + (res.checked || 0) : "база пуста";
     var last = ROWS.map(function(r){ return r.updated_at || ""; }).sort().pop();
     document.getElementById("stamp").textContent = last ? "обновлено " + last.slice(0, 16).replace("T", " ") + " UTC" : "";
     var sel = document.getElementById("f-mgr"), cur = sel.value, mgrs = {};

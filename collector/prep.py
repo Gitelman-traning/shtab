@@ -430,6 +430,40 @@ def cmd_cases(out):
         log("база участников обновлена в витрине")
 
 
+def cmd_growth(limit, cases_path, out, max_age_days=90):
+    """База «было → стало»: по каждому участнику без свежей проверки — поиск на дешёвой модели, результат в витрину (prep_cases.result)."""
+    cases = load_cases(cases_path)
+    cutoff = (dt.datetime.now(MSK) - dt.timedelta(days=max_age_days)).strftime("%Y-%m-%d")
+    todo = [c for c in cases if (c.get("company") or c.get("site")) and not ((c.get("checked_at") or "") >= cutoff and c.get("result"))]
+    todo.sort(key=lambda c: c.get("paid_at") or "", reverse=True)     # свежие выпускники первыми
+    log("участников в базе %d, к проверке %d (без компании и сайта пропущено %d), за прогон не больше %d" % (
+        len(cases), len(todo), sum(1 for c in cases if not (c.get("company") or c.get("site"))), limit))
+    usage, rows, done = {}, [], 0
+    for c in todo[:limit]:
+        try:
+            g, _, u = alumni_growth(c)
+            add_usage(usage, u, cheap=True)
+            rows.append({"deal": c["deal"], "result": g[:3000], "checked_at": dt.datetime.now(MSK).strftime("%Y-%m-%d")})
+            done += 1
+        except Exception as e:
+            log("участник %d: ОШИБКА %s" % (c["deal"], str(e)[:120]))
+            if "402" in str(e):
+                log("баланс модели кончился — останавливаюсь")
+                break
+        if len(rows) >= 20:
+            if URL and STOKEN and not out:
+                shtab("POST", "/api/ingest", {"collector": "prep", "prep_growth": rows})
+            rows = []
+            log("  проверено %d, расход ≈ %.0f ₽" % (done, usage.get("rub", 0)))
+    if rows and URL and STOKEN and not out:
+        shtab("POST", "/api/ingest", {"collector": "prep", "prep_growth": rows})
+    if out:
+        with open(out, "w", encoding="utf-8") as f:
+            json.dump(rows, f, ensure_ascii=False, indent=1)
+    log("готово: проверено %d участников, токенов %d/%d, поисков %d, ≈ %.0f ₽; осталось без проверки %d" % (
+        done, usage.get("in", 0), usage.get("out", 0), usage.get("search", 0), usage.get("rub", 0), max(0, len(todo) - done)))
+
+
 def load_cases(path):
     if path:
         return json.load(open(path, encoding="utf-8"))
@@ -473,19 +507,18 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
     else:
         picked, u = pick_cases(ctx, facts, cases)
         add_usage(usage, u)
-        log("  участников подобрано: %d" % len(picked))
+        # рост выпускников — из базы «было → стало» (prep.py growth, раз в квартал), при подготовке в интернет не ходим
+        checked = 0
         for c in picked:
-            try:
-                g, gs, u = alumni_growth(c)
-                add_usage(usage, u, cheap=True)
-                c["growth"], c["sources"] = g, gs
-            except Exception as e:
-                c["growth"] = "не проверено (ошибка поиска)"
-                log("  рост участника %d: %s" % (c["deal"], str(e)[:100]))
-        if out_path:   # промежуточный результат, чтобы при сбое сборки не платить за подбор и рост заново
+            if c.get("result"):
+                c["growth"] = c["result"] + ("\n(проверено %s)" % c["checked_at"][:10] if c.get("checked_at") else "")
+                checked += 1
+            else:
+                c["growth"] = "не проверялось: участник ещё не прошёл проверку роста в базе"
+        log("  участников подобрано: %d, с проверенным ростом %d" % (len(picked), checked))
+        if out_path:
             with open(out_path + ".picked.json", "w", encoding="utf-8") as f:
                 json.dump(picked, f, ensure_ascii=False, indent=1)
-        log("  рост участников проверен, расход пока ≈ %.0f ₽" % usage.get("rub", 0))
     brief, _, u = build_brief(ctx, facts, picked, prompt)
     add_usage(usage, u)
     log("  подготовка: %d символов, всего токенов %d/%d, поисков %d, %d сек, ≈ %.0f ₽" % (
@@ -544,8 +577,9 @@ def cmd_run(deal, dry, out_path, cases_path, facts_path=None, picked_path=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["cases", "run"])
+    ap.add_argument("cmd", choices=["cases", "growth", "run"])
     ap.add_argument("--deal", type=int)
+    ap.add_argument("--limit", type=int, default=int(os.environ.get("PREP_GROWTH_LIMIT", "100")), help="growth: сколько участников проверить за прогон")
     ap.add_argument("--dry", action="store_true")
     ap.add_argument("--out")
     ap.add_argument("--cases")
@@ -556,6 +590,10 @@ def main():
         sys.exit("нет AMO_TOKEN")
     if a.cmd == "cases":
         cmd_cases(a.out)
+    elif a.cmd == "growth":
+        if not LLM_KEY:
+            sys.exit("нет LLM_API_KEY")
+        cmd_growth(a.limit, a.cases, a.out)
     else:
         if not LLM_KEY:
             sys.exit("нет LLM_API_KEY")
