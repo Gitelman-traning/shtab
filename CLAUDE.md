@@ -11,7 +11,8 @@
 - `site/public/` — страницы. Каждая страница — отдельный html с `/ui.css`, `/ui.js`, `/nav.js`; данные берутся из `/api/points` и других API.
   - `sales/l1/` — Первая линия (менеджеры, окна на день), `sales/l2/` — Вторая линия и ОКК (страницы ОКК собираются из репозитория `okk`, в git не попадают),
   - `marketing/` — источники (страницы генерируются из `site/src/source.tpl.html` и `web.tpl.html` скриптом `build.py`),
-  - `index.html` — общий экран, `tags.html`, `users.html` — настройки (только админ).
+  - `index.html` — общий экран, `tags.html`, `users.html`, `budget.html` — настройки (только админ),
+    `settings/dashboard/` — личный дашборд проектов Никиты: три вкладки показывают страницы из KV (`/api/dashboard`), которые присылает его локальная сборка (`Local/dashboard/publish.mjs`); в git их нет.
 - `site/functions/api/` — API (Cloudflare Functions). `_lib.js` — права, сессии, `sectionOf()` (какой раздел отвечает за адрес).
 - `site/public/nav.js` — единое меню: новый раздел добавляется в дерево `TREE` здесь и в `SECTIONS`/`sectionOf` в `_lib.js`.
 - `collector/` — ночные сборщики (GitHub Actions `shtab-collect.yml`): `collect.py` — из выгрузки amo в Google Sheets, `okna.py` — окна Первой линии прямо из amo, `metrika.py` — Яндекс Метрика.

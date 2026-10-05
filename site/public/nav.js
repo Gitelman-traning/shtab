@@ -61,7 +61,8 @@
     { id: "settings", name: "Настройки", icon: I.gear, admin: true, children: [
       { name: "Пользователи", href: "/users", icon: I.users, admin: true, sec: "users" },
       { name: "Теги", href: "/tags", icon: I.tag, admin: true, sec: "tags" },
-      { name: "Бюджет и расходы", href: "/budget", icon: I.coin, admin: true, sec: "budget" }
+      { name: "Бюджет и расходы", href: "/budget", icon: I.coin, admin: true, sec: "budget" },
+      { name: "Дашборд проектов", href: "/settings/dashboard/", icon: I.hub, admin: true, sec: "dashboard" }
     ] }
   ];
 

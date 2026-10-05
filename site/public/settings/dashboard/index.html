@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Дашборд проектов</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tabs button{border:1px solid var(--line-2);background:var(--card);color:var(--dim);border-radius:10px;padding:6px 12px;font:inherit;font-size:12.5px;cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--gold-soft);color:var(--gold);border-color:transparent;font-weight:600}
+.tabs .upd{margin-left:auto;font-size:12px;color:var(--faint)}
+main{max-width:none;padding-bottom:0}
+.frame{background:var(--card);border-radius:16px;overflow:hidden;flex:1;min-height:70vh}
+.frame iframe{display:block;width:100%;height:calc(100vh - 150px);min-height:600px;border:0;background:transparent}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Настройки · <b>Дашборд проектов</b></div><h1>Дашборд проектов</h1><p class="sub">Проекты Никиты в Claude Code: стадии, задачи со сроками, утренний бриф. Собирается на его компьютере и присылается сюда после каждой сборки</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div class="card"><div class="tabs" id="tabs">
+    <button type="button" data-page="projects" aria-pressed="true">Проекты</button>
+    <button type="button" data-page="tasks" aria-pressed="false">Задачи и сроки</button>
+    <button type="button" data-page="brief" aria-pressed="false">Утренний бриф</button>
+    <span class="upd" id="upd"></span>
+  </div></div>
+  <div class="frame"><iframe id="frame" title="Дашборд проектов"></iframe></div>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+(function () {
+  var frame = document.getElementById("frame"), tabs = document.getElementById("tabs"), meta = {};
+  var NAMES = { projects: "Проекты", tasks: "Задачи и сроки", brief: "Утренний бриф", months: "По месяцам" };
+  function when(iso) { if (!iso) return ""; var d = new Date(iso); return isNaN(d) ? iso : dmy(d) + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+  function show(page) {
+    tabs.querySelectorAll("button[data-page]").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.page === page ? "true" : "false"); });
+    frame.src = "/api/dashboard?page=" + page;
+    document.getElementById("upd").textContent = meta[page] ? "обновлено " + when(meta[page]) : "";
+    try { history.replaceState(null, "", "#" + page); } catch (e) {}
+  }
+  tabs.addEventListener("click", function (e) { var b = e.target.closest("button[data-page]"); if (b) show(b.dataset.page); });
+  var start = (location.hash || "#projects").slice(1); if (!NAMES[start]) start = "projects";
+  fetch("/api/dashboard?meta=1").then(function (r) { return r.json(); }).then(function (j) {
+    meta = (j && j.pages) || {};
+    var last = Object.values(meta).sort().pop();
+    document.getElementById("stamp").textContent = last ? "обновлено " + when(last) : "ещё не загружался";
+    show(start);
+  }).catch(function () { show(start); });
+})();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>
