@@ -359,20 +359,34 @@ def pick_cases(ctx, facts, cases):
 # ---------- шаг 3: рост выпускников ----------
 
 GROWTH_SYS = """Ты проверяешь по открытым источникам, как изменилась компания участника тренинга с момента тренинга до сегодня.
-Ищи выручку и штат по реестрам (Rusprofile, Checko, СБИС и аналоги по стране), число точек/филиалов, вакансии, новости, соцсети.
-Ответ — 3–6 строк строго по формату:
-Тогда (<год тренинга>): <что известно: оборот/штат/точки> (источник: карточка CRM или адрес)
-Сейчас (<текущий год>): <оборот/штат/точки> (источник: адрес)
+Ищи выручку и штат по реестрам (Rusprofile, Checko, СБИС, list-org и аналоги по стране компании), число точек/филиалов, вакансии, новости.
+Это автоматический прогон: собеседника нет, вопросов задавать некому, уточнений не будет — работай с тем, что дано.
+Числовых идентификаторов (ИНН, ОГРН) в задании нет — не придумывай их и не ищи по ним.
+Ответ — ТОЛЬКО четыре строки строго по формату, без вступлений, рассуждений и заголовков:
+Тогда (<год тренинга>): <что известно: оборот/штат/точки> (источник: карточка CRM)
+Сейчас (<текущий год>): <оборот/штат/точки> (источник: адрес страницы) — или «данных нет»
 Изменение: <рост ×N / +N% / без изменений / не подтверждено>
 Что ещё заметно: <1–2 факта с источниками или «ничего»>
-Если компанию найти не удалось или данных о динамике нет — пиши «Изменение: не подтверждено» и не придумывай."""
+Если компанию найти не удалось или данных о динамике нет — «Изменение: не подтверждено». Ничего не выдумывай."""
+
+RE_GROWTH_LINE = re.compile(r"^\**\s*(Тогда|Сейчас|Изменение|Что ещё заметно)\b", re.I)
 
 
 def alumni_growth(case):
-    desc = cases_lines([case])
-    user = "Участник тренинга: %s\nГод тренинга: %s\nЧто известно на момент тренинга — из карточки CRM выше. Найди текущее состояние компании." % (
-        desc, (case.get("paid_at") or "")[:4] or "неизвестен")
-    return claude(GROWTH_SYS, user, search_uses=4, max_tokens=900, model=MODEL_GROWTH)
+    # в модель — только описание компании, без id сделки (модель принимала его за ИНН)
+    bits = [case.get("company") or case.get("name") or "?"]
+    for k, fmt in (("niche", "%s"), ("sphere", "%s"), ("turn", "оборот %s млн ₽ в год"), ("staff", "%s сотрудников"), ("site", "сайт %s")):
+        if case.get(k):
+            bits.append(fmt % case[k])
+    geo = ", ".join(x for x in (case.get("city"), case.get("country")) if x)
+    if geo:
+        bits.append(geo)
+    user = "Компания участника: %s\nГод и месяц тренинга: %s (данные выше — на тот момент, со слов участника). Найди текущее состояние компании." % (
+        "; ".join(bits), (case.get("paid_at") or "")[:7] or "неизвестен")
+    text, sources, usage = claude(GROWTH_SYS, user, search_uses=3, max_tokens=700, model=MODEL_GROWTH)
+    lines = [l.strip() for l in text.splitlines() if RE_GROWTH_LINE.match(l.strip())]
+    clean_text = "\n".join(lines) if len(lines) >= 2 else text.strip()[-900:]
+    return clean_text, sources, usage
 
 
 # ---------- шаг 4: сборка подготовки ----------
@@ -434,10 +448,26 @@ def cmd_growth(limit, cases_path, out, max_age_days=90):
     """База «было → стало»: по каждому участнику без свежей проверки — поиск на дешёвой модели, результат в витрину (prep_cases.result)."""
     cases = load_cases(cases_path)
     cutoff = (dt.datetime.now(MSK) - dt.timedelta(days=max_age_days)).strftime("%Y-%m-%d")
-    todo = [c for c in cases if (c.get("company") or c.get("site")) and not ((c.get("checked_at") or "") >= cutoff and c.get("result"))]
-    todo.sort(key=lambda c: c.get("paid_at") or "", reverse=True)     # свежие выпускники первыми
-    log("участников в базе %d, к проверке %d (без компании и сайта пропущено %d), за прогон не больше %d" % (
-        len(cases), len(todo), sum(1 for c in cases if not (c.get("company") or c.get("site"))), limit))
+    # кого проверять: тренинг старше полугода (у свежих «сейчас» = «тогда»), есть название компании или сайт,
+    # название не похоже на ФИО без сайта (искать нечего), нет свежей проверки
+    young = (dt.datetime.now(MSK) - dt.timedelta(days=180)).strftime("%Y-%m-%d")
+    person = re.compile(r"^[А-ЯЁA-Z][а-яёa-z]+(\s[А-ЯЁA-Z][а-яёa-z]+){1,2}$")
+    skipped = {"свежие": 0, "без компании": 0, "ФИО без сайта": 0}
+    todo = []
+    for c in cases:
+        if (c.get("checked_at") or "") >= cutoff and c.get("result"):
+            continue
+        if (c.get("paid_at") or "") >= young:
+            skipped["свежие"] += 1
+        elif not (c.get("company") or c.get("site")):
+            skipped["без компании"] += 1
+        elif c.get("company") and not c.get("site") and person.match(c["company"].strip()):
+            skipped["ФИО без сайта"] += 1
+        else:
+            todo.append(c)
+    todo.sort(key=lambda c: c.get("paid_at") or "", reverse=True)     # сначала те, у кого прошло полгода-год: динамика уже видна
+    log("участников в базе %d, к проверке %d, пропущено: %s; за прогон не больше %d" % (
+        len(cases), len(todo), ", ".join("%s %d" % (k, v) for k, v in skipped.items()), limit))
     usage, rows, done = {}, [], 0
     for c in todo[:limit]:
         try:
