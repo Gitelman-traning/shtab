@@ -547,15 +547,32 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
     else:
         picked, u = pick_cases(ctx, facts, cases)
         add_usage(usage, u)
-        # рост выпускников — из базы «было → стало» (prep.py growth, раз в квартал), при подготовке в интернет не ходим
-        checked = 0
+        # рост выпускников — из базы «было → стало»; кого в базе ещё нет, проверяем сейчас (дешёвая модель) и кладём в базу:
+        # так база наполняется теми участниками, которые реально нужны на встречах
+        checked, fresh_rows = 0, []
+        today = dt.datetime.now(MSK).strftime("%Y-%m-%d")
         for c in picked:
             if c.get("result"):
                 c["growth"] = c["result"] + ("\n(проверено %s)" % c["checked_at"][:10] if c.get("checked_at") else "")
                 checked += 1
-            else:
-                c["growth"] = "не проверялось: участник ещё не прошёл проверку роста в базе"
-        log("  участников подобрано: %d, с проверенным ростом %d" % (len(picked), checked))
+                continue
+            try:
+                g, _, u = alumni_growth(c)
+                add_usage(usage, u, cheap=True)
+                c["growth"], c["result"], c["checked_at"] = g, g, today
+                key = re.sub(r"\W+", "", (c.get("company") or c.get("site") or "").lower())
+                for x in cases:
+                    if re.sub(r"\W+", "", (x.get("company") or x.get("site") or "").lower()) == key and not x.get("result"):
+                        fresh_rows.append({"deal": x["deal"], "result": g[:3000], "checked_at": today})
+            except Exception as e:
+                c["growth"] = "не проверено (ошибка поиска)"
+                log("  рост участника %d: %s" % (c["deal"], str(e)[:100]))
+        log("  участников подобрано: %d, из базы %d, проверено сейчас %d" % (len(picked), checked, len(picked) - checked))
+        if fresh_rows and not dry and URL and STOKEN:
+            try:
+                shtab("POST", "/api/ingest", {"collector": "prep", "prep_growth": fresh_rows})
+            except Exception as e:
+                log("  база «было → стало» не обновлена: %s" % str(e)[:100])
         if out_path:
             with open(out_path + ".picked.json", "w", encoding="utf-8") as f:
                 json.dump(picked, f, ensure_ascii=False, indent=1)
