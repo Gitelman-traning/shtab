@@ -36,6 +36,18 @@ const LIMIT = 245;
 const BOT = "gitelmanteam_bot";
 const BOT_PREFIX = "git_influence_";
 const PHONES = [{ value: "77010439135", label: "+7 701 043-91-35 — основной WhatsApp" }];
+// Рабочие таблицы Никиты, которые генератор заполняет сам:
+//   «Ссылки на все чаты Вотсап» → «Реестер фраз…»: A «=», B текст/фраза, C «интеграции», D тег, E номер, F ссылка WA;
+//                                → «Лист1»: следующая строка после последней заполненной в F — тег (WA, TG-входящее)
+//                                  или метка бота без префикса (TG-бот); для TG-входящего в той же строке C — ссылка;
+//   «Интеграции» → «справочник»: колонка A сама тянет Лист1!F через IMPORTRANGE со сдвигом, в B ставим заказчика.
+const WORK_SHEET_ID = PHRASES_SHEET_ID;
+const LIST1 = "Лист1";
+const DIR_SHEET_ID = "1iiYPyXb_xVDbE-ixMq1JBq9YlAqMLlXSt38euH2ePZI";
+const DIR_TAB = "справочник";
+let WS = WORK_SHEET_ID, DS = DIR_SHEET_ID;   // GO_WORK_SHEET_ID / GO_DIR_SHEET_ID — копии таблиц для проверки
+function useSheets(env) { WS = env.GO_WORK_SHEET_ID || WORK_SHEET_ID; DS = env.GO_DIR_SHEET_ID || DIR_SHEET_ID; if (WS !== useSheets.last) { dirOffset = 0; phrasesCache.at = 0; useSheets.last = WS; } }
+const CUSTOMERS = ["Маша Кишко", "Настя Богоявленская"]; // заказчики ссылок; позже свяжем с аккаунтами по Telegram
 const PLATFORMS = ["сторис Instagram", "пост Instagram", "Telegram-канал", "YouTube", "TikTok", "кружок / нативка", "другое"];
 const WA_TEMPLATES = ["Я от {имя}, тренинг Команда", "Я от {имя}, детали тренинга Команда", "Привет! Я от {имя}, тренинг Команда"];
 const TGIN_TEMPLATES = [
@@ -46,7 +58,7 @@ const TGIN_TEMPLATES = [
 
 // Порядок колонок менять нельзя — строки читаются по индексам. Новые — только в конец.
 const HEADER = ["Дата", "Тег", "Заказчик", "Блогер и площадка", "Типы", "WA текст", "WA ссылка", "WA длина",
-  "TG-бот ссылка", "TG-входящее фраза", "TG-входящее ссылка", "Статус", "Выдал", "Примечание", "Кружок", "Логин заказчика"];
+  "TG-бот ссылка", "TG-входящее фраза", "TG-входящее ссылка", "Статус", "Выдал", "Примечание", "Кружок", "Логин заказчика", "Рабочие таблицы"];
 const C = Object.fromEntries(HEADER.map((h, i) => [h, i]));
 const LAST = String.fromCharCode(64 + HEADER.length);
 
@@ -144,7 +156,7 @@ function view(x) {
   const g = (h) => x.v[C[h]] || "";
   return { row: x.row, date: g("Дата"), tag: g("Тег"), by: g("Заказчик"), who: g("Блогер и площадка"), types: g("Типы"), waText: g("WA текст"), wa: g("WA ссылка"),
     waLen: g("WA длина"), bot: g("TG-бот ссылка"), phrase: g("TG-входящее фраза"), tgin: g("TG-входящее ссылка"), status: g("Статус"), issued: g("Выдал"),
-    circle: g("Кружок"), login: g("Логин заказчика") };
+    circle: g("Кружок"), login: g("Логин заказчика"), tables: g("Рабочие таблицы") };
 }
 async function updateCells(sa, row, patch) {
   const data = Object.entries(patch).map(([h, val]) => ({ range: `${TAB}!${String.fromCharCode(65 + C[h])}${row}`, values: [[val]] }));
@@ -154,7 +166,7 @@ let phrasesCache = { at: 0, list: [], error: "" };
 async function externalPhrases(sa) {
   if (Date.now() - phrasesCache.at < 120000) return phrasesCache;
   try {
-    const d = await sheets(sa, PHRASES_SHEET_ID, "GET", `/values/${q(PHRASES_TAB)}!A2:D?majorDimension=ROWS`);
+    const d = await sheets(sa, WS, "GET", `/values/${q(PHRASES_TAB)}!A2:D?majorDimension=ROWS`);
     phrasesCache = { at: Date.now(), list: (d.values || []).filter((r) => r[1]).map((r) => ({ phrase: r[1], source: r[2] || "", tag: r[3] || "" })), error: "" };
   } catch (e) { phrasesCache = { at: Date.now(), list: phrasesCache.list, error: String(e.message || e) }; }
   return phrasesCache;
@@ -170,6 +182,43 @@ async function phraseConflict(sa, phrase, rows) {
     if (n.includes(p) || p.includes(n)) return `пересекается с фразой «${e.phrase}» (${e.tag || e.source}) — триггер «содержит» их не различит`;
   }
   return "";
+}
+
+// ---------- рабочие таблицы Никиты ----------
+let dirOffset = 0;   // строка Лист1 − строка справочника (из формулы IMPORTRANGE в колонке A)
+async function directoryOffset(sa) {
+  if (dirOffset) return dirOffset;
+  const d = await sheets(sa, DS, "GET", `/values/${q(DIR_TAB)}!A1:A400?valueRenderOption=FORMULA`);
+  const rows = d.values || [];
+  for (let i = 0; i < rows.length; i++) {
+    const m = /IMPORTRANGE\([^)]*Лист1!\s*F(\d+)\s*:\s*F/i.exec(String(rows[i][0] || ""));
+    if (m) { dirOffset = Number(m[1]) - (i + 1); return dirOffset; }
+  }
+  throw new Error("в «справочнике» не нашлась формула IMPORTRANGE на Лист1!F");
+}
+async function appendPhrase(sa, phrase, tag, phone, link) {
+  await sheets(sa, WS, "POST", `/values/${q(PHRASES_TAB)}!A1:F1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+    { values: [["=", phrase, "интеграции", tag, phone || "", link || ""]] });
+}
+// Следующая строка после последней заполненной в F: F — тег/метка, C — ссылка (для TG-входящего); в справочнике — заказчик.
+async function appendList1(sa, value, customer, linkC) {
+  const d = await sheets(sa, WS, "GET", `/values/${q(LIST1)}!F1:F`);
+  const row = (d.values || []).length + 1;
+  const data = [{ range: `${LIST1}!F${row}`, values: [[value]] }];
+  if (linkC) data.push({ range: `${LIST1}!C${row}`, values: [[linkC]] });
+  await sheets(sa, WS, "POST", "/values:batchUpdate", { valueInputOption: "RAW", data });
+  const dirRow = row - (await directoryOffset(sa));
+  await sheets(sa, DS, "PUT", `/values/${q(DIR_TAB)}!B${dirRow}?valueInputOption=RAW`, { values: [[customer]] });
+  return `Лист1!F${row}, справочник!B${dirRow}`;
+}
+// Ошибка записи в рабочие таблицы не отменяет заявку: пишем причину в реестр и сообщаем администратору.
+async function workTables(env, sa, steps) {
+  const done = [], failed = [];
+  for (const [name, fn] of steps) {
+    try { const r = await fn(); done.push(r ? name + " (" + r + ")" : name); }
+    catch (e) { failed.push(name + ": " + (e.message || e)); }
+  }
+  return { done, failed };
 }
 
 // ---------- уведомления ----------
@@ -188,6 +237,7 @@ async function gate(request, env) {
 }
 
 export async function onRequestGet({ request, env }) {
+  useSheets(env);
   const { user, error } = await gate(request, env);
   if (error) return error;
   const { sa, error: saError } = serviceAccount(env);
@@ -199,7 +249,7 @@ export async function onRequestGet({ request, env }) {
   return json({
     ok: true,
     me: { name: user.name || user.login, login: user.login, admin: isAdmin(user), canCreate: user.login !== "shared" && !!sa },
-    config: { limit: LIMIT, bot: BOT, prefix: BOT_PREFIX, phones: PHONES, platforms: PLATFORMS, waTemplates: WA_TEMPLATES, tgTemplates: TGIN_TEMPLATES, telegram: !!(env.TG_BOT_TOKEN && adminChat(env)) },
+    config: { customers: CUSTOMERS, limit: LIMIT, bot: BOT, prefix: BOT_PREFIX, phones: PHONES, platforms: PLATFORMS, waTemplates: WA_TEMPLATES, tgTemplates: TGIN_TEMPLATES, telegram: !!(env.TG_BOT_TOKEN && adminChat(env)) },
     sheetUrl: `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`, tab: TAB,
     sheetError, extError, serviceAccount: sa ? sa.client_email : "",
     rows: rows.slice(-60).reverse(),
@@ -207,6 +257,7 @@ export async function onRequestGet({ request, env }) {
 }
 
 export async function onRequestPost({ request, env }) {
+  useSheets(env);
   const { user, error } = await gate(request, env);
   if (error) return error;
   const { sa, error: saError } = serviceAccount(env);
@@ -266,15 +317,28 @@ export async function onRequestPost({ request, env }) {
       return bad(`${TYPE_NAME[t]} для тега ${tag} уже выдан ${dupTag.date} (${dupTag.by}) — возьмите другой день или имя`);
     }
     if (phrase) { const c = await phraseConflict(sa, phrase, rows); if (c) return bad("Фраза не подходит: " + c); }
+    if (waText) { const c = await phraseConflict(sa, waText, rows); if (c) return bad("Текст WhatsApp не подходит: " + c); }
     if (bot) { const d = views.find((r) => r.bot === bot); if (d) return bad(`Ссылка на бота ${bot} уже выдана (${d.tag})`); }
 
-    const by = user.name || user.login;
+    const customer = String(b.customer || "").trim();
+    if (!CUSTOMERS.includes(customer)) return bad("Выберите заказчика из списка");
+    const by = customer;
     const waiting = [types.includes("tgin") ? "ссылку TG" : "", circle.startsWith("нужен") ? "кружок" : ""].filter(Boolean);
     const status = waiting.length ? "ждёт: " + waiting.join(", ") : "выдано";
     await ensureTab(sa);
     await sheets(sa, SHEET_ID, "POST", `/values/${q(TAB)}!A1:${LAST}1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
       { values: [[fmtMsk(Date.now()), tag, by, who, types.join(","), waText, wa, waLen, bot, phrase, "", status, waiting.length ? "" : by, "", circle, user.login]] });
     await audit(env, user.login, "influence.links.save", tag, types.join(","));
+
+    const steps = [];
+    if (wa) steps.push(["реестр фраз", () => appendPhrase(sa, waText, tag, String(b.phone || "").replace(/\D/g, ""), wa)],
+                       ["Лист1 и справочник", () => appendList1(sa, tag, customer)]);
+    if (bot) steps.push(["Лист1 и справочник (бот)", () => appendList1(sa, botSlug(tag), customer)]);
+    if (phrase) steps.push(["реестр фраз (TG-входящее)", () => appendPhrase(sa, phrase, tag)]);
+    const wt = await workTables(env, sa, steps);
+    const after = (await readRows(sa)).map(view).filter((r) => r.tag === tag && r.types === types.join(",")).pop();
+    if (after) await updateCells(sa, after.row, { "Рабочие таблицы": wt.failed.length ? "ошибка: " + wt.failed.join("; ") : "записано: " + wt.done.join("; ") });
+    if (wt.failed.length) await tgSend(env, adminChat(env), `Инфлюенс ${tag}: не удалось записать в рабочие таблицы — ${wt.failed.join("; ")}`);
 
     if (waiting.length) {
       const lines = [`Инфлюенс: заявка на ссылки ${tag}`, `Блогер: ${who}`, `Запросил: ${by}`,
@@ -284,7 +348,7 @@ export async function onRequestPost({ request, env }) {
         `Выдать: ${new URL(request.url).origin}/marketing/influence/links/`].filter(Boolean);
       await tgSend(env, adminChat(env), lines.join("\n"));
     }
-    return json({ ok: true, tag, wa, waLen, bot, waiting });
+    return json({ ok: true, tag, wa, waLen, bot, waiting, tables: wt.failed.length ? "ошибка" : "ok" });
   }
 
   if (action === "issue" || action === "circle") {
@@ -306,6 +370,11 @@ export async function onRequestPost({ request, env }) {
       msg = `Кружок Паши добавлен в бота для ${r.tag}:\n${r.bot}`;
     }
     await updateCells(sa, row, patch);
+    if (action === "issue") {
+      const wt = await workTables(env, sa, [["Лист1 и справочник (TG-входящее)", () => appendList1(sa, r.tag, r.by, String(b.link || "").trim())]]);
+      await updateCells(sa, row, { "Рабочие таблицы": (r.tables || "") + (wt.failed.length ? " · ошибка: " + wt.failed.join("; ") : " · записано: " + wt.done.join("; ")) });
+      if (wt.failed.length) await tgSend(env, adminChat(env), `Инфлюенс ${r.tag}: не удалось записать в рабочие таблицы — ${wt.failed.join("; ")}`);
+    }
     await audit(env, user.login, "influence.links." + action, r.tag);
     const tgId = await tgOfLogin(env, r.login);
     if (tgId) await tgSend(env, tgId, msg);

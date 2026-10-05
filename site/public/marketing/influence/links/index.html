@@ -74,6 +74,8 @@
           <li>Формат <b>ДД.ММ_Имя</b>: день и месяц размещения, подчёркивание, имя блогера. Два слова можно: <b>01.10_Анатолий_Пистол</b>.</li>
           <li>Напишете «1.10_Имя» или «Имя_1.10» — тег приведётся к формату сам. У блогера один тег на все его ссылки: выдали WhatsApp — переключите вкладку и выдайте бота с тем же тегом.</li>
         </ul>
+        <label for="customer">Заказчик <span class="req">обязательно</span></label>
+        <select id="customer"></select>
         <div class="two">
           <div><label for="name">Блогер <span class="req">обязательно</span></label><input id="name" type="text" maxlength="80" placeholder="Мухаммад Алиев"></div>
           <div><label for="platform">Площадка</label><select id="platform"></select></div>
@@ -167,7 +169,7 @@ function render(){
   st.over = n > LIMIT; $('meter').className = 'meter' + (st.over ? ' over' : (t ? ' ok' : '')); $('over').hidden = !st.over;
   var s = slug(st.tag); st.bot = s ? 'https://t.me/' + CFG.bot + '?start=' + CFG.prefix + s : ''; $('botslug').textContent = s ? CFG.prefix + s : '—';
   var p = [];
-  if (!st.tag) p.push('тег не по формату'); if (!$('name').value.trim()) p.push('не указан блогер'); if (!$('gen').value.trim()) p.push('не заполнено «Я от …»');
+  if (!st.tag) p.push('тег не по формату'); if (!$('customer').value) p.push('не выбран заказчик'); if (!$('name').value.trim()) p.push('не указан блогер'); if (!$('gen').value.trim()) p.push('не заполнено «Я от …»');
   if (st.types.indexOf('wa') >= 0 && !t) p.push('нет текста для WhatsApp'); if (st.types.indexOf('wa') >= 0 && t && !/я от/i.test(t)) p.push('в тексте нет «Я от …»');
   if (st.types.indexOf('bot') >= 0 && circle() === 'yes' && !$('circleNote').value.trim()) p.push('не указано, где взять кружок');
   if (st.types.indexOf('tgin') >= 0 && !$('phrase').value.trim()) p.push('нет фразы для TG-входящего');
@@ -222,7 +224,7 @@ $('f').addEventListener('submit', function(e){
   e.preventDefault(); if ($('save').disabled) return;
   if (st.types.indexOf('wa') >= 0 && st.over && !window.confirm('WA-ссылка длиннее ' + LIMIT + ' знаков и не может использоваться в сторис Instagram.\n\nУверены, что хотите её сохранить?')) return;
   $('save').disabled = true;
-  api('POST', { action: 'save', tag: $('tag').value, name: $('name').value, platform: $('platform').value, types: st.types, phone: $('phone').value, text: $('text').value,
+  api('POST', { action: 'save', customer: $('customer').value, tag: $('tag').value, name: $('name').value, platform: $('platform').value, types: st.types, phone: $('phone').value, text: $('text').value,
     phrase: $('phrase').value, circle: circle(), circleNote: $('circleNote').value, long: st.over })
     .then(function(d){
       var html = 'Записано: <b>' + esc(d.tag) + '</b>.';
@@ -240,11 +242,13 @@ $('copybot').onclick = function(){ copy($('copybot'), st.bot, 'Копирова�
 
 load().then(function(d){
   CFG = d.config; LIMIT = CFG.limit; $('lim').textContent = LIMIT;
+  var who = String(ME.name || '').toLowerCase();
+  $('customer').innerHTML = '<option value="">— выберите —</option>' + CFG.customers.map(function(c){ var sur = c.split(' ').pop().toLowerCase().slice(0, 6); return '<option' + (who.indexOf(sur) >= 0 ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('');
   $('platform').innerHTML = CFG.platforms.map(function(p){ return '<option>' + esc(p) + '</option>'; }).join('');
   $('phone').innerHTML = CFG.phones.map(function(p){ return '<option value="' + esc(p.value) + '">' + esc(p.label) + '</option>'; }).join('');
   $('watpl').innerHTML = CFG.waTemplates.map(function(t, i){ return '<option value="' + i + '">' + esc(t) + '</option>'; }).join('') + '<option value="custom">Свой текст</option>';
   $('tgtpl').innerHTML = CFG.tgTemplates.map(function(t, i){ return '<option value="' + i + '">' + esc(t) + '</option>'; }).join('') + '<option value="custom">Своя фраза</option>';
-  ['tag','name','text','phone','phrase','circleNote'].forEach(function(id){ $(id).addEventListener('input', render); $(id).addEventListener('change', render); });
+  ['tag','name','text','phone','phrase','circleNote','customer'].forEach(function(id){ $(id).addEventListener('input', render); $(id).addEventListener('change', render); });
   ['gen','watpl','tgtpl'].forEach(function(id){ $(id).addEventListener('input', function(){ fill(); render(); }); $(id).addEventListener('change', function(){ fill(); render(); }); });
   document.querySelectorAll('[name=circle]').forEach(function(c){ c.addEventListener('change', render); });
   document.querySelectorAll('.tabs [role=tab]').forEach(function(b){ b.addEventListener('click', function(){ setTab(b.getAttribute('data-type')); }); });
