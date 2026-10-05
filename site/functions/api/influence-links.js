@@ -47,7 +47,7 @@ const DIR_SHEET_ID = "1iiYPyXb_xVDbE-ixMq1JBq9YlAqMLlXSt38euH2ePZI";
 const DIR_TAB = "справочник";
 let WS = WORK_SHEET_ID, DS = DIR_SHEET_ID;   // GO_WORK_SHEET_ID / GO_DIR_SHEET_ID — копии таблиц для проверки
 function useSheets(env) { WS = env.GO_WORK_SHEET_ID || WORK_SHEET_ID; DS = env.GO_DIR_SHEET_ID || DIR_SHEET_ID; if (WS !== useSheets.last) { dirOffset = 0; phrasesCache.at = 0; useSheets.last = WS; } }
-const CUSTOMERS = ["Маша Кишко", "Настя Богоявленская"]; // заказчики ссылок; позже свяжем с аккаунтами по Telegram
+const CUSTOMERS = ["Маша Кишко", "Настя Богоявленская"]; // запасной список; основной — «справочник»!D2:D (выпадающий список в B)
 const PLATFORMS = ["сторис Instagram", "пост Instagram", "Telegram-канал", "YouTube", "TikTok", "кружок / нативка", "другое"];
 const WA_TEMPLATES = ["Я от {имя}, тренинг Команда", "Я от {имя}, детали тренинга Команда", "Привет! Я от {имя}, тренинг Команда"];
 const TGIN_TEMPLATES = [
@@ -211,6 +211,17 @@ async function appendList1(sa, value, customer, linkC) {
   await sheets(sa, DS, "PUT", `/values/${q(DIR_TAB)}!B${dirRow}?valueInputOption=RAW`, { values: [[customer]] });
   return `Лист1!F${row}, справочник!B${dirRow}`;
 }
+// Заказчики — тот же список, что в выпадающем списке «справочника» (диапазон D2:D). Нет доступа — запасной список.
+let customersCache = { at: 0, list: [] };
+async function customers(sa) {
+  if (Date.now() - customersCache.at < 300000 && customersCache.list.length) return customersCache.list;
+  try {
+    const d = await sheets(sa, DS, "GET", `/values/${q(DIR_TAB)}!D2:D`);
+    const list = [...new Set((d.values || []).map((r) => String(r[0] || "").trim()).filter(Boolean))];
+    if (list.length) customersCache = { at: Date.now(), list };
+  } catch (e) { /* запасной список ниже */ }
+  return customersCache.list.length ? customersCache.list : CUSTOMERS;
+}
 // Ошибка записи в рабочие таблицы не отменяет заявку: пишем причину в реестр и сообщаем администратору.
 async function workTables(env, sa, steps) {
   const done = [], failed = [];
@@ -249,7 +260,7 @@ export async function onRequestGet({ request, env }) {
   return json({
     ok: true,
     me: { name: user.name || user.login, login: user.login, admin: isAdmin(user), canCreate: user.login !== "shared" && !!sa },
-    config: { customers: CUSTOMERS, limit: LIMIT, bot: BOT, prefix: BOT_PREFIX, phones: PHONES, platforms: PLATFORMS, waTemplates: WA_TEMPLATES, tgTemplates: TGIN_TEMPLATES, telegram: !!(env.TG_BOT_TOKEN && adminChat(env)) },
+    config: { customers: sa ? await customers(sa) : CUSTOMERS, limit: LIMIT, bot: BOT, prefix: BOT_PREFIX, phones: PHONES, platforms: PLATFORMS, waTemplates: WA_TEMPLATES, tgTemplates: TGIN_TEMPLATES, telegram: !!(env.TG_BOT_TOKEN && adminChat(env)) },
     sheetUrl: `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`, tab: TAB,
     sheetError, extError, serviceAccount: sa ? sa.client_email : "",
     rows: rows.slice(-60).reverse(),
@@ -321,7 +332,7 @@ export async function onRequestPost({ request, env }) {
     if (bot) { const d = views.find((r) => r.bot === bot); if (d) return bad(`Ссылка на бота ${bot} уже выдана (${d.tag})`); }
 
     const customer = String(b.customer || "").trim();
-    if (!CUSTOMERS.includes(customer)) return bad("Выберите заказчика из списка");
+    if (!(await customers(sa)).includes(customer)) return bad("Выберите заказчика из списка");
     const by = customer;
     const waiting = [types.includes("tgin") ? "ссылку TG" : "", circle.startsWith("нужен") ? "кружок" : ""].filter(Boolean);
     const status = waiting.length ? "ждёт: " + waiting.join(", ") : "выдано";
