@@ -353,18 +353,17 @@ export async function onRequestPost({ request, env }) {
     if (after) await updateCells(sa, after.row, { "Рабочие таблицы": wt.failed.length ? "ошибка: " + wt.failed.join("; ") : "записано: " + wt.done.join("; ") });
     if (wt.failed.length) await tgSend(env, adminChat(env), `Инфлюенс ${tag}: не удалось записать в рабочие таблицы — ${wt.failed.join("; ")}`);
 
-    // Каждая заявка — в канал: что выдано сразу и что ждёт администратора.
+    // Каждая заявка — в канал, в том же виде, как заказчики пишут в чат «Инфлюенс маркетинг».
     {
-      const TN = { wa: "WhatsApp", bot: "TG-бот", tgin: "TG-входящее" };
-      const msg = [(waiting.length ? "🟡 Ждёт: " + waiting.join(", ") : "🟢 Выдано") + " · " + types.map((t) => TN[t]).join(", ") + " · " + tag,
-        "Блогер: " + who,
-        "Заказчик: " + customer + (user.name && user.name !== customer ? " (оформил " + user.name + ")" : ""),
-        wa ? "WA (" + waLen + " зн.): «" + waText + "»\n" + wa : "",
-        bot ? "TG-бот: " + bot : "",
-        phrase ? "TG-входящее — нужна ссылка Telegram Business и блок в триггерах amo.\nФраза: «" + phrase + "»\nИсточник: интеграции · Тег: " + tag : "",
-        circle.startsWith("нужен") ? "Кружок Паши в ветку бота — " + circle.slice(7) : "",
-        waiting.length ? "Выдать: " + new URL(request.url).origin + "/marketing/influence/links/" : ""].filter(Boolean);
-      await tgSend(env, adminChat(env), msg.join("\n"));
+      const ADMIN = "@KaganovichNT";
+      const parts = [];
+      if (phrase) parts.push(ADMIN + " ссылку на входящее в тг\n\nТег: " + tag + "\n\nСообщение:\n" + phrase);
+      if (circle.startsWith("нужен")) parts.push(ADMIN + " кружок Паши в бота\n\nТег: " + tag + "\nБот: " + bot + "\nГде взять кружок: " + circle.slice(7));
+      if (wa) parts.push("Выдано: WhatsApp\n\nТег: " + tag + "\n\nСообщение:\n" + waText + "\n\n" + wa + " (" + waLen + " зн.)");
+      if (bot && !circle.startsWith("нужен")) parts.push("Выдано: TG-бот\n\nТег: " + tag + "\n" + bot);
+      const footer = "Блогер: " + who + "\nЗаказчик: " + customer + (user.name && user.name !== customer ? " (оформил " + user.name + ")" : "")
+        + (waiting.length ? "\nВыдать: " + new URL(request.url).origin + "/marketing/influence/links/" : "");
+      await tgSend(env, adminChat(env), parts.join("\n\n———\n\n") + "\n\n" + footer);
     }
     return json({ ok: true, tag, wa, waLen, bot, waiting, tables: wt.failed.length ? "ошибка" : "ok" });
   }
