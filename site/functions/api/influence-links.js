@@ -77,7 +77,8 @@ const TRANSLIT = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e"
 export function botSlug(tag) {
   const m = tag.match(/^(\d{2})\.(\d{2})_(.+)$/u);
   if (!m) return "";
-  const first = m[3].split("_")[0].toLowerCase();
+  // Фамилия (последнее слово тега), как Никита ставил метки руками: Golubev0110, Bakhtiyarych0110.
+  const first = m[3].split("_").pop().toLowerCase();
   const lat = [...first].map((ch) => TRANSLIT[ch] !== undefined ? TRANSLIT[ch] : ch).join("").replace(/[^a-z0-9]/g, "");
   return lat ? `${lat}${m[1]}${m[2]}` : "";
 }

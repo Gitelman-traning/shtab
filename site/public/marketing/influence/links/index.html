@@ -97,7 +97,7 @@
         </div>
 
         <div class="blk" id="b-bot" hidden><h3>TG-бот</h3>
-          <div class="hint">Метка для Salebot только латиницей: имя из тега транслитерируется, добавляются день и месяц.</div>
+          <div class="hint">Метка для Salebot только латиницей: последнее слово тега (обычно фамилия) транслитерируется, добавляются день и месяц.</div>
           <div class="res"><div class="sub">Метка Salebot: <span class="tagc" id="botslug">—</span></div>
           <button class="btn ghost" type="button" id="copybot" style="margin-top:8px">Копировать ссылку на бота</button></div>
           <label>Кружок Паши в боте <span class="req">обязательно</span></label>
@@ -138,7 +138,7 @@ var TAG_RE = /^(0[1-9]|[12]\d|3[01])\.(0[1-9]|1[0-2])_[^\s]{2,60}$/u;
 function normTag(raw){ var s = String(raw||'').trim().replace(/\s+/g,' ').replace(/\s*_\s*/g,'_').replace(/\s/g,'_').replace(/_+/g,'_');
   var m = s.match(/^(\d{1,2})[.,](\d{1,2})(?:[.,]\d{2,4})?_(.+)$/u); if (!m) { var m2 = s.match(/^(.+?)_(\d{1,2})[.,](\d{1,2})(?:[.,]\d{2,4})?$/u); if (m2) m = [null, m2[2], m2[3], m2[1]]; }
   if (!m) return ''; var t = m[1].padStart(2,'0') + '.' + m[2].padStart(2,'0') + '_' + m[3].replace(/^_+|_+$/g,''); return TAG_RE.test(t) ? t : ''; }
-function slug(tag){ var m = tag.match(/^(\d{2})\.(\d{2})_(.+)$/u); if (!m) return ''; var f = m[3].split('_')[0].toLowerCase(), lat = '';
+function slug(tag){ var m = tag.match(/^(\d{2})\.(\d{2})_(.+)$/u); if (!m) return ''; var f = m[3].split('_').pop().toLowerCase(), lat = '';
   for (var i = 0; i < f.length; i++) lat += (TR[f[i]] !== undefined ? TR[f[i]] : f[i]); lat = lat.replace(/[^a-z0-9]/g,''); return lat ? lat + m[1] + m[2] : ''; }
 function msg(kind, html){ $('msgs').innerHTML = html ? '<div class="msg ' + kind + '">' + html + '</div>' : ''; if (html) window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function api(method, body){ return fetch('/api/influence-links', { method: method, credentials: 'same-origin', headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
