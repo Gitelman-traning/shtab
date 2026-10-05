@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Бюджет и расходы</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tabs button{border:1px solid var(--line-2);background:var(--card);color:var(--dim);border-radius:10px;padding:6px 12px;font:inherit;font-size:12.5px;cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--gold-soft);color:var(--gold);border-color:transparent;font-weight:600}
+table td.num,table th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.k{display:inline-block;font-size:11px;padding:1px 7px;border-radius:7px;background:var(--soft);color:var(--dim)}
+.k.topup{background:var(--ok-bg);color:var(--ok)}.k.fixed{background:var(--gold-soft);color:var(--gold)}
+.bar{height:8px;border-radius:4px;background:var(--soft);position:relative;overflow:hidden;margin-top:4px}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--gold-b)}.bar i.over{background:var(--bad-bar)}
+.days{display:flex;align-items:flex-end;gap:3px;height:90px;margin-top:8px}
+.days b{flex:1;background:var(--gold-b);border-radius:3px 3px 0 0;min-height:1px;position:relative}
+.days b span{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:10px;color:var(--dim);white-space:nowrap;display:none}
+.days b:hover span{display:block}
+.days b.tu{background:var(--ok-bar)}
+.add{display:grid;grid-template-columns:130px 150px 1fr 110px 110px auto;gap:8px;align-items:center}
+.add input,.add select{font:inherit;font-size:12.5px;padding:6px 9px;border-radius:8px;border:1px solid var(--line-2);background:var(--page);color:var(--ink);width:100%}
+.add button{font:inherit;font-size:12.5px;padding:6px 14px;border-radius:8px;border:1px solid var(--gold);background:var(--gold);color:#fff;cursor:pointer;white-space:nowrap}
+@media (max-width:900px){.add{grid-template-columns:1fr 1fr}}
+.del{border:0;background:none;color:var(--faint);cursor:pointer;font-size:14px}.del:hover{color:var(--bad)}
+.msg{font-size:12.5px;color:var(--dim);margin-top:8px}.msg.bad{color:var(--bad)}
+.plan td input{width:110px;font:inherit;font-size:12.5px;padding:4px 8px;border-radius:7px;border:1px solid var(--line-2);background:var(--page);color:var(--ink);text-align:right}
+.plan td button{font:inherit;font-size:12px;padding:4px 10px;border-radius:7px;border:1px solid var(--line-2);background:var(--page);color:var(--ink);cursor:pointer}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Настройки · <b>Бюджет и расходы</b></div><h1>Бюджет и расходы</h1><p class="sub">Сколько и на что уходит: подписки, модели, пополнения. Траты на модели подтягиваются из листов ОКК и прогонов, остальное вносится руками</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div class="card"><div class="tabs" id="months"></div></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid2">
+    <div class="card"><h2>По сервисам <small id="bysub"></small></h2><div class="wide"><table id="by"><thead><tr><th>Сервис</th><th class="num">Потрачено</th><th class="num">План / лимит</th><th style="width:30%"></th><th class="num">Пополнено</th></tr></thead><tbody></tbody></table></div><p class="note">План и лимиты правятся в таблице ниже. Полоса показывает долю потраченного от плана; красная, если перерасход.</p></div>
+    <div class="card"><h2>По дням <small>траты золотым, пополнения зелёным</small></h2><div class="days" id="days"></div><p class="note" id="daysnote"></p></div>
+  </div>
+  <div class="card"><h2>Последние 12 месяцев</h2><div class="wide"><table id="mon"><thead><tr><th>Месяц</th><th class="num">Подписки</th><th class="num">Модели и сервисы</th><th class="num">Итого трат</th><th class="num">Пополнения</th></tr></thead><tbody></tbody></table></div></div>
+  <div class="card"><h2>Записи за месяц <small id="rowsub"></small></h2>
+    <form class="add" id="add" autocomplete="off">
+      <input name="day" type="date" required>
+      <input name="service" placeholder="Сервис" list="services" required><datalist id="services"></datalist>
+      <input name="item" placeholder="Что именно (статья)">
+      <input name="amount" type="number" step="0.01" placeholder="₽" required>
+      <select name="kind"><option value="spend">трата</option><option value="topup">пополнение</option><option value="fixed">подписка</option></select>
+      <button type="submit">Добавить</button>
+    </form>
+    <p class="msg" id="addmsg"></p>
+    <div class="wide"><table id="rows"><thead><tr><th>Дата</th><th>Сервис</th><th>Статья</th><th>Тип</th><th class="num">₽</th><th>Откуда</th><th></th></tr></thead><tbody></tbody></table></div></div>
+  <div class="card"><h2>План и лимиты по сервисам</h2>
+    <div class="wide"><table class="plan" id="plan"><thead><tr><th>Сервис</th><th>Тип</th><th class="num">₽ в месяц</th><th>Примечание</th><th></th></tr></thead><tbody></tbody></table></div>
+    <form class="add" id="addplan" autocomplete="off" style="margin-top:10px;grid-template-columns:150px 130px 110px 1fr auto">
+      <input name="service" placeholder="Сервис" required>
+      <select name="kind"><option value="limit">лимит</option><option value="fixed">подписка</option></select>
+      <input name="monthly_rub" type="number" step="1" placeholder="₽ / мес" required>
+      <input name="note" placeholder="Примечание">
+      <button type="submit">Сохранить</button>
+    </form>
+    <p class="msg" id="planmsg"></p>
+  </div>
+  <footer>Подписка Cloudflare Workers Paid считается по курсу 95 ₽ за доллар. Траты на модели: стоимость каждого разбора из листов «ОКК», «ОКК модели», «Коуч» и прогонов пингов. Deepgram и Apify оплачиваются с отдельных аккаунтов, их суммы вносятся руками из кабинетов.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var MON = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+var CUR = new Date().toISOString().slice(0, 7), DATA = null;
+function rub(n){ return Math.round(n || 0).toLocaleString("ru-RU").replace(/ /g, " ") + " ₽"; }
+function api(method, q, body){ return fetch("/api/budget" + (q || ""), { method: method || "GET", credentials: "same-origin", headers: body ? { "content-type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined }).then(function(r){ return r.json(); }); }
+function monthEnd(m){ var y = +m.slice(0, 4), mo = +m.slice(5, 7); return m + "-" + String(new Date(y, mo, 0).getDate()).padStart(2, "0"); }
+function load(m){ CUR = m; return api("GET", "?from=" + m + "-01&to=" + monthEnd(m)).then(function(res){ if (!res.ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">' + esc(res.error || "нет доступа") + '</span></div>'; return; } DATA = res; render(); }); }
+function months(){
+  var el = document.getElementById("months"), list = [], d = new Date(); d.setDate(1);
+  for (var i = 0; i < 12; i++) { list.push(d.toISOString().slice(0, 7)); d.setMonth(d.getMonth() - 1); }
+  el.innerHTML = list.map(function(m){ return '<button type="button" data-m="' + m + '" aria-pressed="' + (m === CUR) + '">' + MON[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4) + '</button>'; }).join("");
+  el.querySelectorAll("button").forEach(function(b){ b.onclick = function(){ load(b.dataset.m).then(months); }; });
+}
+function render(){
+  var rows = DATA.rows, plan = DATA.plan, planBy = {}; plan.forEach(function(p){ planBy[p.service] = p; });
+  var spent = 0, fixed = 0, topup = 0, by = {}, days = {};
+  rows.forEach(function(r){
+    var s = by[r.service] = by[r.service] || { spend: 0, topup: 0 };
+    if (r.kind === "topup") { topup += r.amount; s.topup += r.amount; days[r.day] = days[r.day] || { s: 0, t: 0 }; days[r.day].t += r.amount; }
+    else { spent += r.amount; s.spend += r.amount; if (r.kind === "fixed") fixed += r.amount; days[r.day] = days[r.day] || { s: 0, t: 0 }; days[r.day].s += r.amount; }
+  });
+  var planTotal = plan.reduce(function(a, p){ return a + (p.monthly_rub || 0); }, 0);
+  var limitTotal = plan.filter(function(p){ return p.kind === "limit"; }).reduce(function(a, p){ return a + p.monthly_rub; }, 0);
+  document.getElementById("kpis").innerHTML =
+    '<div class="kpi"><span class="nm">Потрачено за месяц</span><span class="v">' + rub(spent) + '</span><span class="row"><span>план на месяц</span><b>' + rub(planTotal) + '</b></span><span class="row"><span>остаток плана</span><b>' + rub(planTotal - spent) + '</b></span></div>'
+    + '<div class="kpi"><span class="nm">Подписки</span><span class="v">' + rub(fixed) + '</span><span class="row"><span>по плану</span><b>' + rub(plan.filter(function(p){ return p.kind === "fixed"; }).reduce(function(a, p){ return a + p.monthly_rub; }, 0)) + '</b></span></div>'
+    + '<div class="kpi"><span class="nm">Модели и сервисы</span><span class="v">' + rub(spent - fixed) + '</span><span class="row"><span>лимит</span><b>' + rub(limitTotal) + '</b></span><span class="row"><span>записей</span><b>' + rows.filter(function(r){ return r.kind === "spend"; }).length + '</b></span></div>'
+    + '<div class="kpi"><span class="nm">Пополнения</span><span class="v">' + rub(topup) + '</span><span class="row"><span>баланс по нашим записям</span><b>' + rub(topup - (spent - fixed)) + '</b></span></div>';
+  var services = Object.keys(by).sort(function(a, b){ return by[b].spend - by[a].spend; });
+  plan.forEach(function(p){ if (!by[p.service]) services.push(p.service); });
+  document.getElementById("bysub").textContent = MON[+CUR.slice(5, 7) - 1] + " " + CUR.slice(0, 4);
+  document.querySelector("#by tbody").innerHTML = services.map(function(s){ var x = by[s] || { spend: 0, topup: 0 }, p = planBy[s], lim = p ? p.monthly_rub : 0, pc = lim ? Math.min(100, 100 * x.spend / lim) : 0;
+    return '<tr><td>' + esc(s) + (p ? ' <span class="k ' + p.kind + '">' + (p.kind === "fixed" ? "подписка" : "лимит") + '</span>' : '') + '</td><td class="num">' + rub(x.spend) + '</td><td class="num">' + (lim ? rub(lim) : "—") + '</td><td>' + (lim ? '<div class="bar"><i class="' + (x.spend > lim ? "over" : "") + '" style="width:' + pc + '%"></i></div>' : '') + '</td><td class="num">' + (x.topup ? rub(x.topup) : "—") + '</td></tr>'; }).join("") || '<tr><td colspan="5" class="empty">за месяц записей нет</td></tr>';
+  var dk = Object.keys(days).sort(), max = Math.max.apply(null, dk.map(function(d){ return Math.max(days[d].s, days[d].t); }).concat([1]));
+  document.getElementById("days").innerHTML = dk.map(function(d){ var v = days[d]; var h = v.t > v.s ? v.t : v.s; return '<b class="' + (v.t > v.s ? "tu" : "") + '" style="height:' + Math.max(2, 100 * h / max) + '%"><span>' + d.slice(8) + '.' + d.slice(5, 7) + ': ' + rub(v.s) + (v.t ? ' / +' + rub(v.t) : '') + '</span></b>'; }).join("");
+  document.getElementById("daysnote").textContent = dk.length ? "дней с движением: " + dk.length + ", самый дорогой день " + rub(max) : "движений за месяц нет";
+  var mm = {}; DATA.months.forEach(function(r){ var m = mm[r.month] = mm[r.month] || { fixed: 0, spend: 0, topup: 0 }; m[r.kind === "topup" ? "topup" : r.kind === "fixed" ? "fixed" : "spend"] += r.amount; });
+  document.querySelector("#mon tbody").innerHTML = Object.keys(mm).sort().reverse().map(function(m){ var x = mm[m]; return '<tr><td>' + MON[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4) + '</td><td class="num">' + rub(x.fixed) + '</td><td class="num">' + rub(x.spend) + '</td><td class="num"><b>' + rub(x.fixed + x.spend) + '</b></td><td class="num">' + (x.topup ? rub(x.topup) : "—") + '</td></tr>'; }).join("") || '<tr><td colspan="5" class="empty">пока пусто</td></tr>';
+  document.getElementById("rowsub").textContent = rows.length + " записей";
+  document.querySelector("#rows tbody").innerHTML = rows.map(function(r){ return '<tr><td>' + r.day.split("-").reverse().join(".") + '</td><td>' + esc(r.service) + '</td><td>' + esc(r.item) + (r.note ? ' <span class="k">' + esc(r.note) + '</span>' : '') + '</td><td><span class="k ' + r.kind + '">' + ({ spend: "трата", topup: "пополнение", fixed: "подписка" }[r.kind] || r.kind) + '</span></td><td class="num">' + rub(r.amount) + (r.currency !== "RUB" && r.amount_orig != null ? ' <small>(' + r.amount_orig + ' ' + esc(r.currency) + ')</small>' : '') + '</td><td><small>' + esc((r.source || "").replace("collector:", "")) + '</small></td><td><button type="button" class="del" data-id="' + r.id + '" title="удалить">✕</button></td></tr>'; }).join("") || '<tr><td colspan="7" class="empty">за месяц записей нет</td></tr>';
+  document.querySelectorAll("#rows .del").forEach(function(b){ b.onclick = function(){ if (!confirm("Удалить запись?")) return; api("DELETE", "?id=" + b.dataset.id).then(function(){ load(CUR); }); }; });
+  document.getElementById("services").innerHTML = Object.keys(planBy).concat(services).filter(function(s, i, a){ return a.indexOf(s) === i; }).map(function(s){ return '<option value="' + esc(s) + '">'; }).join("");
+  document.querySelector("#plan tbody").innerHTML = plan.map(function(p){ return '<tr><td>' + esc(p.service) + '</td><td><span class="k ' + p.kind + '">' + (p.kind === "fixed" ? "подписка" : "лимит") + '</span></td><td class="num"><input type="number" value="' + Math.round(p.monthly_rub) + '" data-s="' + esc(p.service) + '" data-k="' + p.kind + '" data-n="' + esc(p.note) + '"></td><td><small>' + esc(p.note) + '</small></td><td><button type="button" data-save="' + esc(p.service) + '">сохранить</button></td></tr>'; }).join("");
+  document.querySelectorAll("#plan [data-save]").forEach(function(b){ b.onclick = function(){ var inp = document.querySelector('#plan input[data-s="' + b.dataset.save.replace(/"/g, '\\"') + '"]'); api("POST", "", { plan: { service: b.dataset.save, monthly_rub: Number(inp.value), kind: inp.dataset.k, note: inp.dataset.n } }).then(function(r){ msg("planmsg", r.ok ? "сохранено" : r.error, !r.ok); load(CUR); }); }; });
+  var last = ""; rows.forEach(function(r){ if (r.day > last) last = r.day; });
+  document.getElementById("stamp").textContent = last ? "последняя запись " + last.split("-").reverse().join(".") : "";
+}
+function msg(id, t, bad){ var e = document.getElementById(id); e.textContent = t || ""; e.className = "msg" + (bad ? " bad" : ""); }
+document.getElementById("add").onsubmit = function(e){ e.preventDefault(); var f = e.target, b = { day: f.day.value, service: f.service.value, item: f.item.value, amount: Number(f.amount.value), kind: f.kind.value };
+  api("POST", "", b).then(function(r){ msg("addmsg", r.ok ? "добавлено" : r.error, !r.ok); if (r.ok) { f.item.value = ""; f.amount.value = ""; load(CUR); } }); };
+document.getElementById("addplan").onsubmit = function(e){ e.preventDefault(); var f = e.target;
+  api("POST", "", { plan: { service: f.service.value, kind: f.kind.value, monthly_rub: Number(f.monthly_rub.value), note: f.note.value } }).then(function(r){ msg("planmsg", r.ok ? "сохранено" : r.error, !r.ok); if (r.ok) { f.reset(); load(CUR); } }); };
+document.querySelector("#add [name=day]").value = new Date().toISOString().slice(0, 10);
+load(CUR).then(months);
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>

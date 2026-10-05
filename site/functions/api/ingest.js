@@ -110,6 +110,21 @@ export async function onRequestPost({ request, env }) {
     }
     for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); }
   }
+  // расходы (collector/expenses.py, pings.py): ref — ключ автоимпорта, повтор не дублирует
+  const expenses = Array.isArray(body.expenses) ? body.expenses : [];
+  if (expenses.length) {
+    const es = env.DB.prepare(
+      "INSERT INTO expenses (day, service, item, kind, amount, currency, amount_orig, qty, note, source, ref, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) " +
+      "ON CONFLICT(ref) DO UPDATE SET day = excluded.day, amount = excluded.amount, qty = excluded.qty, note = excluded.note, item = excluded.item");
+    const batch = [];
+    for (const r of expenses.slice(0, 500)) {
+      if (!r || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.day || "")) || !r.service || typeof r.amount !== "number" || !isFinite(r.amount)) continue;
+      batch.push(es.bind(String(r.day), String(r.service).slice(0, 60), String(r.item || "").slice(0, 200), String(r.kind || "spend"), r.amount,
+        String(r.currency || "RUB"), r.amount_orig == null ? null : Number(r.amount_orig), r.qty == null ? null : Number(r.qty),
+        String(r.note || "").slice(0, 500), "collector:" + collector, r.ref ? String(r.ref).slice(0, 200) : null, "collector:" + collector, stamp));
+    }
+    for (let i = 0; i < batch.length; i += 20) { await env.DB.batch(batch.slice(i, i + 20)); written += Math.min(20, batch.length - i); }
+  }
   const goals = Array.isArray(body.goals) ? body.goals : [];
   if (goals.length) {
     const gs = env.DB.prepare(

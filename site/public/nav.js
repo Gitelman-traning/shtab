@@ -15,6 +15,7 @@
     help: '<svg viewBox="0 0 20 20"><path d="M4 4h5a2 2 0 012 2v10a2 2 0 00-2-2H4V4zM16 4h-5a2 2 0 00-2 2v10a2 2 0 012-2h5V4z" stroke-linejoin="round"/></svg>',
     db: '<svg viewBox="0 0 20 20"><ellipse cx="10" cy="5" rx="6" ry="2.4"/><path d="M4 5v10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4V5M4 10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4"/></svg>',
     gear: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6" stroke-linecap="round"/></svg>',
+    coin: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 6v8M7.8 8.2c0-.9.9-1.5 2.2-1.5s2.2.6 2.2 1.5c0 1.9-4.4 1.1-4.4 3.1 0 .9.9 1.5 2.2 1.5s2.2-.6 2.2-1.5" stroke-linecap="round"/></svg>',
     tag: '<svg viewBox="0 0 20 20"><path d="M3 4h6l8 8-6 6-8-8z" stroke-linejoin="round"/><circle cx="7" cy="8" r="1.2"/></svg>',
     users: '<svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2"/><path d="M4 17c.8-3.2 3.2-4.8 6-4.8s5.2 1.6 6 4.8" stroke-linecap="round"/></svg>',
     chev: '<svg class="chev" viewBox="0 0 20 20"><path d="M7 8l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -59,7 +60,8 @@
     ] },
     { id: "settings", name: "Настройки", icon: I.gear, admin: true, children: [
       { name: "Пользователи", href: "/users", icon: I.users, admin: true, sec: "users" },
-      { name: "Теги", href: "/tags", icon: I.tag, admin: true, sec: "tags" }
+      { name: "Теги", href: "/tags", icon: I.tag, admin: true, sec: "tags" },
+      { name: "Бюджет и расходы", href: "/budget", icon: I.coin, admin: true, sec: "budget" }
     ] }
   ];
 

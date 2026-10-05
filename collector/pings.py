@@ -251,8 +251,10 @@ def deliver(plan_path, dry):
     if dry:
         log("ПРОБНЫЙ ПРОГОН: черновиков %d (в Telegram не отправлено), расход ≈ %.0f ₽" % (len(drafts), rub))
         return
-    if rows:
-        shtab("POST", "/api/ingest", {"collector": "pings", "pings": rows, "finalize": True, "run_note": "пинги %s: %d" % (key, len(rows))})
+    exp = [{"day": day, "service": "ProxyAPI", "item": "пинги · " + os.environ.get("PINGS_MODEL", "anthropic/claude-sonnet-5").split("/")[-1],
+            "kind": "spend", "amount": round(rub, 2), "qty": len(drafts), "note": card["name"], "ref": "pings|%s|%s|%s" % (key, day, dt.datetime.now(MSK).strftime("%H%M"))}] if rub > 0 else []
+    if rows or exp:
+        shtab("POST", "/api/ingest", {"collector": "pings", "pings": rows, "expenses": exp, "finalize": True, "run_note": "пинги %s: %d" % (key, len(rows))})
     tg(chat, "Сегодня подготовлено пингов: %d. Отправь клиентам из amo (Wazzup) и, если не отправляешь, просто пропусти." % done)
     log("черновиков отправлено менеджеру: %d, расход ≈ %.0f ₽" % (done, rub))
 

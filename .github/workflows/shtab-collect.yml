@@ -43,6 +43,14 @@ jobs:
           FROM: ${{ inputs.from }}
           TO: ${{ inputs.to }}
           SYNC_METRICS: ${{ inputs.sync_metrics }}
+      # расходы на модели из листов ОКК → раздел «Бюджет и расходы»
+      - run: python collector/expenses.py
+        if: always()
+        env:
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          SHTAB_URL: ${{ secrets.SHTAB_URL }}
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
       # окна менеджеров Первой линии: срез на 00:00 сегодняшнего дня, прямо из amo (только чтение)
       - run: python collector/okna.py
         if: always()
