@@ -38,6 +38,7 @@ LLM_BASE = os.environ.get("PREP_ANTHROPIC_BASE", "https://api.proxyapi.ru/anthro
 MODEL = os.environ.get("PREP_MODEL", "claude-sonnet-5")
 MODEL_GROWTH = os.environ.get("PREP_MODEL_GROWTH", "claude-haiku-4-5")   # рост выпускников: задача простая, модель дешёвая
 MAX_PER_RUN = int(os.environ.get("PREP_MAX", "10"))
+MAX_PER_DAY = int(os.environ.get("PREP_DAILY", "10"))     # предохранитель расхода: больше N подготовок в день не считаем (решение 05.10.2026)
 
 L1 = 8733326                      # Первая линия
 ST_CONF = 70704326                # «Встреча подтверждена» — триггер подготовки
@@ -238,8 +239,7 @@ def lead_context(deal):
             manager, copy_id = user_name(x.get("responsible_user_id")), lid
             break
         time.sleep(0.1)
-    if not manager:
-        manager = user_name(lead.get("responsible_user_id"))
+    # копии ещё нет — диагност не определён: страница покажет выбор из списка, сборщик дотянет при следующем прогоне
     # заметки: сделка Первой линии + копия Второй
     notes = []
     for lid in [deal] + ([copy_id] if copy_id else []):
@@ -396,9 +396,55 @@ def build_brief(ctx, facts, picked, prompt):
     for i, c in enumerate(picked, 1):
         cases_txt.append("### Участник %d: %s\n%s\nЧем похож: %s\nДинамика по открытым источникам:\n%s" % (
             i, cases_lines([c]), "", c.get("why", ""), c.get("growth") or "не проверялось"))
-    user = "%s\n\n# ДОСЬЕ ПО ОТКРЫТЫМ ИСТОЧНИКАМ\n%s\n\n# УЧАСТНИКИ ИЗ БАЗЫ (подобраны по сходству)\n%s" % (
-        card_text(ctx), facts, "\n\n".join(cases_txt) or "Подходящих участников в базе не нашлось.")
+    style = STYLES.get(ctx.get("manager") or "")
+    style_txt = ("\n\n# СТИЛЬ ВОПРОСОВ ДИАГНОСТА (%s) — из его реальных встреч\nВопросы в разделах 6, 10, 12 формулируй в этой манере, не копируя дословно:\n%s" % (ctx["manager"], style)) if style else ""
+    user = "%s\n\n# ДОСЬЕ ПО ОТКРЫТЫМ ИСТОЧНИКАМ\n%s\n\n# УЧАСТНИКИ ИЗ БАЗЫ (подобраны по сходству)\n%s%s" % (
+        card_text(ctx), facts, "\n\n".join(cases_txt) or "Подходящих участников в базе не нашлось.", style_txt)
     return claude(prompt, user, max_tokens=10000)
+
+
+# ---------- стиль вопросов диагноста из расшифровок ОКК ----------
+
+STYLE_SYS = """Перед тобой расшифровки нескольких диагностических встреч одного менеджера с собственниками бизнеса (реплики не размечены
+по говорящим: менеджер — тот, кто ведёт встречу, задаёт вопросы и рассказывает о тренинге; клиент — собственник).
+Опиши стиль вопросов этого менеджера так, чтобы другая модель могла формулировать вопросы в его манере. Без имён клиентов и компаний.
+Структура ответа (markdown, до 4 000 знаков):
+## Как он открывает разговор
+## Как он копает (приёмы: уточнение цифр, «а что будет, если…», сравнение с другими собственниками и т.п.)
+## Любимые формулировки и обороты (10–15 коротких примеров дословно, без имён)
+## 20 характерных вопросов дословно (без имён и названий компаний)
+## Чего он не делает (не давит, не читает лекции и т.п. — только то, что видно из встреч)
+Пиши только то, что видно в расшифровках. Если менеджер мало спрашивает — так и скажи."""
+
+
+def cmd_style(user_id, limit=8):
+    name = user_name(user_id)
+    # его сделки на Второй линии — любые статусы, свежие первыми
+    leads = []
+    for pid in L2_PIPES:
+        leads += leads_pages({"filter[responsible_user_id]": user_id, "filter[pipeline_id]": pid}, cap=8)
+    leads.sort(key=lambda l: l.get("updated_at") or 0, reverse=True)
+    ids = [l["id"] for l in leads]
+    log("%s: сделок на Второй линии %d" % (name, len(ids)))
+    found = []
+    for i in range(0, min(len(ids), 300), 60):
+        j = shtab("GET", "/api/prep", params={"mode": "transcripts", "deals": ",".join(str(x) for x in ids[i:i + 60])})
+        found += j.get("transcripts") or []
+        if len(found) >= limit:
+            break
+    found = found[:limit]
+    log("расшифровок найдено: %d" % len(found))
+    if len(found) < 2:
+        log("мало расшифровок для портрета стиля — нужны хотя бы 2")
+        return
+    per = max(6000, 90000 // len(found))     # общий объём ≈ 90 тыс. знаков
+    body = "\n\n".join("### Встреча %d\n%s" % (k + 1, clean(t["text"])[:per]) for k, t in enumerate(found))
+    text, _, u = claude(STYLE_SYS, "Менеджер: %s\n\n%s" % (name, body), max_tokens=3000)
+    rub = (u["in"] * 600 + u["out"] * 3030) / 1e6
+    log("портрет стиля: %d знаков, токенов %d/%d, ≈ %.0f ₽" % (len(text), u["in"], u["out"], rub))
+    shtab("POST", "/api/ingest", {"collector": "prep", "prep_style": [{"manager": name, "text": text[:8000], "meetings": len(found)}]})
+    log("стиль записан в витрину для «%s»" % name)
+    print("\n" + text[:1500])
 
 
 # ---------- команды ----------
@@ -598,22 +644,68 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
     return row
 
 
+STYLES = {}     # диагност → стиль вопросов (prep_style), заполняется в cmd_run
+
+
+def find_l2_manager(deal):
+    """Диагност = ответственный открытой копии сделки на Второй линии (ищем через контакт). '' если копии ещё нет."""
+    lead = amo("/leads/%d" % deal, {"with": "contacts"})
+    cid = main_contact_id(lead) if lead.get("id") else None
+    if not cid:
+        return ""
+    contact = amo("/contacts/%d" % cid, {"with": "leads"})
+    for x in (contact.get("_embedded") or {}).get("leads") or []:
+        if x["id"] == deal:
+            continue
+        l = amo("/leads/%d" % x["id"])
+        if l.get("pipeline_id") in L2_PIPES and l.get("status_id") not in (WIN, LOST):
+            return user_name(l.get("responsible_user_id"))
+        time.sleep(0.1)
+    return ""
+
+
+def resolve_managers(deals):
+    """Подготовки без диагноста: копия на Второй линии могла появиться позже — дотягиваем."""
+    rows = []
+    for d in deals[:20]:
+        try:
+            m = find_l2_manager(d)
+        except Exception as e:
+            log("диагност по сделке %d не определён: %s" % (d, str(e)[:80]))
+            continue
+        if m:
+            rows.append({"deal": d, "manager": m})
+    if rows:
+        shtab("POST", "/api/ingest", {"collector": "prep", "prep_manager": rows})
+        log("диагност определён по %d подготовкам" % len(rows))
+
+
 def cmd_run(deal, dry, out_path, cases_path, facts_path=None, picked_path=None):
     prompt = open(os.path.join(os.path.dirname(__file__), "prep_prompt.md"), encoding="utf-8").read()
-    known, queued = set(), []
+    known, queued, done_today, styles = set(), [], 0, {}
     if URL and STOKEN and not cases_path:
         j = shtab("GET", "/api/prep", params={"mode": "collector"})
         known = set(int(x) for x in j.get("known") or [])
         queued = [int(x) for x in j.get("queued") or []]
         cases = j.get("cases") or []
+        done_today = int(j.get("done_today") or 0)
+        styles = {s["manager"]: s["text"] for s in (j.get("styles") or []) if s.get("text")}
+        resolve_managers([int(x) for x in j.get("no_manager") or []])
     else:
         cases = load_cases(cases_path)
     if not cases:
         log("ВНИМАНИЕ: база участников пуста — сперва python collector/prep.py cases")
     ids = targets(deal, known, queued)
+    if not deal:
+        room = max(0, MAX_PER_DAY - done_today)
+        if len(ids) > room:
+            log("лимит %d подготовок в день: сегодня уже %d, из %d к подготовке возьму %d" % (MAX_PER_DAY, done_today, len(ids), room))
+            ids = ids[:room]
     if not ids:
         log("готовить нечего")
         return
+    global STYLES
+    STYLES = styles
     done, failed = 0, 0
     for d in ids:
         try:
@@ -634,8 +726,9 @@ def cmd_run(deal, dry, out_path, cases_path, facts_path=None, picked_path=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["cases", "growth", "run"])
+    ap.add_argument("cmd", choices=["cases", "growth", "style", "run"])
     ap.add_argument("--deal", type=int)
+    ap.add_argument("--user", type=int, help="style: id пользователя amo (диагност)")
     ap.add_argument("--limit", type=int, default=int(os.environ.get("PREP_GROWTH_LIMIT", "100")), help="growth: сколько участников проверить за прогон")
     ap.add_argument("--dry", action="store_true")
     ap.add_argument("--out")
@@ -651,6 +744,10 @@ def main():
         if not LLM_KEY:
             sys.exit("нет LLM_API_KEY")
         cmd_growth(a.limit, a.cases, a.out)
+    elif a.cmd == "style":
+        if not LLM_KEY or not a.user:
+            sys.exit("нужны LLM_API_KEY и --user <id amo>")
+        cmd_style(a.user)
     else:
         if not LLM_KEY:
             sys.exit("нет LLM_API_KEY")

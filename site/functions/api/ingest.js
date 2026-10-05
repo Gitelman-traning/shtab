@@ -1,7 +1,23 @@
 // POST /api/ingest — сборщик присылает пачку точек. Идемпотентно: одна и та же точка перезаписывается.
 // Тело: {"collector": "amo-sheet", "points": [{"metric","ptype","period","dim","asof","value"}, ...], "plans": [{"metric","ptype","period","dim","value"}, ...],
 //        "okna": [{"day","mgr","key","n","items"}, ...], "goals": [{"mgr","month","goal","base","rate","note"}, ...]}
-import { json, bad, hasIngestToken, now } from "./_lib.js";
+import { json, bad, hasIngestToken, now, tgSend } from "./_lib.js";
+
+// диагносту в Telegram: «подготовка готова». Пользователь Штаба ищется по имени (все слова его имени есть в имени диагноста из amo);
+// шлём, только если совпадение одно. PREP_TG_CC — чат, которому дублировать всё (пилот).
+async function notifyPrepReady(env, origin, rows) {
+  const users = (await env.DB.prepare("SELECT login, name, tg_id FROM users WHERE active = 1 AND tg_id IS NOT NULL AND tg_id != ''").all()).results || [];
+  for (const r of rows) {
+    const who = (r.client || "клиент") + (r.company ? " · " + r.company : "");
+    const when = r.meet_at ? ", встреча " + String(r.meet_at).replace(/^(\d+)-(\d+)-(\d+)/, "$3.$2.$1") + " МСК" : "";
+    const text = "Подготовка к встрече готова: " + who + when + ".\nОткрыть: " + origin + "/sales/l2/prep/#deal=" + r.deal;
+    const m = String(r.manager || "").toLowerCase();
+    const hits = m ? users.filter((u) => { const w = String(u.name || "").toLowerCase().split(/\s+/).filter((x) => x.length >= 3); return w.length && w.every((x) => m.includes(x)); }) : [];
+    const sent = new Set();
+    if (hits.length === 1) { await tgSend(env, hits[0].tg_id, text); sent.add(String(hits[0].tg_id)); }
+    if (env.PREP_TG_CC && !sent.has(String(env.PREP_TG_CC))) await tgSend(env, env.PREP_TG_CC, (r.manager ? "Диагност " + r.manager + (hits.length === 1 ? "" : " (в Штабе не найден, уведомление не ушло)") + ". " : "Диагност не определён. ") + text);
+  }
+}
 
 const CHUNK = 80;   // D1 принимает пачки запросов; держим их небольшими
 
@@ -17,7 +33,7 @@ export async function onRequestPost({ request, env }) {
   const plans = Array.isArray(body.plans) ? body.plans : [];
   const collector = String(body.collector || "unknown").slice(0, 60);
   const has = (k) => Array.isArray(body[k]) && body[k].length;
-  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("expenses")) return bad("пустая пачка");
+  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("expenses")) return bad("пустая пачка");
 
   const stamp = now();
   const stmt = env.DB.prepare(
@@ -78,6 +94,7 @@ export async function onRequestPost({ request, env }) {
   }
   // подготовка к встрече (collector/prep.py): одна строка на сделку, перезаписывается целиком
   const prep = Array.isArray(body.prep) ? body.prep : [];
+  const readyPrep = [];
   if (prep.length) {
     const s = (v, n = 200) => String(v == null ? "" : v).slice(0, n);
     const st = env.DB.prepare(
@@ -94,6 +111,10 @@ export async function onRequestPost({ request, env }) {
         status, s(r.facts, 60000), JSON.stringify(Array.isArray(r.sources) ? r.sources.slice(0, 60) : []), JSON.stringify(Array.isArray(r.cases) ? r.cases.slice(0, 10) : []), s(r.brief, 80000),
         s(r.model, 60), Number(r.tokens_in) || 0, Number(r.tokens_out) || 0, Number(r.searches) || 0, s(r.amo_url, 200), s(r.error, 300), stamp, stamp).run();
       written++;
+      if (status === "ready" && r.brief) readyPrep.push(r);
+    }
+    if (readyPrep.length) {
+      try { await notifyPrepReady(env, new URL(request.url).origin, readyPrep); } catch (e) { /* уведомление не должно ронять приём */ }
     }
   }
   // база участников для подбора кейсов (prep.py cases)
@@ -124,6 +145,21 @@ export async function onRequestPost({ request, env }) {
         String(r.note || "").slice(0, 500), "collector:" + collector, r.ref ? String(r.ref).slice(0, 200) : null, "collector:" + collector, stamp));
     }
     for (let i = 0; i < batch.length; i += 20) { await env.DB.batch(batch.slice(i, i + 20)); written += Math.min(20, batch.length - i); }
+  }
+  // диагност, определённый сборщиком позже (копия на Второй линии появилась после подготовки)
+  const pm = Array.isArray(body.prep_manager) ? body.prep_manager : [];
+  for (const r of pm.slice(0, 50)) {
+    if (!r || !Number(r.deal) || !r.manager) continue;
+    await env.DB.prepare("UPDATE prep SET manager = ?, updated_at = ? WHERE deal = ? AND manager = ''").bind(String(r.manager).slice(0, 80), stamp, Number(r.deal)).run();
+    written++;
+  }
+  // стиль вопросов диагноста (prep.py style)
+  const pst = Array.isArray(body.prep_style) ? body.prep_style : [];
+  for (const r of pst.slice(0, 20)) {
+    if (!r || !r.manager || !r.text) continue;
+    await env.DB.prepare("INSERT INTO prep_style (manager, text, meetings, updated_at) VALUES (?,?,?,?) ON CONFLICT(manager) DO UPDATE SET text = excluded.text, meetings = excluded.meetings, updated_at = excluded.updated_at")
+      .bind(String(r.manager).slice(0, 80), String(r.text).slice(0, 8000), Number(r.meetings) || 0, stamp).run();
+    written++;
   }
   // база «было → стало»: результат проверки роста участника (prep.py growth), ночная пересборка базы его не трогает
   const growth = Array.isArray(body.prep_growth) ? body.prep_growth : [];

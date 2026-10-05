@@ -131,7 +131,8 @@ function renderList(){
     + rows.map(function(r){
       var biz = [r.niche, r.turn ? r.turn + " млн ₽" : "", r.staff ? r.staff + " чел" : "", r.geo].filter(Boolean).join(" · ");
       var status = '<span class="st ' + r.status + '">' + (ST[r.status] || r.status) + '</span>' + (r.status === "error" && r.error ? '<span class="sub">' + esc(r.error.slice(0, 90)) + '</span>' : "");
-      return '<tr class="row" data-deal="' + r.deal + '"><td>' + dateLabel(r.meet_at) + '</td><td>' + esc(r.client || "—") + (r.company ? '<span class="sub">' + esc(r.company) + '</span>' : '') + '</td><td>' + (esc(biz) || '<span class="sub">поля не заполнены</span>') + '</td><td>' + esc(r.manager || "—") + '</td><td>' + status + '</td><td class="num"><a class="btn ghost" href="' + esc(r.amo_url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">amo ↗</a></td></tr>';
+      var mgr = r.manager ? esc(r.manager) : '<span class="st">не определён</span>';
+      return '<tr class="row" data-deal="' + r.deal + '"><td>' + dateLabel(r.meet_at) + '</td><td>' + esc(r.client || "—") + (r.company ? '<span class="sub">' + esc(r.company) + '</span>' : '') + '</td><td>' + (esc(biz) || '<span class="sub">поля не заполнены</span>') + '</td><td>' + mgr + '</td><td>' + status + '</td><td class="num"><a class="btn ghost" href="' + esc(r.amo_url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">amo ↗</a></td></tr>';
     }).join("") + '</tbody></table>';
   Array.prototype.forEach.call(document.querySelectorAll("tr.row"), function(tr){ tr.addEventListener("click", function(){ location.hash = "deal=" + tr.getAttribute("data-deal"); }); });
 }
@@ -166,9 +167,18 @@ function showDetail(deal){
     if (!res.ok) { document.getElementById("d-title").textContent = res.error || "нет данных"; return; }
     var r = res.row; CUR = r;
     document.getElementById("d-title").textContent = (r.client || "Клиент") + (r.company ? " · " + r.company : "");
-    var meta = [r.meet_at ? "Встреча " + r.meet_at.replace(/^(\d+)-(\d+)-(\d+)/, "$3.$2.$1") + " МСК" : "Дата встречи не указана", r.manager ? "Диагност: " + r.manager : "",
+    var meta = [r.meet_at ? "Встреча " + r.meet_at.replace(/^(\d+)-(\d+)-(\d+)/, "$3.$2.$1") + " МСК" : "Дата встречи не указана",
       [r.niche, r.turn ? "оборот " + r.turn + " млн ₽" : "", r.staff ? r.staff + " сотрудников" : "", r.geo].filter(Boolean).join(" · ")].filter(Boolean);
-    document.getElementById("d-meta").innerHTML = meta.map(esc).join("<br>");
+    document.getElementById("d-meta").innerHTML = meta.map(esc).join("<br>")
+      + '<br>Диагност: <select id="d-mgr" title="Берётся из копии сделки на Второй линии; пока копии нет — выбери вручную"><option value="">не определён</option>' + (r.manager ? '<option selected>' + esc(r.manager) + '</option>' : '') + '</select>';
+    var sel = document.getElementById("d-mgr");
+    api("mode=managers").then(function(m){
+      if (!m.ok) return;
+      (m.managers || []).forEach(function(name){ if (name !== r.manager) { var o = document.createElement("option"); o.textContent = name; sel.appendChild(o); } });
+    });
+    sel.addEventListener("change", function(){
+      post({ action: "manager", deal: r.deal, manager: sel.value }).then(function(res){ if (!res.ok) alert(res.error || "не получилось"); else { r.manager = sel.value; var row = ROWS.filter(function(x){ return x.deal === r.deal; })[0]; if (row) row.manager = sel.value; } });
+    });
     document.getElementById("d-tech").innerHTML = '<span class="st ' + r.status + '">' + (ST[r.status] || r.status) + '</span>' + (r.status === "error" ? "<br>" + esc(r.error) : "")
       + (r.updated_at ? "<br>обновлено " + esc(r.updated_at.slice(0, 16).replace("T", " ")) + " UTC" : "") + (r.model ? "<br>" + esc(r.model) + " · " + (r.tokens_in + r.tokens_out).toLocaleString("ru") + " токенов · " + r.searches + " поисков" : "");
     document.getElementById("d-amo").href = r.amo_url || ("https://pavelgitelman.amocrm.ru/leads/detail/" + r.deal);

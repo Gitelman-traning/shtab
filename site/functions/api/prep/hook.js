@@ -1,10 +1,13 @@
-// POST /api/prep/hook?key=…  — вебхук amoCRM «сделка сменила этап».
-// Если сделка попала на «Встреча подтверждена» (70704326) Первой линии — ставим её в очередь подготовки
-// и дёргаем прогон сборщика в GitHub Actions (repository_dispatch), если задан GH_DISPATCH_TOKEN.
+// POST /api/prep/hook?key=…  — вебхук amoCRM: сделка попала на «Встреча подтверждена» (70704326) Первой линии.
+// Подходит и для «Webhooks» в интеграциях (событие «смена этапа»), и для триггера digital pipeline на самом этапе.
+// Тело amo — form-urlencoded: leads[status|update|add][N][id], …[status_id], …[pipeline_id]. Если триггер стоит на этапе,
+// status_id может не прийти — тогда берём сделку как есть (триггер и так срабатывает только на этом этапе).
+// Ставим сделку в очередь и дёргаем прогон сборщика в GitHub Actions (repository_dispatch), если задан GH_DISPATCH_TOKEN.
 // Ключ в адресе (PREP_HOOK_KEY в Doppler) — единственная защита: amo вебхуки не подписывает. Отвечаем 200 всегда, чтобы amo не отключил хук.
 import { json, now } from "../_lib.js";
 
 const STAGE = 70704326;
+const PIPE = 8733326;
 const REPO = "Gitelman-traning/shtab";
 
 export async function onRequestPost({ request, env, waitUntil }) {
@@ -13,14 +16,21 @@ export async function onRequestPost({ request, env, waitUntil }) {
   let text = "";
   try { text = await request.text(); } catch (e) { return json({ ok: true, skipped: "пустое тело" }); }
   const p = new URLSearchParams(text);
-  const deals = [];
-  for (let i = 0; i < 20; i++) {
-    const id = Number(p.get("leads[status][" + i + "][id]") || p.get("leads[update][" + i + "][id]"));
-    if (!id) break;
-    const st = Number(p.get("leads[status][" + i + "][status_id]") || p.get("leads[update][" + i + "][status_id]"));
-    if (st === STAGE) deals.push(id);
+  const found = {};
+  for (const [k, v] of p.entries()) {
+    const m = k.match(/^leads\[(\w+)\]\[(\d+)\]\[(id|status_id|pipeline_id)\]$/);
+    if (!m) continue;
+    const key = m[1] + ":" + m[2];
+    (found[key] = found[key] || {})[m[3]] = Number(v);
   }
-  if (!deals.length) return json({ ok: true, skipped: "не тот этап" });
+  const deals = [];
+  for (const f of Object.values(found)) {
+    if (!f.id) continue;
+    if (f.status_id && f.status_id !== STAGE) continue;
+    if (f.pipeline_id && f.pipeline_id !== PIPE) continue;
+    if (!deals.includes(f.id)) deals.push(f.id);
+  }
+  if (!deals.length) return json({ ok: true, skipped: "не тот этап", seen: Object.keys(found).length });
   const stamp = now();
   for (const d of deals) {
     await env.DB.prepare(
