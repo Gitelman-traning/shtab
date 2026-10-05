@@ -31,7 +31,7 @@ MSK = dt.timezone(dt.timedelta(hours=3))
 AMO = "https://pavelgitelman.amocrm.ru/api/v4"
 AMO_UI = "https://pavelgitelman.amocrm.ru/leads/detail/%d"
 AMO_TOKEN = os.environ.get("AMO_TOKEN", "").strip()
-URL = os.environ.get("SHTAB_URL", "").rstrip("/")
+URL = (os.environ.get("SHTAB_URL", "").strip() or "https://shtab-20v.pages.dev").rstrip("/")
 STOKEN = os.environ.get("SHTAB_TOKEN", "").strip()
 LLM_KEY = os.environ.get("LLM_API_KEY", "").strip()
 LLM_BASE = os.environ.get("PREP_ANTHROPIC_BASE", "https://api.proxyapi.ru/anthropic").rstrip("/")
