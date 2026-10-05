@@ -90,13 +90,13 @@
           <textarea id="text" maxlength="200" style="margin-top:8px"></textarea>
           <div class="hint">В 245 знаков помещается около 35 букв. «Я от Мухаммада, тренинг Команда» = 202, с фамилией уже не лезет.</div>
           <div class="res"><div class="meter" id="meter"><span>Длина ссылки для сторис</span><b><span id="len">0</span> / <span id="lim">245</span></b></div><div class="bar"><i id="bar"></i></div>
-          <div class="mono" id="walink">—</div><button class="btn ghost" type="button" id="copywa" style="margin-top:8px">Копировать WA-ссылку</button>
+          <button class="btn ghost" type="button" id="copywa" style="margin-top:4px">Копировать WA-ссылку</button>
           <div class="hint bad" id="over" hidden>Длиннее предела — стикер в сторис не примет. Сократите текст или подтвердите при копировании.</div></div>
         </div>
 
         <div class="blk" id="b-bot" hidden><h3>TG-бот</h3>
           <div class="hint">Метка для Salebot только латиницей: имя из тега транслитерируется, добавляются день и месяц.</div>
-          <div class="res"><div class="sub">Метка Salebot: <span class="tagc" id="botslug">—</span></div><div class="mono" id="botlink" style="margin-top:6px">—</div>
+          <div class="res"><div class="sub">Метка Salebot: <span class="tagc" id="botslug">—</span></div>
           <button class="btn ghost" type="button" id="copybot" style="margin-top:8px">Копировать ссылку на бота</button></div>
           <label>Кружок Паши в боте <span class="req">обязательно</span></label>
           <div class="checks">
@@ -163,9 +163,9 @@ function render(){
   $('tagnorm').textContent = raw ? (st.tag ? (st.tag !== raw ? 'Будет сохранён как ' + st.tag : 'Тег в порядке') : 'Не понимаю тег — нужен вид ДД.ММ_Имя') : '';
   $('tagnorm').className = 'hint' + (raw ? (st.tag ? ' ok' : ' bad') : '');
   var t = $('text').value.trim(); st.wa = t ? 'https://wa.me/' + $('phone').value + '?text=' + encodeURIComponent(t) : '';
-  var n = st.wa.length; $('len').textContent = n; $('bar').style.width = Math.min(100, n / LIMIT * 100) + '%'; $('walink').textContent = st.wa || '—';
+  var n = st.wa.length; $('len').textContent = n; $('bar').style.width = Math.min(100, n / LIMIT * 100) + '%'; 
   st.over = n > LIMIT; $('meter').className = 'meter' + (st.over ? ' over' : (t ? ' ok' : '')); $('over').hidden = !st.over;
-  var s = slug(st.tag); st.bot = s ? 'https://t.me/' + CFG.bot + '?start=' + CFG.prefix + s : ''; $('botlink').textContent = st.bot || '—'; $('botslug').textContent = s ? CFG.prefix + s : '—';
+  var s = slug(st.tag); st.bot = s ? 'https://t.me/' + CFG.bot + '?start=' + CFG.prefix + s : ''; $('botslug').textContent = s ? CFG.prefix + s : '—';
   var p = [];
   if (!st.tag) p.push('тег не по формату'); if (!$('name').value.trim()) p.push('не указан блогер'); if (!$('gen').value.trim()) p.push('не заполнено «Я от …»');
   if (st.types.indexOf('wa') >= 0 && !t) p.push('нет текста для WhatsApp'); if (st.types.indexOf('wa') >= 0 && t && !/я от/i.test(t)) p.push('в тексте нет «Я от …»');
