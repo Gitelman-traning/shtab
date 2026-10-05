@@ -1,0 +1,71 @@
+name: Prep (meeting briefs)
+
+# Подготовка диагноста к встрече: сделки Первой линии на этапе «Встреча подтверждена» → досье, участники, подготовка → витрина Штаба.
+#   по расписанию каждые 30 минут днём (МСК 07:30–22:30) — новые сделки на этапе и очередь со страницы;
+#   repository_dispatch «prep» — вебхук amo через /api/prep/hook дёргает прогон сразу после подтверждения встречи;
+#   вручную — конкретная сделка (deal) и сухой прогон (dry: ничего в витрину, текст в артефакт).
+# База участников (купившие из amo) пересобирается ночью в 02:10 UTC и вручную (cases: 1).
+
+on:
+  schedule:
+    - cron: '*/30 4-19 * * *'
+    - cron: '10 2 * * *'
+  repository_dispatch:
+    types: [prep]
+  workflow_dispatch:
+    inputs:
+      deal:
+        description: 'amo deal id (empty = scan the stage)'
+        required: false
+        default: ''
+      dry:
+        description: 'Dry run: brief to artifact only (1 = yes)'
+        required: false
+        default: ''
+      cases:
+        description: 'Rebuild participants base first (1 = yes)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prep
+  cancel-in-progress: false
+
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests
+      - name: Participants base
+        if: github.event.schedule == '10 2 * * *' || inputs.cases == '1'
+        run: python collector/prep.py cases
+        env:
+          AMO_TOKEN: ${{ secrets.AMO_TOKEN }}
+          SHTAB_URL: ${{ secrets.SHTAB_URL }}
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
+      - name: Briefs
+        if: github.event.schedule != '10 2 * * *'
+        run: python collector/prep.py run ${{ inputs.deal && format('--deal {0}', inputs.deal) || '' }} ${{ inputs.dry == '1' && '--dry --out brief.md' || '' }}
+        env:
+          AMO_TOKEN: ${{ secrets.AMO_TOKEN }}
+          SHTAB_URL: ${{ secrets.SHTAB_URL }}
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          PREP_MODEL: ${{ vars.PREP_MODEL }}
+      - uses: actions/upload-artifact@v4
+        if: always() && inputs.dry == '1'
+        with:
+          name: brief
+          path: brief.md
+          if-no-files-found: ignore
+          retention-days: 7

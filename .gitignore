@@ -5,7 +5,8 @@ __pycache__/
 *.pyc
 .env
 # страницы с данными клиентов (сборка ОКК) и макеты — только на сервере
-site/public/sales/l2/
+site/public/sales/l2/*
+!site/public/sales/l2/prep/
 site/public/guide.html
 site/public/mockups*.html
 # сессия для локальной проверки (tools/local.py)
