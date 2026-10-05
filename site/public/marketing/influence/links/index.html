@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Инфлюенс · Генератор ссылок</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.grid{display:grid;grid-template-columns:minmax(0,640px) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:1100px){.grid{grid-template-columns:1fr}}
+.f label{display:block;font-size:12px;font-weight:600;color:var(--dim);margin:14px 0 5px}
+.f label:first-child{margin-top:0}
+.f input[type=text],.f input[type=url],.f textarea,.f select{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.f textarea{min-height:64px;resize:vertical}.f textarea[readonly]{color:var(--dim)}
+.f .two{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}@media (max-width:560px){.f .two{grid-template-columns:1fr}}
+.req{font-size:10px;font-weight:700;color:var(--bad);text-transform:uppercase;letter-spacing:.04em;margin-left:6px}
+.hint{font-size:12px;color:var(--dim);margin-top:5px}.hint.ok{color:var(--ok);font-weight:600}.hint.bad{color:var(--bad);font-weight:600}
+.rules{font-size:12px;color:var(--dim);margin:6px 0 0;padding-left:16px}.rules li{margin:2px 0}.rules b{color:var(--ink)}
+.checks{display:flex;gap:16px;flex-wrap:wrap;margin:4px 0}.checks label{display:inline-flex;align-items:center;gap:7px;margin:0;color:var(--ink);font-size:14px;font-weight:600;cursor:pointer}
+.blk{border-left:3px solid var(--gold-b);padding:2px 0 2px 14px;margin-top:16px}.blk h3{margin:0;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--dim)}
+.res{margin-top:10px;padding:11px 13px;border-radius:10px;background:var(--soft)}
+.meter{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-bottom:5px}.meter b{font-size:14px;color:var(--ink)}.meter.ok b{color:var(--ok)}.meter.over b{color:var(--bad)}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-bottom:8px}.bar i{display:block;height:100%;width:0;background:var(--gold-b)}.over .bar i{background:var(--bad)}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+.btn{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:9px;padding:9px 16px;cursor:pointer;background:linear-gradient(135deg,var(--gold-a),var(--gold-b));color:#151616}
+.btn.ghost{background:var(--card);border:1px solid var(--line);color:var(--ink);font-weight:600;padding:5px 11px;font-size:12px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
+.msg{padding:11px 14px;border-radius:10px;margin:0 0 14px;font-size:13px;word-break:break-word}.msg.ok{background:var(--ok-bg);color:var(--ok)}.msg.bad{background:var(--bad-bg);color:var(--bad)}.msg.mid{background:var(--mid-bg);color:var(--mid)}
+.tagc{display:inline-block;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--gold-soft);border-radius:6px;padding:1px 7px}
+.pill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px}.pill.wait{background:var(--mid-bg);color:var(--mid)}
+.sub{font-size:12px;color:var(--dim);margin-top:3px;word-break:break-word}
+.it{padding:12px 0;border-top:1px solid var(--line)}.it:first-child{border-top:0;padding-top:0}
+.it .ln{margin-top:8px}.inl{display:flex;gap:8px;margin-top:6px}.inl input{flex:1;font:inherit;font-size:13px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:8px;padding:6px 9px}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · Инфлюенс · <b>Генератор ссылок</b></div><h1>Генератор ссылок для блогеров</h1><p class="sub">Одна заявка на блогера. WhatsApp и TG-бот выдаются сразу, TG-входящее и кружок Паши в боте уходят администратору в Telegram, готовую ссылку пришлём вам туда же. Всё, что выдано, попадает в реестр.</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div id="msgs"></div>
+  <div class="grid">
+    <div class="card">
+      <h2>Новая заявка</h2>
+      <form class="f" id="f" autocomplete="off">
+        <label for="tag">Тег для amoCRM <span class="req">обязательно</span></label>
+        <input id="tag" type="text" placeholder="16.09_Мухаммад">
+        <div class="hint" id="tagnorm"></div>
+        <ul class="rules">
+          <li>Формат <b>ДД.ММ_Имя</b>: день и месяц размещения, подчёркивание, имя блогера. Два слова можно: <b>01.10_Анатолий_Пистол</b>.</li>
+          <li>Напишете «1.10_Имя» или «Имя_1.10» — тег приведётся к формату сам. Тег должен быть новым.</li>
+        </ul>
+        <div class="two">
+          <div><label for="name">Блогер <span class="req">обязательно</span></label><input id="name" type="text" maxlength="80" placeholder="Мухаммад Алиев"></div>
+          <div><label for="platform">Площадка</label><select id="platform"></select></div>
+        </div>
+        <label for="gen">Как написать «Я от …» <span class="req">обязательно</span></label>
+        <input id="gen" type="text" maxlength="60" placeholder="Мухаммада">
+        <div class="hint">Имя блогера в нужном падеже, оно подставится в текст.</div>
+
+        <label>Какие ссылки нужны <span class="req">обязательно</span></label>
+        <div class="checks">
+          <label><input type="checkbox" name="type" value="wa" checked> WhatsApp</label>
+          <label><input type="checkbox" name="type" value="bot" checked> TG-бот</label>
+          <label><input type="checkbox" name="type" value="tgin"> TG-входящее</label>
+        </div>
+        <ul class="rules">
+          <li><b>WhatsApp</b> — клиент сразу в WhatsApp с готовым текстом «Я от …». Выдаётся сразу.</li>
+          <li><b>TG-бот</b> — клиент в боте gitelmanteam_bot, бот сам берёт номер и заводит сделку с меткой. Выдаётся сразу.</li>
+          <li><b>TG-входящее</b> — клиент пишет менеджеру в личный Telegram готовой фразой. Ссылку делает администратор, пришлём в Telegram.</li>
+        </ul>
+
+        <div class="blk" id="b-wa"><h3>WhatsApp</h3>
+          <div class="two">
+            <div><label for="phone">Номер</label><select id="phone"></select></div>
+            <div><label for="watpl">Текст сообщения</label><select id="watpl"></select></div>
+          </div>
+          <textarea id="text" maxlength="200" style="margin-top:8px"></textarea>
+          <div class="hint">В 245 знаков помещается около 35 букв. «Я от Мухаммада, тренинг Команда» = 202, с фамилией уже не лезет.</div>
+          <div class="res"><div class="meter" id="meter"><span>Длина ссылки для сторис</span><b><span id="len">0</span> / <span id="lim">245</span></b></div><div class="bar"><i id="bar"></i></div>
+          <div class="mono" id="walink">—</div><button class="btn ghost" type="button" id="copywa" style="margin-top:8px">Копировать WA-ссылку</button>
+          <div class="hint bad" id="over" hidden>Длиннее предела — стикер в сторис не примет. Сократите текст или подтвердите при копировании.</div></div>
+        </div>
+
+        <div class="blk" id="b-bot"><h3>TG-бот</h3>
+          <div class="hint">Метка для Salebot только латиницей: имя из тега транслитерируется, добавляются день и месяц.</div>
+          <div class="res"><div class="sub">Метка Salebot: <span class="tagc" id="botslug">—</span></div><div class="mono" id="botlink" style="margin-top:6px">—</div>
+          <button class="btn ghost" type="button" id="copybot" style="margin-top:8px">Копировать ссылку на бота</button></div>
+          <label>Кружок Паши в боте <span class="req">обязательно</span></label>
+          <div class="checks">
+            <label><input type="radio" name="circle" value="no" checked> Не нужен</label>
+            <label><input type="radio" name="circle" value="yes"> Нужен — администратор добавит в ветку бота</label>
+          </div>
+          <div id="circlebox" hidden><label for="circleNote">Где взять кружок <span class="req">обязательно</span></label>
+          <input id="circleNote" type="text" maxlength="200" placeholder="ссылка на сообщение в чате «Инфлюенс маркетинг» или «перешлю в личку»"></div>
+        </div>
+
+        <div class="blk" id="b-tgin" hidden><h3>TG-входящее</h3>
+          <label for="tgtpl">Фраза, с которой клиент напишет</label>
+          <select id="tgtpl"></select>
+          <textarea id="phrase" maxlength="300" style="margin-top:8px"></textarea>
+          <div class="hint" id="phrasecheck">Фраза должна отличаться от всех выданных и не быть частью другой — иначе триггер в amo их не различит.</div>
+        </div>
+
+        <div class="acts"><button class="btn" type="submit" id="save">Сохранить и выдать</button><span class="hint" id="savehint"></span></div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Заявки <small id="cnt"></small></h2>
+      <div id="list"><p class="note">Загружаю…</p></div>
+      <p class="note" id="reg"></p>
+    </div>
+  </div>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+(function(){
+var $ = function(id){ return document.getElementById(id); };
+var CFG = null, ME = null, LIMIT = 245;
+var TR = {а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'c',ч:'ch',ш:'sh',щ:'sch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya'};
+var TAG_RE = /^(0[1-9]|[12]\d|3[01])\.(0[1-9]|1[0-2])_[^\s]{2,60}$/u;
+function normTag(raw){ var s = String(raw||'').trim().replace(/\s+/g,' ').replace(/\s*_\s*/g,'_').replace(/\s/g,'_').replace(/_+/g,'_');
+  var m = s.match(/^(\d{1,2})[.,](\d{1,2})(?:[.,]\d{2,4})?_(.+)$/u); if (!m) { var m2 = s.match(/^(.+?)_(\d{1,2})[.,](\d{1,2})(?:[.,]\d{2,4})?$/u); if (m2) m = [null, m2[2], m2[3], m2[1]]; }
+  if (!m) return ''; var t = m[1].padStart(2,'0') + '.' + m[2].padStart(2,'0') + '_' + m[3].replace(/^_+|_+$/g,''); return TAG_RE.test(t) ? t : ''; }
+function slug(tag){ var m = tag.match(/^(\d{2})\.(\d{2})_(.+)$/u); if (!m) return ''; var f = m[3].split('_')[0].toLowerCase(), lat = '';
+  for (var i = 0; i < f.length; i++) lat += (TR[f[i]] !== undefined ? TR[f[i]] : f[i]); lat = lat.replace(/[^a-z0-9]/g,''); return lat ? lat + m[1] + m[2] : ''; }
+function msg(kind, html){ $('msgs').innerHTML = html ? '<div class="msg ' + kind + '">' + html + '</div>' : ''; if (html) window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function api(method, body){ return fetch('/api/influence-links', { method: method, credentials: 'same-origin', headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+  .then(function(r){ return r.json().then(function(j){ if (!r.ok || !j.ok) throw new Error(j.error || ('ошибка ' + r.status)); return j; }); }); }
+function copy(btn, v, label){ if (!v) return; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(function(){ btn.textContent = 'Скопировано'; setTimeout(function(){ btn.textContent = label; }, 1500); }, function(){ window.prompt('Скопируйте', v); }); }
+
+var st = { tag: '', wa: '', over: false, bot: '', types: [] };
+function types(){ return Array.prototype.map.call(document.querySelectorAll('[name=type]:checked'), function(c){ return c.value; }); }
+function circle(){ var c = document.querySelector('[name=circle]:checked'); return c ? c.value : ''; }
+function fill(){ var g = $('gen').value.trim() || '…';
+  if ($('watpl').value !== 'custom') $('text').value = CFG.waTemplates[+$('watpl').value].replace('{имя}', g);
+  if ($('tgtpl').value !== 'custom') $('phrase').value = CFG.tgTemplates[+$('tgtpl').value].replace('{имя}', g);
+  $('text').readOnly = $('watpl').value !== 'custom'; $('phrase').readOnly = $('tgtpl').value !== 'custom'; checkPhrase(); }
+function render(){
+  st.types = types(); ['wa','bot','tgin'].forEach(function(t){ $('b-' + t).hidden = st.types.indexOf(t) < 0; }); $('circlebox').hidden = circle() !== 'yes';
+  var raw = $('tag').value.trim(); st.tag = normTag(raw);
+  $('tagnorm').textContent = raw ? (st.tag ? (st.tag !== raw ? 'Будет сохранён как ' + st.tag : 'Тег в порядке') : 'Не понимаю тег — нужен вид ДД.ММ_Имя') : '';
+  $('tagnorm').className = 'hint' + (raw ? (st.tag ? ' ok' : ' bad') : '');
+  var t = $('text').value.trim(); st.wa = t ? 'https://wa.me/' + $('phone').value + '?text=' + encodeURIComponent(t) : '';
+  var n = st.wa.length; $('len').textContent = n; $('bar').style.width = Math.min(100, n / LIMIT * 100) + '%'; $('walink').textContent = st.wa || '—';
+  st.over = n > LIMIT; $('meter').className = 'meter' + (st.over ? ' over' : (t ? ' ok' : '')); $('over').hidden = !st.over;
+  var s = slug(st.tag); st.bot = s ? 'https://t.me/' + CFG.bot + '?start=' + CFG.prefix + s : ''; $('botlink').textContent = st.bot || '—'; $('botslug').textContent = s ? CFG.prefix + s : '—';
+  var p = [];
+  if (!st.tag) p.push('тег не по формату'); if (!$('name').value.trim()) p.push('не указан блогер'); if (!$('gen').value.trim()) p.push('не заполнено «Я от …»');
+  if (!st.types.length) p.push('не выбран тип ссылки');
+  if (st.types.indexOf('wa') >= 0 && !t) p.push('нет текста для WhatsApp'); if (st.types.indexOf('wa') >= 0 && t && !/я от/i.test(t)) p.push('в тексте нет «Я от …»');
+  if (st.types.indexOf('bot') >= 0 && circle() === 'yes' && !$('circleNote').value.trim()) p.push('не указано, где взять кружок');
+  if (st.types.indexOf('tgin') >= 0 && !$('phrase').value.trim()) p.push('нет фразы для TG-входящего');
+  var blocked = !ME.canCreate; $('save').disabled = blocked || p.length > 0;
+  $('savehint').textContent = blocked ? 'Сохранять может только именной пользователь, и реестр должен быть подключён' : (p.length ? 'Нельзя сохранить: ' + p.join(', ') : '');
+}
+var pt;
+function checkPhrase(){ clearTimeout(pt); var v = $('phrase').value.trim(); if (!v || st.types.indexOf('tgin') < 0) return;
+  pt = setTimeout(function(){ api('POST', { action: 'check', phrase: v }).then(function(d){ $('phrasecheck').textContent = d.conflict ? 'Нельзя: ' + d.conflict : 'Фраза свободна'; $('phrasecheck').className = 'hint ' + (d.conflict ? 'bad' : 'ok'); }).catch(function(){}); }, 400); }
+
+function list(rows){
+  $('cnt').textContent = rows.length ? 'последние ' + rows.length : '';
+  var pend = rows.filter(function(r){ return String(r.status).indexOf('ждёт') === 0; }).length;
+  if (pend) $('cnt').innerHTML = 'последние ' + rows.length + ' · <span class="pill wait">ждут администратора: ' + pend + '</span>';
+  if (!rows.length) { $('list').innerHTML = '<p class="note">Заявок пока нет</p>'; return; }
+  $('list').innerHTML = rows.map(function(r){
+    var out = '<div class="it"><span class="tagc">' + esc(r.tag) + '</span> <span class="sub" style="display:inline">' + esc(r.date) + ' · ' + esc(r.by) + '</span><div class="sub">' + esc(r.who) + '</div>';
+    if (r.wa) out += '<div class="ln"><span class="sub">WA · ' + esc(r.waLen) + ' зн. · «' + esc(r.waText) + '»</span><div class="mono">' + esc(r.wa) + '</div><button class="btn ghost cp" type="button" data-v="' + esc(r.wa) + '">Копировать</button></div>';
+    if (r.bot) out += '<div class="ln"><span class="sub">TG-бот</span><div class="mono">' + esc(r.bot) + '</div><button class="btn ghost cp" type="button" data-v="' + esc(r.bot) + '">Копировать</button></div>';
+    if (String(r.circle).indexOf('нужен') === 0) out += '<div class="ln"><span class="pill wait">Кружок в боте: ждёт администратора</span><div class="sub">' + esc(r.circle.slice(7)) + '</div>' + (ME.admin ? '<button class="btn ghost act" type="button" data-a="circle" data-row="' + r.row + '" style="margin-top:6px">Кружок добавлен</button>' : '') + '</div>';
+    else if (r.circle === 'добавлен') out += '<div class="sub ln">Кружок в боте добавлен</div>';
+    if (String(r.types).indexOf('tgin') >= 0) {
+      if (r.tgin) out += '<div class="ln"><span class="sub">TG-входящее</span><div class="mono">' + esc(r.tgin) + '</div><button class="btn ghost cp" type="button" data-v="' + esc(r.tgin) + '">Копировать</button></div>';
+      else out += '<div class="ln"><span class="pill wait">TG-входящее: ждёт ссылку</span><div class="sub">«' + esc(r.phrase) + '»</div>' + (ME.admin ? '<div class="inl"><input type="url" placeholder="https://t.me/m/…" id="lk' + r.row + '"><button class="btn ghost act" type="button" data-a="issue" data-row="' + r.row + '">Выдать</button></div>' : '') + '</div>';
+    }
+    return out + '</div>';
+  }).join('');
+  $('list').querySelectorAll('.cp').forEach(function(b){ b.onclick = function(){ copy(b, b.getAttribute('data-v'), 'Копировать'); }; });
+  $('list').querySelectorAll('.act').forEach(function(b){ b.onclick = function(){
+    var row = b.getAttribute('data-row'), a = b.getAttribute('data-a'), body = { action: a, row: row };
+    if (a === 'issue') { body.link = ($('lk' + row).value || '').trim(); if (!body.link) return; }
+    b.disabled = true;
+    api('POST', body).then(function(d){ msg('ok', (a === 'issue' ? 'Ссылка выдана.' : 'Кружок отмечен.') + (d.notified ? ' Заказчику ушло сообщение в Telegram.' : ' У заказчика не привязан Telegram — передайте ему сами.')); load(); })
+      .catch(function(e){ b.disabled = false; msg('bad', esc(e.message)); });
+  }; });
+}
+
+function load(){ return api('GET').then(function(d){
+  ME = d.me; list(d.rows || []);
+  var waitN = (d.rows || []).filter(function(r){ return String(r.status).indexOf('ждёт') === 0; }).length;
+  $('stamp').textContent = waitN ? 'ждут администратора: ' + waitN : 'всё выдано';
+  $('reg').innerHTML = 'Реестр — <a href="' + esc(d.sheetUrl) + '" target="_blank" rel="noopener">Google Таблица, лист «' + esc(d.tab) + '»</a>.';
+  var warns = [];
+  if (d.sheetError) warns.push('Реестр не подключён: ' + esc(d.sheetError) + '. Сохранять заявки пока нельзя.');
+  if (d.extError && ME.admin) warns.push('Реестр фраз из таблицы «Ссылки на все чаты Вотсап» недоступен — фразы сверяются только между заявками. Нужен доступ «Редактор» для ' + esc(d.serviceAccount) + '.');
+  if (!d.config.telegram && ME.admin) warns.push('Уведомления в Telegram выключены: нет TG_BOT_TOKEN или чата администратора.');
+  if (warns.length && !$('msgs').innerHTML) msg('mid', warns.join('<br>'));
+  return d;
+}); }
+
+$('f').addEventListener('submit', function(e){
+  e.preventDefault(); if ($('save').disabled) return;
+  if (st.types.indexOf('wa') >= 0 && st.over && !window.confirm('WA-ссылка длиннее ' + LIMIT + ' знаков и не может использоваться в сторис Instagram.\n\nУверены, что хотите её сохранить?')) return;
+  $('save').disabled = true;
+  api('POST', { action: 'save', tag: $('tag').value, name: $('name').value, platform: $('platform').value, types: st.types, phone: $('phone').value, text: $('text').value,
+    phrase: $('phrase').value, circle: circle(), circleNote: $('circleNote').value, long: st.over })
+    .then(function(d){
+      var html = 'Записано: <b>' + esc(d.tag) + '</b>.';
+      if (d.wa) html += '<br>WA (' + d.waLen + ' зн.): <span class="mono">' + esc(d.wa) + '</span>';
+      if (d.bot) html += '<br>TG-бот: <span class="mono">' + esc(d.bot) + '</span>';
+      if (d.waiting && d.waiting.length) html += '<br>Ждёт администратора: ' + esc(d.waiting.join(', ')) + '. Готовую ссылку пришлём в Telegram.';
+      msg('ok', html); $('tag').value = ''; $('name').value = ''; $('gen').value = ''; $('circleNote').value = ''; fill(); render(); load();
+    })
+    .catch(function(e){ msg('bad', esc(e.message)); render(); });
+});
+$('copywa').onclick = function(){ if (st.over && !window.confirm('Ссылка длиннее ' + LIMIT + ' знаков и не может использоваться в сторис Instagram.\n\nУверены, что хотите её использовать?')) return; copy($('copywa'), st.wa, 'Копировать WA-ссылку'); };
+$('copybot').onclick = function(){ copy($('copybot'), st.bot, 'Копировать ссылку на бота'); };
+
+load().then(function(d){
+  CFG = d.config; LIMIT = CFG.limit; $('lim').textContent = LIMIT;
+  $('platform').innerHTML = CFG.platforms.map(function(p){ return '<option>' + esc(p) + '</option>'; }).join('');
+  $('phone').innerHTML = CFG.phones.map(function(p){ return '<option value="' + esc(p.value) + '">' + esc(p.label) + '</option>'; }).join('');
+  $('watpl').innerHTML = CFG.waTemplates.map(function(t, i){ return '<option value="' + i + '">' + esc(t) + '</option>'; }).join('') + '<option value="custom">Свой текст</option>';
+  $('tgtpl').innerHTML = CFG.tgTemplates.map(function(t, i){ return '<option value="' + i + '">' + esc(t) + '</option>'; }).join('') + '<option value="custom">Своя фраза</option>';
+  ['tag','name','text','phone','phrase','circleNote'].forEach(function(id){ $(id).addEventListener('input', render); $(id).addEventListener('change', render); });
+  ['gen','watpl','tgtpl'].forEach(function(id){ $(id).addEventListener('input', function(){ fill(); render(); }); $(id).addEventListener('change', function(){ fill(); render(); }); });
+  document.querySelectorAll('[name=type],[name=circle]').forEach(function(c){ c.addEventListener('change', function(){ render(); checkPhrase(); }); });
+  $('phrase').addEventListener('input', checkPhrase);
+  fill(); render();
+}).catch(function(e){ $('list').innerHTML = '<p class="note">Нет доступа: ' + esc(e.message) + '</p>'; $('save').disabled = true; });
+})();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>
