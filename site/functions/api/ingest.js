@@ -115,7 +115,7 @@ export async function onRequestPost({ request, env }) {
   if (expenses.length) {
     const es = env.DB.prepare(
       "INSERT INTO expenses (day, service, item, kind, amount, currency, amount_orig, qty, note, source, ref, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) " +
-      "ON CONFLICT(ref) DO UPDATE SET day = excluded.day, amount = excluded.amount, qty = excluded.qty, note = excluded.note, item = excluded.item");
+      "ON CONFLICT(ref) WHERE ref IS NOT NULL DO UPDATE SET day = excluded.day, amount = excluded.amount, qty = excluded.qty, note = excluded.note, item = excluded.item");
     const batch = [];
     for (const r of expenses.slice(0, 500)) {
       if (!r || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.day || "")) || !r.service || typeof r.amount !== "number" || !isFinite(r.amount)) continue;
