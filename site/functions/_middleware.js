@@ -152,9 +152,15 @@ function letIn(token) {
 export async function onRequest(context) {
   const { request, env, next } = context;
   if (!env.OKK_KV) return new Response("Хранилище пароля не подключено", { status: 500 });
-  await loadSecrets(env, context);   // секреты из Doppler (если задан DOPPLER_TOKEN) — для всех маршрутов, включая /api/*
-
   const url = new URL(request.url);
+  await loadSecrets(env, context);   // секреты из Doppler (если задан DOPPLER_TOKEN) — для всех маршрутов, включая /api/*
+  // старый адрес okk-dashboard.pages.dev: всех, кроме координатора, переводим на новый сайт (решение Никиты 05.10.2026)
+  const OLD_HOST = "okk-dashboard.pages.dev", NEW_SITE = env.SITE_URL || "https://shtab-20v.pages.dev";
+  if (url.hostname === OLD_HOST) {
+    const who = await currentUser(request, env).catch(() => null);
+    if (!who || who.login !== "nikita") return Response.redirect(NEW_SITE + url.pathname + url.search, 302);
+  }
+
   // API витрины Штаба проверяет доступ сам: токен сборщика или персональная сессия
   if (url.pathname.startsWith("/api/")) return next();
 
