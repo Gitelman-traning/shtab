@@ -37,7 +37,7 @@ export async function onRequestPost({ request, env }) {
     if (!service || !isFinite(v) || v < 0) return bad("нужны service и monthly_rub");
     await env.DB.prepare("INSERT INTO budget_plan (service, monthly_rub, kind, note, updated_by, updated_at) VALUES (?,?,?,?,?,?) " +
       "ON CONFLICT(service) DO UPDATE SET monthly_rub = excluded.monthly_rub, kind = excluded.kind, note = excluded.note, updated_by = excluded.updated_by, updated_at = excluded.updated_at")
-      .bind(service, v, p.kind === "fixed" ? "fixed" : "limit", String(p.note || "").slice(0, 300), me.login, now()).run();
+      .bind(service, v, ["fixed", "limit", "start"].includes(p.kind) ? p.kind : "limit", String(p.note || "").slice(0, 300), me.login, now()).run();
     await audit(env, me.login, "budget.plan", service, String(v));
     return json({ ok: true });
   }

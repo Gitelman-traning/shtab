@@ -12,7 +12,7 @@
 .tabs button[aria-pressed=true]{background:var(--gold-soft);color:var(--gold);border-color:transparent;font-weight:600}
 table td.num,table th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .k{display:inline-block;font-size:11px;padding:1px 7px;border-radius:7px;background:var(--soft);color:var(--dim)}
-.k.topup{background:var(--ok-bg);color:var(--ok)}.k.fixed{background:var(--gold-soft);color:var(--gold)}
+.k.topup{background:var(--ok-bg);color:var(--ok)}.k.fixed{background:var(--gold-soft);color:var(--gold)}.k.start{background:var(--ok-bg);color:var(--ok)}
 .bar{height:8px;border-radius:4px;background:var(--soft);position:relative;overflow:hidden;margin-top:4px}
 .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--gold-b)}.bar i.over{background:var(--bad-bar)}
 .days{display:flex;align-items:flex-end;gap:3px;height:90px;margin-top:8px}
@@ -67,7 +67,7 @@ table td.num,table th.num{text-align:right;font-variant-numeric:tabular-nums;whi
     <div class="wide"><table class="plan" id="plan"><thead><tr><th>Сервис</th><th>Тип</th><th class="num">₽ в месяц</th><th>Примечание</th><th></th></tr></thead><tbody></tbody></table></div>
     <form class="add" id="addplan" autocomplete="off" style="margin-top:10px;grid-template-columns:150px 130px 110px 1fr auto">
       <input name="service" placeholder="Сервис" required>
-      <select name="kind"><option value="limit">лимит</option><option value="fixed">подписка</option></select>
+      <select name="kind"><option value="limit">лимит</option><option value="fixed">подписка</option><option value="start">стартовый бюджет</option></select>
       <input name="monthly_rub" type="number" step="1" placeholder="₽ / мес" required>
       <input name="note" placeholder="Примечание">
       <button type="submit">Сохранить</button>
@@ -100,13 +100,16 @@ function render(){
     if (r.kind === "topup") { topup += r.amount; s.topup += r.amount; days[r.day] = days[r.day] || { s: 0, t: 0 }; days[r.day].t += r.amount; }
     else { spent += r.amount; s.spend += r.amount; if (r.kind === "fixed") fixed += r.amount; days[r.day] = days[r.day] || { s: 0, t: 0 }; days[r.day].s += r.amount; }
   });
+  var start = plan.filter(function(p){ return p.kind === "start"; }).reduce(function(a, p){ return a + p.monthly_rub; }, 0);
+  plan = plan.filter(function(p){ return p.kind !== "start"; });
   var planTotal = plan.reduce(function(a, p){ return a + (p.monthly_rub || 0); }, 0);
   var limitTotal = plan.filter(function(p){ return p.kind === "limit"; }).reduce(function(a, p){ return a + p.monthly_rub; }, 0);
   document.getElementById("kpis").innerHTML =
     '<div class="kpi"><span class="nm">Потрачено за месяц</span><span class="v">' + rub(spent) + '</span><span class="row"><span>план на месяц</span><b>' + rub(planTotal) + '</b></span><span class="row"><span>остаток плана</span><b>' + rub(planTotal - spent) + '</b></span></div>'
     + '<div class="kpi"><span class="nm">Подписки</span><span class="v">' + rub(fixed) + '</span><span class="row"><span>по плану</span><b>' + rub(plan.filter(function(p){ return p.kind === "fixed"; }).reduce(function(a, p){ return a + p.monthly_rub; }, 0)) + '</b></span></div>'
     + '<div class="kpi"><span class="nm">Модели и сервисы</span><span class="v">' + rub(spent - fixed) + '</span><span class="row"><span>лимит</span><b>' + rub(limitTotal) + '</b></span><span class="row"><span>записей</span><b>' + rows.filter(function(r){ return r.kind === "spend"; }).length + '</b></span></div>'
-    + '<div class="kpi"><span class="nm">Пополнения за месяц</span><span class="v">' + rub(topup) + '</span>' + balances() + '</div>';
+    + '<div class="kpi"><span class="nm">Пополнения за месяц</span><span class="v">' + rub(topup) + '</span>' + balances() + '</div>'
+    + projectBalance(start);
   var services = Object.keys(by).sort(function(a, b){ return by[b].spend - by[a].spend; });
   plan.forEach(function(p){ if (!by[p.service]) services.push(p.service); });
   document.getElementById("bysub").textContent = MON[+CUR.slice(5, 7) - 1] + " " + CUR.slice(0, 4);
@@ -121,10 +124,24 @@ function render(){
   document.querySelector("#rows tbody").innerHTML = rows.map(function(r){ return '<tr><td>' + r.day.split("-").reverse().join(".") + '</td><td>' + esc(r.service) + '</td><td>' + esc(r.item) + (r.note ? ' <span class="k">' + esc(r.note) + '</span>' : '') + '</td><td><span class="k ' + r.kind + '">' + ({ spend: "трата", topup: "пополнение", fixed: "подписка" }[r.kind] || r.kind) + '</span></td><td class="num">' + rub(r.amount) + (r.currency !== "RUB" && r.amount_orig != null ? ' <small>(' + r.amount_orig + ' ' + esc(r.currency) + ')</small>' : '') + '</td><td><small>' + esc((r.source || "").replace("collector:", "")) + '</small></td><td><button type="button" class="del" data-id="' + r.id + '" title="удалить">✕</button></td></tr>'; }).join("") || '<tr><td colspan="7" class="empty">за месяц записей нет</td></tr>';
   document.querySelectorAll("#rows .del").forEach(function(b){ b.onclick = function(){ if (!confirm("Удалить запись?")) return; api("DELETE", "?id=" + b.dataset.id).then(function(){ load(CUR); }); }; });
   document.getElementById("services").innerHTML = Object.keys(planBy).concat(services).filter(function(s, i, a){ return a.indexOf(s) === i; }).map(function(s){ return '<option value="' + esc(s) + '">'; }).join("");
-  document.querySelector("#plan tbody").innerHTML = plan.map(function(p){ return '<tr><td>' + esc(p.service) + '</td><td><span class="k ' + p.kind + '">' + (p.kind === "fixed" ? "подписка" : "лимит") + '</span></td><td class="num"><input type="number" value="' + Math.round(p.monthly_rub) + '" data-s="' + esc(p.service) + '" data-k="' + p.kind + '" data-n="' + esc(p.note) + '"></td><td><small>' + esc(p.note) + '</small></td><td><button type="button" data-save="' + esc(p.service) + '">сохранить</button></td></tr>'; }).join("");
+  document.querySelector("#plan tbody").innerHTML = DATA.plan.map(function(p){ return '<tr><td>' + esc(p.service) + '</td><td><span class="k ' + p.kind + '">' + ({ fixed: "подписка", limit: "лимит", start: "стартовый бюджет" }[p.kind] || p.kind) + '</span></td><td class="num"><input type="number" value="' + Math.round(p.monthly_rub) + '" data-s="' + esc(p.service) + '" data-k="' + p.kind + '" data-n="' + esc(p.note) + '"></td><td><small>' + esc(p.note) + '</small></td><td><button type="button" data-save="' + esc(p.service) + '">сохранить</button></td></tr>'; }).join("");
   document.querySelectorAll("#plan [data-save]").forEach(function(b){ b.onclick = function(){ var inp = document.querySelector('#plan input[data-s="' + b.dataset.save.replace(/"/g, '\\"') + '"]'); api("POST", "", { plan: { service: b.dataset.save, monthly_rub: Number(inp.value), kind: inp.dataset.k, note: inp.dataset.n } }).then(function(r){ msg("planmsg", r.ok ? "сохранено" : r.error, !r.ok); load(CUR); }); }; });
   var last = ""; rows.forEach(function(r){ if (r.day > last) last = r.day; });
   document.getElementById("stamp").textContent = last ? "последняя запись " + last.split("-").reverse().join(".") : "";
+}
+function projectBalance(start){
+  if (!start) return "";
+  // со счёта компании уходят: подписки, пополнения балансов сервисов и траты сервисов, у которых пополнений не было (платятся напрямую)
+  var topped = {}, fixed = 0, topup = 0, direct = 0;
+  (DATA.months || []).forEach(function(r){ if (r.kind === "topup") topped[r.service] = 1; });
+  (DATA.months || []).forEach(function(r){ if (r.kind === "fixed") fixed += r.amount; else if (r.kind === "topup") topup += r.amount; else if (!topped[r.service]) direct += r.amount; });
+  var out = fixed + topup + direct, left = start - out;
+  return '<div class="kpi"><span class="nm">Баланс проекта</span><span class="v"' + (left < 0 ? ' style="color:var(--bad)"' : '') + '>' + rub(left) + '</span>'
+    + '<span class="row"><span>стартовый бюджет</span><b>' + rub(start) + '</b></span>'
+    + '<span class="row"><span>ушло: подписки</span><b>' + rub(fixed) + '</b></span>'
+    + '<span class="row"><span>ушло: пополнения сервисов</span><b>' + rub(topup) + '</b></span>'
+    + (direct ? '<span class="row"><span>ушло: прямые оплаты</span><b>' + rub(direct) + '</b></span>' : '')
+    + '<div class="bar"><i class="' + (left < 0 ? "over" : "") + '" style="width:' + Math.min(100, 100 * out / start) + '%"></i></div></div>';
 }
 function balances(){
   // остаток по нашим записям за всё время (12 месяцев): пополнения минус траты, по сервисам, где были пополнения
