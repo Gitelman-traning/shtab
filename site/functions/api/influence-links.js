@@ -258,8 +258,13 @@ export async function onRequestPost({ request, env }) {
 
     const rows = await readRows(sa);
     const views = rows.map(view);
-    const dupTag = views.find((r) => r.tag.toLowerCase() === tag.toLowerCase());
-    if (dupTag) return bad(`Тег ${tag} уже выдан ${dupTag.date} (${dupTag.by}) — возьмите другой день или имя`);
+    // Один тег — разные типы ссылок можно (вкладки на странице), тот же тип повторно — нет.
+    const TYPE_NAME = { wa: "WhatsApp", bot: "TG-бот", tgin: "TG-входящее" };
+    const dupTag = views.find((r) => r.tag.toLowerCase() === tag.toLowerCase() && types.some((t) => String(r.types).split(",").includes(t)));
+    if (dupTag) {
+      const t = types.find((x) => String(dupTag.types).split(",").includes(x));
+      return bad(`${TYPE_NAME[t]} для тега ${tag} уже выдан ${dupTag.date} (${dupTag.by}) — возьмите другой день или имя`);
+    }
     if (phrase) { const c = await phraseConflict(sa, phrase, rows); if (c) return bad("Фраза не подходит: " + c); }
     if (bot) { const d = views.find((r) => r.bot === bot); if (d) return bad(`Ссылка на бота ${bot} уже выдана (${d.tag})`); }
 
