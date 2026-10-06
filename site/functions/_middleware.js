@@ -12,7 +12,7 @@
  */
 
 import { loadSecrets } from "./_secrets.js";
-import { currentUser, createSession, dropSession, verifyPassword, hashPassword, randomId, audit, tgVerify, tgSend, now, level, sectionOf } from "./api/_lib.js";
+import { currentUser, createSession, dropSession, verifyPassword, hashPassword, randomId, audit, tgVerify, tgSend, tgRequestAccess, now, level, sectionOf } from "./api/_lib.js";
 
 const RE_LOGIN = /^[a-z0-9._-]{3,32}$/;
 
@@ -122,6 +122,7 @@ ${STYLE}</head><body>
   <button type="submit">${button}</button>
   ${tgBot && !setup ? `<div class="or"><span>или</span></div>
   <div class="tg"><script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="${tgBot}" data-size="large" data-userpic="false" data-radius="6" data-auth-url="/__tg" data-request-access="write"></script></div>
+  <p class="hint">Кнопка не сработала (Safari, Яндекс Браузер)? Напишите боту <a href="https://t.me/${tgBot}?start=1" target="_blank" rel="noopener">@${tgBot}</a> «/start» — заявка уйдёт так же.</p>
   <p class="hint">Через Telegram: первый вход создаёт заявку, администратор подтверждает доступ.</p>` : ""}
   ${setup ? "" : `<p class="hint" style="text-align:center">Нет доступа? Нажмите «Войти через Telegram» — администратор подтвердит заявку.</p>`}
 </form></body></html>`;
@@ -213,26 +214,14 @@ export async function onRequest(context) {
     if (!env.TG_BOT_TOKEN || !env.DB) return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Вход через Telegram не настроен." }), 503);
     const tg = await tgVerify(url.searchParams, env.TG_BOT_TOKEN);
     if (!tg) return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Подпись Telegram не сошлась или устарела. Попробуйте ещё раз." }), 403);
-    const tgId = Number(tg.id);
-    const fullName = [tg.first_name, tg.last_name].filter(Boolean).join(" ").slice(0, 80);
-    let row = await env.DB.prepare("SELECT login, role, active FROM users WHERE tg_id = ?").bind(tgId).first();
-    if (!row) {
-      // заявка: пользователь создаётся без доступа, администратор подтверждает и назначает роль
-      let login = String(tg.username || "").toLowerCase().replace(/[^a-z0-9._-]/g, "");
-      if (login.length < 3) login = "tg" + tgId;
-      const taken = await env.DB.prepare("SELECT login FROM users WHERE login = ?").bind(login).first();
-      if (taken) login = login + "-" + String(tgId).slice(-4);
-      await env.DB.prepare(
-        "INSERT INTO users (login, pass_hash, salt, name, role, sections, active, must_change, created_at, tg_id, tg_username, photo) VALUES (?,?,?,?,?,?,0,0,?,?,?,?)")
-        .bind(login, "", "", fullName, "pending", "", now(), tgId, tg.username || "", tg.photo_url || "").run();
-      await audit(env, login, "tg.request", login, fullName + (tg.username ? " @" + tg.username : ""));
-      await tgSend(env, env.TG_ADMIN_CHAT, "Штаб: заявка на доступ — " + fullName + (tg.username ? " (@" + tg.username + ")" : "") + ". Подтвердить: " + url.origin + "/users");
-      await tgSend(env, tgId, "Заявка на доступ в Штаб отправлена. Когда администратор подтвердит, придёт сообщение.");
+    const req = await tgRequestAccess(env, tg, url.origin);
+    if (req.status === "created") {
       return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка отправлена. Администратор подтвердит доступ, и вы сможете войти этой же кнопкой." }), 202);
     }
-    if (!row.active || row.role === "pending") {
+    if (req.status === "pending") {
       return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка ещё не подтверждена. Мы напишем в Telegram, когда доступ откроют." }), 403);
     }
+    const row = { login: req.login };
     await env.DB.prepare("UPDATE users SET tg_username = ?, photo = ? WHERE login = ?").bind(tg.username || "", tg.photo_url || "", row.login).run();
     const s = await createSession(env, row.login);
     await audit(env, row.login, "login.tg");

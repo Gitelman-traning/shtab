@@ -275,6 +275,27 @@ export async function tgVerify(params, botToken) {
   return timingSafeEqual(mac, hash) ? data : null;
 }
 
+// Заявка на доступ по аккаунту Telegram: общая для виджета на странице входа (/__tg) и для «/start» боту в личку
+// (запасной путь, когда браузер режет виджет — сторонние cookie, Safari/Яндекс). tg = {id, username, first_name, last_name, photo_url}.
+// Возвращает: "created" (заявка создана и ушла админу), "pending" (уже ждёт), "active" (доступ уже есть, {login}).
+export async function tgRequestAccess(env, tg, origin) {
+  const tgId = Number(tg.id);
+  const fullName = [tg.first_name, tg.last_name].filter(Boolean).join(" ").slice(0, 80);
+  const row = await env.DB.prepare("SELECT login, role, active FROM users WHERE tg_id = ?").bind(tgId).first();
+  if (row) return { status: row.active && row.role !== "pending" ? "active" : "pending", login: row.login };
+  let login = String(tg.username || "").toLowerCase().replace(/[^a-z0-9._-]/g, "");
+  if (login.length < 3) login = "tg" + tgId;
+  const taken = await env.DB.prepare("SELECT login FROM users WHERE login = ?").bind(login).first();
+  if (taken) login = login + "-" + String(tgId).slice(-4);
+  await env.DB.prepare(
+    "INSERT INTO users (login, pass_hash, salt, name, role, sections, active, must_change, created_at, tg_id, tg_username, photo) VALUES (?,?,?,?,?,?,0,0,?,?,?,?)")
+    .bind(login, "", "", fullName, "pending", "", now(), tgId, tg.username || "", tg.photo_url || "").run();
+  await audit(env, login, "tg.request", login, fullName + (tg.username ? " @" + tg.username : ""));
+  await tgSend(env, env.TG_ADMIN_CHAT, "Штаб: заявка на доступ — " + fullName + (tg.username ? " (@" + tg.username + ")" : "") + ". Подтвердить: " + origin + "/users");
+  await tgSend(env, tgId, "Заявка на доступ в Штаб отправлена. Когда администратор подтвердит, придёт сообщение.");
+  return { status: "created", login };
+}
+
 export async function tgSend(env, chatId, text) {
   if (!env.TG_BOT_TOKEN || !chatId) return false;
   try {

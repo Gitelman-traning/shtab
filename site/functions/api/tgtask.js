@@ -12,7 +12,7 @@
 //
 // Настройка вебхука один раз: POST /api/tgtask?setup=1 с Bearer INGEST_TOKEN — ставит setWebhook на этот адрес
 // с секретом (KV dash:tg-secret). GET ?setup=1 с тем же токеном — показать, куда сейчас смотрит вебхук.
-import { json, bad, hasIngestToken, randomId, tgSend } from "./_lib.js";
+import { json, bad, hasIngestToken, randomId, tgSend, tgRequestAccess } from "./_lib.js";
 
 const K = { tasks: "dash:tasks", inbox: "dash:inbox", secret: "dash:tg-secret", list: "dash:tg-list" };
 const PROJECTS = {
@@ -176,7 +176,16 @@ export async function onRequestPost({ request, env }) {
   const msg = update && update.message;
   if (!msg || !msg.from || msg.chat?.type !== "private") return json({ ok: true });
   const admin = await isAdminTg(env, msg.from.id);
-  if (!admin) return json({ ok: true });   // чужие сообщения не обслуживаем и не отвечаем
+  if (!admin) {
+    // не администратор: единственное, что умеет бот в личке, — принять заявку на доступ в Штаб (запасной путь к виджету на сайте)
+    if (!env.DB) return json({ ok: true });
+    try {
+      const req = await tgRequestAccess(env, msg.from, url.origin);
+      if (req.status === "pending") await tgSend(env, msg.chat.id, "Заявка уже отправлена, ждёт подтверждения администратора. Напишем, когда доступ откроют.");
+      if (req.status === "active") await tgSend(env, msg.chat.id, "Доступ уже есть: откройте " + url.origin + " и нажмите «Войти через Telegram».");
+    } catch (e) { /* молча: чужим не отвечаем ошибками */ }
+    return json({ ok: true });
+  }
   try { await handle(env, msg); } catch (e) { await tgSend(env, msg.chat.id, "Не получилось записать: " + (e.message || e)); }
   return json({ ok: true });
 }
