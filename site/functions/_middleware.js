@@ -96,6 +96,8 @@ const STYLE = `<link rel="preconnect" href="https://fonts.googleapis.com">
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
   .tg{display:flex;justify-content:center;min-height:40px}
+  .tgbtn{display:block;text-align:center;text-decoration:none;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:11px;background:#2aabee;color:#fff}
+  .tgbtn:hover{background:#1c9ad8}
 </style>`;
 
 function page({ setup, message, tgBot }) {
@@ -121,11 +123,32 @@ ${STYLE}</head><body>
          autocomplete="${autocomplete}" aria-label="Пароль"${setup ? ` minlength="${MIN_LEN}"` : ""}>
   <button type="submit">${button}</button>
   ${tgBot && !setup ? `<div class="or"><span>или</span></div>
-  <div class="tg"><script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="${tgBot}" data-size="large" data-userpic="false" data-radius="6" data-auth-url="/__tg" data-request-access="write"></script></div>
-  <p class="hint">Кнопка не сработала (Safari, Яндекс Браузер)? Напишите боту <a href="https://t.me/${tgBot}?start=1" target="_blank" rel="noopener">@${tgBot}</a> «/start» — заявка уйдёт так же.</p>
-  <p class="hint">Через Telegram: первый вход создаёт заявку, администратор подтверждает доступ.</p>` : ""}
+  <a class="tgbtn" id="tgbtn" href="https://t.me/${tgBot}" target="_blank" rel="noopener">Войти через Telegram</a>
+  <p class="hint" id="tgst">Кнопка откроет бота @${tgBot}: нажмите в нём «Start», и эта вкладка впустит вас сама.
+  Первый раз — заявка, администратор подтверждает доступ.</p>
+  <script>
+  (function(){
+    var bot=${JSON.stringify(tgBot)}, btn=document.getElementById("tgbtn"), st=document.getElementById("tgst"), code="", timer=0;
+    function fresh(){ return fetch("/__tglink",{method:"POST"}).then(function(r){return r.json()}).then(function(d){ code=d.code||""; if(code) btn.href="https://t.me/"+bot+"?start="+code; }).catch(function(){}); }
+    function poll(){
+      if(!code) return;
+      fetch("/__tglink?code="+code).then(function(r){return r.json()}).then(function(d){
+        if(d.status==="ok"){ st.textContent="Готово, открываем Штаб…"; location.href="/shtab"; return; }
+        if(d.status==="pending"){ st.textContent="Заявка отправлена. Администратор подтвердит доступ, и бот напишет вам — после этого нажмите кнопку ещё раз."; clearInterval(timer); return; }
+        if(d.status==="expired"){ st.textContent="Код устарел, нажмите кнопку ещё раз."; clearInterval(timer); fresh(); return; }
+      }).catch(function(){});
+    }
+    fresh();
+    btn.addEventListener("click",function(){ st.textContent="Ждём ответа от Telegram: в боте нажмите «Start»…"; clearInterval(timer); timer=setInterval(poll,2000); });
+    document.addEventListener("visibilitychange",function(){ if(!document.hidden && timer) poll(); });
+  })();
+  </script>` : ""}
   ${setup ? "" : `<p class="hint" style="text-align:center">Нет доступа? Нажмите «Войти через Telegram» — администратор подтвердит заявку.</p>`}
 </form></body></html>`;
+}
+
+function jsonResp(data, status = 200, extra = {}) {
+  return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...extra } });
 }
 
 function html(body, status = 200) {
@@ -207,6 +230,28 @@ export async function onRequest(context) {
   if (url.pathname === "/__logout") {
     const gone = await dropSession(env, request);
     return new Response(null, { status: 303, headers: [["Location", "/"], ["Set-Cookie", `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`], ["Set-Cookie", gone], ["Cache-Control", "no-store"]] });
+  }
+
+  // вход через бота: POST выдаёт одноразовый код (KV tglogin:<code>, 10 мин), кнопка открывает t.me/<бот>?start=<код>,
+  // бот (вебхук /api/tgtask) привязывает аккаунт к коду, а страница опрашивает GET ?code= и получает сессию — браузер и cookie
+  // Telegram здесь не участвуют, поэтому работает в Safari и Яндекс Браузере
+  if (url.pathname === "/__tglink") {
+    if (!env.TG_BOT_TOKEN || !env.DB || !env.OKK_KV) return jsonResp({ status: "off" }, 503);
+    if (request.method === "POST") {
+      const code = randomId(16);
+      await env.OKK_KV.put("tglogin:" + code, JSON.stringify({ status: "wait" }), { expirationTtl: 600 });
+      return jsonResp({ code });
+    }
+    const code = String(url.searchParams.get("code") || "");
+    if (!/^[a-f0-9]{32}$/.test(code)) return jsonResp({ status: "expired" });
+    let st = null;
+    try { st = JSON.parse((await env.OKK_KV.get("tglogin:" + code)) || ""); } catch (e) { st = null; }
+    if (!st) return jsonResp({ status: "expired" });
+    if (st.status !== "ok" || !st.login) return jsonResp({ status: st.status || "wait" });
+    await env.OKK_KV.delete("tglogin:" + code);
+    const s = await createSession(env, st.login);
+    await audit(env, st.login, "login.tg");
+    return jsonResp({ status: "ok" }, 200, { "Set-Cookie": s.cookie });
   }
 
   // вход через Telegram: виджет возвращает сюда подписанные данные аккаунта

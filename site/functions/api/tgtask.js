@@ -175,6 +175,25 @@ export async function onRequestPost({ request, env }) {
   const update = await request.json().catch(() => null);
   const msg = update && update.message;
   if (!msg || !msg.from || msg.chat?.type !== "private") return json({ ok: true });
+  // вход с сайта: «/start <код>» — код выдан страницей входа (/__tglink), привязываем к нему аккаунт
+  const start = /^\/start\s+([a-f0-9]{32})\s*$/.exec(String(msg.text || ""));
+  if (start && env.DB) {
+    const key = "tglogin:" + start[1];
+    const st = await env.OKK_KV.get(key);
+    if (!st) { await tgSend(env, msg.chat.id, "Ссылка для входа устарела. Откройте " + url.origin + " и нажмите «Войти через Telegram» ещё раз."); return json({ ok: true }); }
+    try {
+      const req = await tgRequestAccess(env, msg.from, url.origin);
+      if (req.status === "active") {
+        await env.OKK_KV.put(key, JSON.stringify({ status: "ok", login: req.login }), { expirationTtl: 600 });
+        await env.DB.prepare("UPDATE users SET tg_username = ? WHERE login = ?").bind(msg.from.username || "", req.login).run();
+        await tgSend(env, msg.chat.id, "Готово: вернитесь во вкладку Штаба, она откроется сама.");
+      } else {
+        await env.OKK_KV.put(key, JSON.stringify({ status: "pending" }), { expirationTtl: 600 });
+        if (req.status === "pending") await tgSend(env, msg.chat.id, "Заявка уже отправлена, ждёт подтверждения администратора. Напишем, когда доступ откроют.");
+      }
+    } catch (e) { await tgSend(env, msg.chat.id, "Не получилось: " + (e.message || e)); }
+    return json({ ok: true });
+  }
   const admin = await isAdminTg(env, msg.from.id);
   if (!admin) {
     // не администратор: единственное, что умеет бот в личке, — принять заявку на доступ в Штаб (запасной путь к виджету на сайте)
