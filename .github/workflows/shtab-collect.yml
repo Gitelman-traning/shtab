@@ -56,6 +56,7 @@ jobs:
         if: always()
         env:
           AMO_TOKEN: ${{ secrets.AMO_TOKEN }}
+          AMO_TOKEN_REPORTS: ${{ secrets.AMO_TOKEN_REPORTS }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           SHTAB_URL: ${{ secrets.SHTAB_URL }}
           SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}

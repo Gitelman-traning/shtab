@@ -14,11 +14,17 @@ const LIST_COLS = "deal, contact, meet_at, manager, client, company, niche, turn
 const AMO = "https://pavelgitelman.amocrm.ru/api/v4";
 const L2_PIPES = [9701010, 8733518];
 
+// Токен интеграции Team_Training_Reports (чтение); AMO_TOKEN — запасной.
+function amoToken(env) {
+  return (env.AMO_TOKEN_REPORTS || env.AMO_TOKEN || "").trim();
+}
+
 async function amoGet(env, path, params) {
-  if (!env.AMO_TOKEN) return null;
+  const token = amoToken(env);
+  if (!token) return null;
   const u = new URL(AMO + path);
   for (const [k, v] of Object.entries(params || {})) u.searchParams.set(k, v);
-  const r = await fetch(u, { headers: { Authorization: "Bearer " + env.AMO_TOKEN } });
+  const r = await fetch(u, { headers: { Authorization: "Bearer " + token } });
   if (r.status === 204) return {};
   if (!r.ok) return null;
   return r.json();
@@ -103,7 +109,7 @@ export async function onRequestGet(context) {
     .bind(from, to).all()).results || [];
   // диагност не определён — копия на Второй линии могла появиться позже; дотягиваем прямо здесь, не дожидаясь сборщика
   const pending = rows.filter((r) => !r.manager && r.status === "ready").slice(0, 3);
-  if (pending.length && env.AMO_TOKEN) {
+  if (pending.length && amoToken(env)) {
     const work = (async () => {
       for (const r of pending) {
         try {
