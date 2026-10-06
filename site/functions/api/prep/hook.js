@@ -4,17 +4,26 @@
 // status_id может не прийти — тогда берём сделку как есть (триггер и так срабатывает только на этом этапе).
 // Ставим сделку в очередь и дёргаем прогон сборщика в GitHub Actions (repository_dispatch), если задан GH_DISPATCH_TOKEN.
 // Ключ в адресе (PREP_HOOK_KEY в Doppler) — единственная защита: amo вебхуки не подписывает. Отвечаем 200 всегда, чтобы amo не отключил хук.
-import { json, now } from "../_lib.js";
+import { json, now, audit } from "../_lib.js";
 
 const STAGE = 70704326;
 const PIPE = 8733326;
 const REPO = "Gitelman-traning/shtab";
 
+// каждый вызов — в журнал (audit, действие prep.hook): видно, доходит ли amo вообще и с чем
+async function log(env, note) {
+  try { await audit(env, "amo-hook", "prep.hook", "", String(note).slice(0, 300)); } catch (e) { /* журнал не обязателен */ }
+}
+
 export async function onRequestPost({ request, env, waitUntil }) {
   const u = new URL(request.url);
-  if (!env.PREP_HOOK_KEY || u.searchParams.get("key") !== env.PREP_HOOK_KEY) return json({ ok: false }, 401);
   let text = "";
-  try { text = await request.text(); } catch (e) { return json({ ok: true, skipped: "пустое тело" }); }
+  try { text = await request.text(); } catch (e) { text = ""; }
+  if (!env.PREP_HOOK_KEY || u.searchParams.get("key") !== env.PREP_HOOK_KEY) {
+    await log(env, "ключ не подошёл; тело " + text.length + " байт: " + text.slice(0, 120));
+    return json({ ok: false }, 401);
+  }
+  if (!text) { await log(env, "пустое тело"); return json({ ok: true, skipped: "пустое тело" }); }
   const p = new URLSearchParams(text);
   const found = {};
   for (const [k, v] of p.entries()) {
@@ -30,7 +39,11 @@ export async function onRequestPost({ request, env, waitUntil }) {
     if (f.pipeline_id && f.pipeline_id !== PIPE) continue;
     if (!deals.includes(f.id)) deals.push(f.id);
   }
-  if (!deals.length) return json({ ok: true, skipped: "не тот этап", seen: Object.keys(found).length });
+  if (!deals.length) {
+    await log(env, "не тот этап; ключей leads " + Object.keys(found).length + "; тело: " + text.slice(0, 200));
+    return json({ ok: true, skipped: "не тот этап", seen: Object.keys(found).length });
+  }
+  await log(env, "в очередь: " + deals.join(", "));
   const stamp = now();
   for (const d of deals) {
     await env.DB.prepare(
