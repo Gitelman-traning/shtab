@@ -492,7 +492,7 @@ def cmd_cases(out):
 
 def cmd_growth(limit, cases_path, out, max_age_days=90):
     """База «было → стало»: по каждому участнику без свежей проверки — поиск на дешёвой модели, результат в витрину (prep_cases.result)."""
-    cases = load_cases(cases_path)
+    cases = merge_cases(load_cases(cases_path))
     cutoff = (dt.datetime.now(MSK) - dt.timedelta(days=max_age_days)).strftime("%Y-%m-%d")
     # кого проверять: тренинг старше полугода (у свежих «сейчас» = «тогда»), есть название компании или сайт,
     # название не похоже на ФИО без сайта (искать нечего), нет свежей проверки
@@ -548,6 +548,82 @@ def cmd_growth(limit, cases_path, out, max_age_days=90):
             json.dump(rows, f, ensure_ascii=False, indent=1)
     log("готово: проверено %d участников, токенов %d/%d, поисков %d, ≈ %.0f ₽; осталось без проверки %d" % (
         done, usage.get("in", 0), usage.get("out", 0), usage.get("search", 0), usage.get("rub", 0), max(0, len(todo) - done)))
+
+
+SHEET_ID = os.environ.get("PREP_SHEET_ID", "1y5ORqWp_bGWeqoSWoIsUfpD7-B5iKHYHjmh_thcdk6g")   # «Участники тренинга НИШИ» (Женя)
+SHEET_BASE = 9_000_000_000     # id строк таблицы в prep_cases — вне диапазона сделок amo
+MONTHS = {"январ": 1, "феврал": 2, "март": 3, "апрел": 4, "ма": 5, "июн": 6, "июл": 7, "август": 8, "сентябр": 9, "октябр": 10, "ноябр": 11, "декабр": 12}
+
+
+def domain(url):
+    m = re.search(r"([a-zа-я0-9-]+\.(?:[a-zа-я0-9-]+\.)*[a-zа-я]{2,})", (url or "").lower().replace("www.", ""))
+    return m.group(1) if m else ""
+
+
+def cmd_sheet():
+    """Таблица Жени → prep_cases (source=sheet): имя, сайт, ниша, штат, оборот, месяц тренинга. Телефоны и ТГ не берём."""
+    import csv
+    import io as _io
+    import zlib
+    r = requests.get("https://docs.google.com/spreadsheets/d/%s/export?format=csv&gid=0" % SHEET_ID, timeout=120)
+    r.raise_for_status()
+    rows = list(csv.reader(_io.StringIO(r.content.decode("utf-8-sig"))))
+    out, skipped = [], 0
+    for row in rows[1:]:
+        row = [x.strip() for x in row] + [""] * 11
+        date_a, name, _, _, _, link, niche, when, staff, turn, comment = row[:11]
+        if not name and not link:
+            skipped += 1
+            continue
+        paid = ""
+        m = re.match(r"(\d{2})\.(\d{2})\.(\d{4})", date_a)
+        if m:
+            paid = "%s-%s-%s" % (m.group(3), m.group(2), m.group(1))
+        else:
+            y = re.search(r"20\d\d", when)
+            mo = next((v for k, v in MONTHS.items() if when.lower().startswith(k)), None)
+            if y:
+                paid = "%s-%02d-01" % (y.group(0), mo or 1)
+        key = re.sub(r"\W+", "", (name + "|" + domain(link)).lower())
+        out.append({"deal": SHEET_BASE + zlib.crc32(key.encode("utf-8")), "pipeline": None, "source": "sheet",
+                    "name": name[:80], "company": domain(link), "site": link[:200], "niche": niche[:100], "sphere": "",
+                    "turn": re.sub(r"[^\d.,]", "", turn)[:12], "staff": re.sub(r"[^\d.,]", "", staff)[:12],
+                    "role": "", "city": "", "country": "", "paid_at": paid})
+    log("таблица «Участники тренинга НИШИ»: строк %d, участников %d (пустых %d), с нишей %d, с сайтом %d" % (
+        len(rows) - 1, len(out), skipped, sum(1 for c in out if c["niche"]), sum(1 for c in out if c["company"])))
+    if URL and STOKEN:
+        for i in range(0, len(out), 150):
+            shtab("POST", "/api/ingest", {"collector": "prep", "prep_cases": out[i:i + 150]})
+        log("таблица залита в витрину")
+    return out
+
+
+def merge_cases(cases):
+    """amo и таблица об одной компании (по домену сайта): у amo-строки берём нишу/штат/оборот из таблицы, дубль из таблицы убираем.
+    Строки таблицы без сайта остаются как есть (дедуп по домену невозможен)."""
+    by_dom = {}
+    for c in cases:
+        d = domain(c.get("site") or c.get("company"))
+        if d:
+            by_dom.setdefault(d, []).append(c)
+    drop = set()
+    for d, group in by_dom.items():
+        amo_rows = [c for c in group if c.get("source", "amo") != "sheet"]
+        sheet_rows = [c for c in group if c.get("source") == "sheet"]
+        if amo_rows and sheet_rows:
+            s = sheet_rows[0]
+            for a in amo_rows:
+                for k in ("niche", "turn", "staff"):
+                    if not a.get(k) and s.get(k):
+                        a[k] = s[k]
+                if not a.get("result") and s.get("result"):
+                    a["result"], a["checked_at"] = s["result"], s.get("checked_at", "")
+            for s in sheet_rows:
+                drop.add(s["deal"])
+    merged = [c for c in cases if c["deal"] not in drop]
+    if drop:
+        log("база участников: %d, из них дублей таблицы с amo убрано %d" % (len(cases), len(drop)))
+    return merged
 
 
 def load_cases(path):
@@ -687,7 +763,7 @@ def cmd_run(deal, dry, out_path, cases_path, facts_path=None, picked_path=None):
         j = shtab("GET", "/api/prep", params={"mode": "collector"})
         known = set(int(x) for x in j.get("known") or [])
         queued = [int(x) for x in j.get("queued") or []]
-        cases = j.get("cases") or []
+        cases = merge_cases(j.get("cases") or [])
         done_today = int(j.get("done_today") or 0)
         styles = {s["manager"]: s["text"] for s in (j.get("styles") or []) if s.get("text")}
         resolve_managers([int(x) for x in j.get("no_manager") or []])
@@ -726,7 +802,7 @@ def cmd_run(deal, dry, out_path, cases_path, facts_path=None, picked_path=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["cases", "growth", "style", "run"])
+    ap.add_argument("cmd", choices=["cases", "sheet", "growth", "style", "run"])
     ap.add_argument("--deal", type=int)
     ap.add_argument("--user", type=int, help="style: id пользователя amo (диагност)")
     ap.add_argument("--limit", type=int, default=int(os.environ.get("PREP_GROWTH_LIMIT", "100")), help="growth: сколько участников проверить за прогон")
@@ -740,6 +816,8 @@ def main():
         sys.exit("нет AMO_TOKEN")
     if a.cmd == "cases":
         cmd_cases(a.out)
+    elif a.cmd == "sheet":
+        cmd_sheet()
     elif a.cmd == "growth":
         if not LLM_KEY:
             sys.exit("нет LLM_API_KEY")

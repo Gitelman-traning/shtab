@@ -57,7 +57,7 @@ jobs:
       - run: pip install requests
       - name: Participants base
         if: github.event.schedule == '10 2 * * *' || inputs.cases == '1'
-        run: python collector/prep.py cases
+        run: python collector/prep.py cases && python collector/prep.py sheet
         env:
           AMO_TOKEN: ${{ secrets.AMO_TOKEN }}
           SHTAB_URL: ${{ secrets.SHTAB_URL }}

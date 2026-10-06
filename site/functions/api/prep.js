@@ -74,7 +74,7 @@ export async function onRequestGet(context) {
     const nm = await env.DB.prepare("SELECT deal FROM prep WHERE manager = '' AND status = 'ready' AND updated_at > ?").bind(new Date(Date.now() - 14 * 864e5).toISOString()).all();
     const today = new Date().toISOString().slice(0, 10);
     const dt = await env.DB.prepare("SELECT COUNT(*) AS n FROM prep WHERE status = 'ready' AND created_at >= ?").bind(today).first();
-    const c = await env.DB.prepare("SELECT deal, pipeline, name, company, niche, sphere, turn, staff, site, role, city, country, paid_at, result, checked_at FROM prep_cases").all();
+    const c = await env.DB.prepare("SELECT deal, pipeline, name, company, niche, sphere, turn, staff, site, role, city, country, paid_at, result, checked_at, source FROM prep_cases").all();
     const st = await env.DB.prepare("SELECT manager, text FROM prep_style").all();
     return json({ ok: true, queued: (q.results || []).map((r) => r.deal), known: (k.results || []).map((r) => r.deal), no_manager: (nm.results || []).map((r) => r.deal),
       done_today: (dt && dt.n) || 0, cases: c.results || [], styles: st.results || [] });

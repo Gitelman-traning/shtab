@@ -122,12 +122,12 @@ export async function onRequestPost({ request, env }) {
   if (cases.length) {
     const s = (v, n = 120) => String(v == null ? "" : v).slice(0, n);
     const cs = env.DB.prepare(
-      "INSERT INTO prep_cases (deal, pipeline, name, company, niche, sphere, turn, staff, site, role, city, country, paid_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
-      "ON CONFLICT(deal) DO UPDATE SET pipeline = excluded.pipeline, name = excluded.name, company = excluded.company, niche = excluded.niche, sphere = excluded.sphere, turn = excluded.turn, staff = excluded.staff, site = excluded.site, role = excluded.role, city = excluded.city, country = excluded.country, paid_at = excluded.paid_at, updated_at = excluded.updated_at");
+      "INSERT INTO prep_cases (deal, pipeline, name, company, niche, sphere, turn, staff, site, role, city, country, paid_at, source, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
+      "ON CONFLICT(deal) DO UPDATE SET pipeline = excluded.pipeline, name = excluded.name, company = excluded.company, niche = excluded.niche, sphere = excluded.sphere, turn = excluded.turn, staff = excluded.staff, site = excluded.site, role = excluded.role, city = excluded.city, country = excluded.country, paid_at = excluded.paid_at, source = excluded.source, updated_at = excluded.updated_at");
     const batch = [];
     for (const r of cases.slice(0, 200)) {
       if (!r || !Number(r.deal)) continue;
-      batch.push(cs.bind(Number(r.deal), Number(r.pipeline) || null, s(r.name), s(r.company), s(r.niche), s(r.sphere), s(r.turn, 20), s(r.staff, 20), s(r.site), s(r.role, 60), s(r.city), s(r.country), s(r.paid_at, 10), stamp));
+      batch.push(cs.bind(Number(r.deal), Number(r.pipeline) || null, s(r.name), s(r.company), s(r.niche), s(r.sphere), s(r.turn, 20), s(r.staff, 20), s(r.site), s(r.role, 60), s(r.city), s(r.country), s(r.paid_at, 10), r.source === "sheet" ? "sheet" : "amo", stamp));
     }
     for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); }
   }
