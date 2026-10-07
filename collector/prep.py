@@ -32,7 +32,7 @@ AMO = "https://pavelgitelman.amocrm.ru/api/v4"
 AMO_UI = "https://pavelgitelman.amocrm.ru/leads/detail/%d"
 # Токен интеграции Team_Training_Reports (отчёты, только чтение);
 # AMO_TOKEN — общий запасной вариант, см. DOPPLER.md.
-AMO_TOKEN = (os.environ.get("AMO_TOKEN_REPORTS") or os.environ.get("AMO_TOKEN", "")).strip()
+AMO_TOKEN = (os.environ.get("AMO_TOKEN_REPORTS") or os.environ.get("AMO_TOKEN", "")).strip().lstrip("﻿")
 URL = (os.environ.get("SHTAB_URL", "").strip() or "https://shtab-20v.pages.dev").rstrip("/")
 STOKEN = os.environ.get("SHTAB_TOKEN", "").strip()
 LLM_KEY = os.environ.get("LLM_API_KEY", "").strip()

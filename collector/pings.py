@@ -23,7 +23,7 @@ MSK = dt.timezone(dt.timedelta(hours=3))
 AMO = "https://pavelgitelman.amocrm.ru/api/v4"
 # Токен интеграции Team_Training_Reports (отчёты, только чтение);
 # AMO_TOKEN — общий запасной вариант, см. DOPPLER.md.
-AMO_TOKEN = (os.environ.get("AMO_TOKEN_REPORTS") or os.environ.get("AMO_TOKEN", "")).strip()
+AMO_TOKEN = (os.environ.get("AMO_TOKEN_REPORTS") or os.environ.get("AMO_TOKEN", "")).strip().lstrip("﻿")
 URL = os.environ.get("SHTAB_URL", "").rstrip("/")
 STOKEN = os.environ.get("SHTAB_TOKEN", "").strip()
 
