@@ -16,3 +16,5 @@
 /marketing        /marketing/           301
 /marketing.html   /marketing/           301
 /index.html       /                     301
+/hr               /hr/structure/        302
+/hr/              /hr/structure/        302

@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Структура компании</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.bar-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bar-top input[type=search]{flex:1;min-width:200px;font:inherit;font-size:13.5px;padding:8px 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--page);color:var(--ink)}
+#edit-tools{display:contents}#edit-tools[hidden]{display:none}
+.bar-top .cnt{font-size:12.5px;color:var(--dim);white-space:nowrap}
+.bar-top label{font-size:12.5px;color:var(--dim);display:flex;gap:6px;align-items:center;white-space:nowrap}
+.btn{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:10px;border:0;cursor:pointer;background:var(--gold-soft);color:var(--gold);white-space:nowrap}
+.btn.ghost{background:none;border:1px solid var(--line-2);color:var(--dim);font-weight:500}
+.btn.danger{background:var(--bad-bg);color:var(--bad)}
+.btn:hover{filter:brightness(.97)}
+.org{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:16px;align-items:start}
+.org .top{grid-column:1/-1}
+.dept{background:var(--card);border-radius:16px;padding:16px 16px 12px}
+.dept>.hd,.subd>.hd{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+.dept>.hd h2{margin:0;font-size:15px;font-weight:600}
+.hd .n{font-size:12px;color:var(--faint)}
+.hd .ed{margin-left:auto;border:0;background:none;color:var(--faint);cursor:pointer;font:inherit;font-size:12px;padding:2px 6px;border-radius:6px}
+.hd .ed:hover{background:var(--soft);color:var(--ink)}
+.subd{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
+.subd>.hd h3{margin:0;font-size:13px;font-weight:600;color:var(--dim)}
+.ppl{display:flex;flex-direction:column;gap:2px}
+.org .top .ppl{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:4px}
+.p{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:10px;cursor:pointer;border:0;background:none;font:inherit;color:inherit;text-align:left;width:100%}
+.p:hover{background:var(--soft)}
+.p.head{background:var(--gold-soft)}
+.p.left{opacity:.55}
+.av{width:32px;height:32px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--ink);background:var(--soft)}
+.p.head .av{background:linear-gradient(135deg,var(--gold-a),var(--gold-b));color:#151616}
+.p .tx{min-width:0;display:flex;flex-direction:column}
+.p .nm{font-size:13.5px;font-weight:600;line-height:1.25}
+.p .ps{font-size:12px;color:var(--dim);line-height:1.3}
+.p .rl{font-size:10.5px;color:var(--gold);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.nohead{font-size:12px;color:var(--faint);padding:4px 8px 8px}
+dialog{border:0;border-radius:16px;padding:0;background:var(--card);color:var(--ink);width:min(460px,calc(100vw - 32px));box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog .in{padding:20px;display:flex;flex-direction:column;gap:12px}
+dialog h3{margin:0;font-size:16px;font-weight:600}
+dialog .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+dialog .row .sp{flex:1}
+dialog label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim)}
+dialog input,dialog select,dialog textarea{font:inherit;font-size:13.5px;padding:8px 10px;border:1px solid var(--line-2);border-radius:9px;background:var(--page);color:var(--ink);width:100%}
+dialog textarea{min-height:180px;font-size:12.5px;font-family:ui-monospace,Consolas,monospace}
+dialog dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
+dialog dt{color:var(--faint)} dialog dd{margin:0}
+dialog .lnk{color:var(--gold);cursor:pointer;background:none;border:0;font:inherit;padding:0;text-align:left}
+dialog .err{color:var(--bad);font-size:12.5px;margin:0}
+.ttl{display:flex;align-items:center;gap:12px}
+dialog .f{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--dim)}
+dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--gold);border-top:1px solid var(--line);padding-top:10px}
+dialog .kid{display:flex;gap:6px}dialog .kid .k-name{flex:1}dialog .kid .k-birth{width:150px}dialog .kid .btn{padding:6px 10px}
+dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+dialog .in{max-height:calc(100vh - 40px);overflow:auto}
+.ttl .av{width:44px;height:44px;font-size:15px}
+@media (max-width:760px){main{padding:16px}.org{grid-template-columns:1fr}.org .top .ppl{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">HR · <b>Структура компании</b></div><h1>Структура компании</h1><p class="sub">Отделы, руководители и кто кому подчиняется. Нажмите на человека, чтобы открыть карточку</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+</header>
+<main>
+  <div class="card bar-top">
+    <input type="search" id="q" placeholder="Найти человека или должность" aria-label="Поиск">
+    <span class="cnt" id="cnt"></span>
+    <span id="edit-tools" hidden>
+      <label><input type="checkbox" id="show-left"> уволенные</label>
+      <button class="btn" type="button" id="add-person">+ Сотрудник</button>
+      <button class="btn ghost" type="button" id="add-dept">+ Отдел</button>
+      <button class="btn ghost" type="button" id="import">Загрузить из таблицы</button>
+    </span>
+  </div>
+  <div class="org" id="org"><div class="card empty">Загружаю…</div></div>
+</main>
+</div>
+</div>
+<dialog id="dlg"><div class="in" id="dlg-in"></div></dialog>
+<script src="/ui.js"></script>
+<script>
+(function () {
+  var D = { depts: [], people: [], can_edit: false };
+  var orgEl = document.getElementById("org"), dlg = document.getElementById("dlg"), dIn = document.getElementById("dlg-in");
+  var qEl = document.getElementById("q"), leftEl = document.getElementById("show-left");
+
+  function api(body) {
+    return fetch("/api/hr/structure", { method: body ? "POST" : "GET", credentials: "same-origin",
+      headers: body ? { "content-type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json(); });
+  }
+  function initials(n) { var w = String(n || "").trim().split(/\s+/); return ((w[0] || "")[0] || "").concat((w[1] || "")[0] || "").toUpperCase(); }
+  function person(id) { return D.people.find(function (p) { return p.id === id; }); }
+  function dept(id) { return D.depts.find(function (d) { return d.id === id; }); }
+  function kids(id) { return D.depts.filter(function (d) { return (d.parent || "") === id; }); }
+  function visible(p) { return p.status !== "left" || leftEl.checked; }
+  function match(p, q) { return !q || (p.name + " " + p.position).toLowerCase().indexOf(q) >= 0; }
+  function deptPath(id) { var d = dept(id), out = []; while (d) { out.unshift(d.name); d = d.parent ? dept(d.parent) : null; } return out.join(" · "); }
+
+  function pRow(p, isHead) {
+    return '<button type="button" class="p' + (isHead ? " head" : "") + (p.status === "left" ? " left" : "") + '" data-p="' + p.id + '">'
+      + '<span class="av">' + esc(initials(p.name)) + '</span><span class="tx">'
+      + (isHead ? '<span class="rl">руководитель</span>' : "")
+      + '<span class="nm">' + esc(p.name) + (p.status === "left" ? ' <span class="tag">уволен</span>' : "") + '</span>'
+      + '<span class="ps">' + esc(p.position || "—") + '</span></span></button>';
+  }
+  // отдел: руководитель первым, дальше люди по должности; подотделы — вложенными блоками
+  function block(d, q, depth) {
+    var head = d.head ? person(d.head) : null;
+    if (head && !visible(head)) head = null;
+    var ppl = D.people.filter(function (p) { return p.dept === d.id && visible(p) && (!head || p.id !== head.id); })
+      .sort(function (a, b) { return (a.position || "").localeCompare(b.position || "", "ru") || a.name.localeCompare(b.name, "ru"); });
+    var shownHead = head && match(head, q) ? head : null;
+    var shown = ppl.filter(function (p) { return match(p, q); });
+    var subs = kids(d.id).map(function (k) { return block(k, q, depth + 1); }).filter(function (b) { return b.html; });
+    var total = ppl.length + (head && head.dept === d.id ? 1 : 0) + subs.reduce(function (s, b) { return s + b.total; }, 0);
+    if (q && !shownHead && !shown.length && !subs.length) return { html: "", total: total };
+    if (!D.can_edit && !shownHead && !shown.length && !subs.length) return { html: "", total: 0 };   // пустые отделы видит только тот, кто заполняет
+    var ed = D.can_edit ? '<button type="button" class="ed" data-d="' + esc(d.id) + '">изменить</button>' : "";
+    var h = '<div class="hd">' + (depth ? "<h3>" : "<h2>") + esc(d.name) + (depth ? "</h3>" : "</h2>") + '<span class="n">' + total + '</span>' + ed + '</div>';
+    h += '<div class="ppl">' + (shownHead ? pRow(shownHead, true) : "") + shown.map(function (p) { return pRow(p, false); }).join("") + '</div>';
+    if (!head && !q && D.can_edit) h += '<div class="nohead">руководитель не назначен</div>';
+    h += subs.map(function (b) { return '<div class="subd">' + b.html + '</div>'; }).join("");
+    return { html: h, total: total };
+  }
+
+  function render() {
+    var q = qEl.value.trim().toLowerCase();
+    var tops = kids("");
+    var html = tops.map(function (d, i) { var b = block(d, q, 0); return b.html ? '<section class="dept' + (i === 0 ? " top" : "") + '">' + b.html + '</section>' : ""; }).join("");
+    // люди без отдела — отдельной карточкой, чтобы не потерялись
+    var loose = D.people.filter(function (p) { return (!p.dept || !dept(p.dept)) && visible(p) && match(p, q); });
+    if (loose.length) html += '<section class="dept"><div class="hd"><h2>Без отдела</h2><span class="n">' + loose.length + '</span></div><div class="ppl">' + loose.map(function (p) { return pRow(p, false); }).join("") + '</div></section>';
+    var n = D.people.filter(function (p) { return p.status !== "left"; }).length;
+    document.getElementById("cnt").textContent = n + " " + plural(n, ["сотрудник", "сотрудника", "сотрудников"]) + " · " + tops.length + " " + plural(tops.length, ["отдел", "отдела", "отделов"]);
+    if (!html) html = '<div class="card empty">' + (q ? "Никого не нашлось." : D.can_edit ? "Сотрудников пока нет. Добавьте вручную или загрузите из таблицы." : "Структура пока не заполнена.") + '</div>';
+    orgEl.innerHTML = html;
+  }
+  function plural(n, f) { var m = n % 10, h = n % 100; return f[m === 1 && h !== 11 ? 0 : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? 1 : 2]; }
+
+  function load() {
+    return api().then(function (r) {
+      if (!r.ok) { orgEl.innerHTML = '<div class="card empty">' + esc(r.error || "Не удалось загрузить") + '</div>'; return; }
+      D = r; document.getElementById("edit-tools").hidden = !r.can_edit; render();
+    });
+  }
+
+  // ---------- окна ----------
+  function open(html) { dIn.innerHTML = html; if (!dlg.open) dlg.showModal(); }
+  function close() { dlg.close(); }
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) close(); });
+  function opts(list, cur, empty) { return '<option value="">' + empty + '</option>' + list.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(cur == null ? "" : cur) ? " selected" : "") + '>' + esc(o[1]) + '</option>'; }).join(""); }
+  function deptOpts(cur, skip) {
+    var out = []; (function walk(pid, pre) { kids(pid).forEach(function (d) { if (d.id === skip) return; out.push([d.id, pre + d.name]); walk(d.id, pre + "— "); }); })("", "");
+    return opts(out, cur, "без отдела");
+  }
+  function peopleOpts(cur, skip) {
+    return opts(D.people.filter(function (p) { return p.id !== skip && p.status !== "left"; }).sort(function (a, b) { return a.name.localeCompare(b.name, "ru"); })
+      .map(function (p) { return [p.id, p.name + (p.position ? " — " + p.position : "")]; }), cur, "не указан");
+  }
+  function save(body) {
+    var err = dIn.querySelector(".err"); if (err) err.textContent = "";
+    return api(body).then(function (r) { if (!r.ok) { if (err) err.textContent = r.error || "Не сохранилось"; return; } close(); load(); });
+  }
+
+  var MON = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+  function dmText(iso) { return iso ? +iso.slice(-2) + " " + MON[+iso.slice(-5, -3) - 1] : ""; }   // ГГГГ-ММ-ДД или --ММ-ДД
+  function fullDate(iso) { return iso ? dmText(iso) + (/^\d{4}/.test(iso) ? " " + iso.slice(0, 4) : "") : ""; }
+  // стаж: «2 года 3 мес.»
+  function tenure(iso) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || "")) return "";
+    var a = iso.split("-").map(Number), t = new Date(), m = (t.getFullYear() - a[0]) * 12 + (t.getMonth() + 1 - a[1]) - (t.getDate() < a[2] ? 1 : 0);
+    if (m < 0) return "выходит " + fullDate(iso);
+    var y = Math.floor(m / 12), r = m % 12;
+    return (y ? y + " " + plural(y, ["год", "года", "лет"]) + " " : "") + (r || !y ? r + " мес." : "");
+  }
+  function kidsOf(id) { return (D.children || []).filter(function (c) { return c.person === id; }); }
+  function showPerson(id) {
+    var p = person(id); if (!p) return;
+    var mgr = p.manager ? person(p.manager) : null;
+    var team = D.people.filter(function (x) { return x.manager === p.id && visible(x); });
+    var leads = D.depts.filter(function (d) { return d.head === p.id; });
+    var h = '<div class="ttl"><span class="av">' + esc(initials(p.name)) + '</span><div><h3>' + esc(p.name) + '</h3><div class="sub" style="font-size:12.5px;color:var(--dim)">' + esc(p.position || "должность не указана") + '</div></div></div><dl>'
+      + '<dt>Отдел</dt><dd>' + esc(p.dept ? deptPath(p.dept) : "—") + '</dd>'
+      + (leads.length ? '<dt>Руководит</dt><dd>' + leads.map(function (d) { return esc(d.name); }).join(", ") + '</dd>' : "")
+      + '<dt>Руководитель</dt><dd>' + (mgr ? '<button type="button" class="lnk" data-go="' + mgr.id + '">' + esc(mgr.name) + '</button>' : "—") + '</dd>'
+      + (team.length ? '<dt>Подчинённые</dt><dd>' + team.map(function (x) { return '<button type="button" class="lnk" data-go="' + x.id + '">' + esc(x.name) + '</button>'; }).join(", ") + '</dd>' : "")
+      + (p.birth ? '<dt>День рождения</dt><dd>' + esc(D.is_hr ? fullDate(p.birth) : dmText(p.birth)) + '</dd>' : "")
+      + (p.hired ? '<dt>В компании</dt><dd>с ' + esc(fullDate(p.hired)) + (tenure(p.hired) ? ", " + esc(tenure(p.hired)) : "") + '</dd>' : "")
+      + (D.is_hr && kidsOf(p.id).length ? '<dt>Дети</dt><dd>' + kidsOf(p.id).map(function (c) { return esc(c.name) + (c.birth ? ", " + esc(fullDate(c.birth)) : ""); }).join("<br>") + '</dd>' : "")
+      + (p.login ? '<dt>Вход в Штаб</dt><dd>' + esc(p.login) + '</dd>' : "")
+      + (p.status === "left" ? '<dt>Статус</dt><dd>уволен</dd>' : "")
+      + '</dl><div class="row"><span class="sp"></span>' + (D.can_edit ? '<button class="btn" type="button" data-edit="' + p.id + '">Изменить</button>' : "") + '<button class="btn ghost" type="button" data-close>Закрыть</button></div>';
+    open(h);
+  }
+
+  function editPerson(id) {
+    var p = id ? person(id) : { name: "", position: "", dept: "", manager: null, login: "", status: "active", hired: "", birth: "", leave_year: 28, leave_adj: 0 };
+    var kidRow = function (c) { return '<div class="kid"><input class="k-name" maxlength="60" placeholder="Имя" value="' + esc(c.name) + '"><input class="k-birth" type="date" value="' + esc(/^\d{4}/.test(c.birth || "") ? c.birth : "") + '"><button type="button" class="btn ghost" data-kdel>×</button></div>'; };
+    var personal = D.is_hr ? '<div class="sect">Личное · видит только HR</div>'
+      + '<label class="f">Дата рождения<input id="f-birth" type="date" value="' + esc(/^\d{4}/.test(p.birth || "") ? p.birth : "") + '"></label>'
+      + '<div class="f">Дети<div id="f-kids">' + (id ? kidsOf(id) : []).map(kidRow).join("") + '</div><button type="button" class="btn ghost" data-kadd style="align-self:flex-start">+ ребёнок</button></div>'
+      + '<div class="row2"><label class="f">Отпуск, дней в год<input id="f-lyear" type="number" min="0" step="1" value="' + esc(p.leave_year == null ? 28 : p.leave_year) + '"></label>'
+      + '<label class="f">Поправка остатка, ± дней<input id="f-ladj" type="number" step="0.5" value="' + esc(p.leave_adj || 0) + '"></label></div>' : "";
+    editPerson.kidRow = kidRow;
+    var h = '<h3>' + (id ? "Сотрудник" : "Новый сотрудник") + '</h3>'
+      + '<label class="f">Имя и фамилия<input id="f-name" maxlength="80" value="' + esc(p.name) + '"></label>'
+      + '<label class="f">Должность<input id="f-pos" maxlength="120" value="' + esc(p.position) + '"></label>'
+      + '<label class="f">Отдел<select id="f-dept">' + deptOpts(p.dept) + '</select></label>'
+      + '<label class="f">Непосредственный руководитель<select id="f-mgr">' + peopleOpts(p.manager, id) + '</select></label>'
+      + '<label class="f">Логин в Штабе (если есть)<input id="f-login" maxlength="32" value="' + esc(p.login) + '"></label>'
+      + '<label class="f">Дата выхода в компанию<input id="f-hired" type="date" value="' + esc(p.hired || "") + '"></label>'
+      + personal
+      + '<label class="f">Статус<select id="f-status">' + opts([["active", "работает"], ["left", "уволен"]], p.status, "").replace('<option value=""></option>', "") + '</select></label>'
+      + '<p class="err"></p><div class="row">' + (id ? '<button class="btn danger" type="button" data-pdel="' + id + '">Удалить</button>' : "")
+      + '<span class="sp"></span><button class="btn ghost" type="button" data-close>Отмена</button><button class="btn" type="button" data-psave="' + (id || "") + '">Сохранить</button></div>';
+    open(h); dIn.querySelector("#f-name").focus();
+  }
+
+  function editDept(id) {
+    var d = id ? dept(id) : { id: "", name: "", parent: "", head: null, sort: 100 };
+    var inDept = D.people.filter(function (p) { return p.status !== "left"; });
+    var h = '<h3>' + (id ? "Отдел" : "Новый отдел") + '</h3>'
+      + '<label class="f">Название<input id="f-dname" maxlength="80" value="' + esc(d.name) + '"></label>'
+      + '<label class="f">Входит в<select id="f-parent">' + deptOpts(d.parent, id).replace(">без отдела<", ">верхний уровень<") + '</select></label>'
+      + '<label class="f">Руководитель отдела<select id="f-head">' + opts(inDept.sort(function (a, b) { return a.name.localeCompare(b.name, "ru"); }).map(function (p) { return [p.id, p.name + (p.position ? " — " + p.position : "")]; }), d.head, "не назначен") + '</select></label>'
+      + '<label class="f">Порядок (меньше — выше)<input id="f-sort" type="number" value="' + esc(d.sort) + '"></label>'
+      + '<p class="err"></p><div class="row">' + (id ? '<button class="btn danger" type="button" data-ddel="' + esc(id) + '">Удалить</button>' : "")
+      + '<span class="sp"></span><button class="btn ghost" type="button" data-close>Отмена</button><button class="btn" type="button" data-dsave="' + esc(id || "") + '">Сохранить</button></div>';
+    open(h); dIn.querySelector("#f-dname").focus();
+  }
+
+  // вставка из Google-таблицы: колонки Имя · Должность · Отдел · Руководитель (через Tab), шапку можно оставить
+  function importDlg() {
+    open('<h3>Загрузить из таблицы</h3><p class="sub" style="margin:0;font-size:12.5px;color:var(--dim)">Выделите в таблице четыре колонки: имя, должность, отдел, руководитель. Скопируйте и вставьте сюда. Отдел сопоставится по названию, руководитель по имени.</p>'
+      + '<textarea id="f-tsv" placeholder="Анна Иванова&#9;Менеджер&#9;Первая линия&#9;Илона Тамахина"></textarea><p class="sub" id="f-prev" style="margin:0;font-size:12.5px;color:var(--dim)"></p>'
+      + '<p class="err"></p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Отмена</button><button class="btn" type="button" id="f-go">Загрузить</button></div>');
+    var ta = dIn.querySelector("#f-tsv");
+    function rows() {
+      // ровно 4 ячейки — берём как есть (пустая должность не сдвигает колонки); иначе пустые ячейки от объединённых колонок выкидываем
+      return ta.value.split(/\r?\n/).map(function (l) { return l.split("\t").map(function (c) { return c.trim(); }); })
+        .map(function (c) { var x = c.length === 4 ? c : c.filter(Boolean); return { name: x[0] || "", position: x[1] || "", dept: x[2] || "", manager: x[3] || "" }; })
+        .filter(function (r) { return r.name && !/^(имя|фио|сотрудник)$/i.test(r.name); });
+    }
+    ta.addEventListener("input", function () {
+      var r = rows(), known = {}; D.depts.forEach(function (d) { known[d.name.toLowerCase()] = 1; known[d.id] = 1; });
+      var unk = r.filter(function (x) { return x.dept && !known[x.dept.toLowerCase()]; }).map(function (x) { return x.dept; });
+      unk = unk.filter(function (v, i) { return unk.indexOf(v) === i; });
+      dIn.querySelector("#f-prev").textContent = r.length ? "Строк: " + r.length + (unk.length ? ". Нет таких отделов, люди попадут в «Без отдела»: " + unk.join(", ") : "") : "";
+    });
+    dIn.querySelector("#f-go").addEventListener("click", function () { var r = rows(); if (!r.length) return; save({ action: "import", rows: r }); });
+    ta.focus();
+  }
+
+  orgEl.addEventListener("click", function (e) {
+    var ed = e.target.closest("[data-d]"); if (ed) { editDept(ed.getAttribute("data-d")); return; }
+    var p = e.target.closest("[data-p]"); if (p) showPerson(+p.getAttribute("data-p"));
+  });
+  dIn.addEventListener("click", function (e) {
+    var t = e.target.closest("button"); if (!t) return;
+    if (t.hasAttribute("data-close")) return close();
+    if (t.hasAttribute("data-go")) return showPerson(+t.getAttribute("data-go"));
+    if (t.hasAttribute("data-edit")) return editPerson(+t.getAttribute("data-edit"));
+    if (t.hasAttribute("data-psave")) {
+      var v = function (id) { return dIn.querySelector(id).value; };
+      var body = { action: "person_save", id: t.getAttribute("data-psave") || null, name: v("#f-name"), position: v("#f-pos"), dept: v("#f-dept"), manager: v("#f-mgr"), login: v("#f-login"), status: v("#f-status"), hired: v("#f-hired") };
+      if (D.is_hr) {
+        body.birth = v("#f-birth"); body.leave_year = v("#f-lyear"); body.leave_adj = v("#f-ladj");
+        body.children = [].map.call(dIn.querySelectorAll(".kid"), function (k) { return { name: k.querySelector(".k-name").value, birth: k.querySelector(".k-birth").value }; }).filter(function (k) { return k.name.trim(); });
+      }
+      return save(body);
+    }
+    if (t.hasAttribute("data-kadd")) { dIn.querySelector("#f-kids").insertAdjacentHTML("beforeend", editPerson.kidRow({ name: "", birth: "" })); return; }
+    if (t.hasAttribute("data-kdel")) { t.closest(".kid").remove(); return;
+    }
+    if (t.hasAttribute("data-pdel")) { if (confirm("Удалить сотрудника из структуры? Если человек уволился, лучше поставить статус «уволен».")) save({ action: "person_del", id: +t.getAttribute("data-pdel") }); return; }
+    if (t.hasAttribute("data-dsave")) {
+      var w = function (id) { return dIn.querySelector(id).value; };
+      return save({ action: "dept_save", id: t.getAttribute("data-dsave") || "", name: w("#f-dname"), parent: w("#f-parent"), head: w("#f-head"), sort: w("#f-sort") });
+    }
+    if (t.hasAttribute("data-ddel")) { if (confirm("Удалить отдел?")) save({ action: "dept_del", id: t.getAttribute("data-ddel") }); return; }
+  });
+  document.getElementById("add-person").addEventListener("click", function () { editPerson(null); });
+  document.getElementById("add-dept").addEventListener("click", function () { editDept(null); });
+  document.getElementById("import").addEventListener("click", importDlg);
+  qEl.addEventListener("input", render);
+  leftEl.addEventListener("change", render);
+  load();
+})();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>

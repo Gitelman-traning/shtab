@@ -89,8 +89,10 @@ export async function currentUser(request, env) {
 
 // ---------- права по разделам ----------
 // дерево разделов: подраздел наследует уровень отдела, если своей строки нет
-export const SECTIONS = ["hub", "sales", "sales.l1", "sales.l2", "sales.l2.okk", "marketing", "marketing.instagram", "marketing.telegram", "marketing.influence", "marketing.youtube", "marketing.fb", "marketing.sitechat", "marketing.site", "guide", "status", "users", "tags", "budget", "dashboard"];
-const PARENT = { "sales.l1": "sales", "sales.l2": "sales", "sales.l2.okk": "sales.l2", "marketing.instagram": "marketing", "marketing.telegram": "marketing", "marketing.influence": "marketing", "marketing.youtube": "marketing", "marketing.fb": "marketing", "marketing.sitechat": "marketing", "marketing.site": "marketing" };
+export const SECTIONS = ["hub", "sales", "sales.l1", "sales.l2", "sales.l2.okk", "marketing", "marketing.instagram", "marketing.telegram", "marketing.influence", "marketing.youtube", "marketing.fb", "marketing.sitechat", "marketing.site", "hr", "hr.structure", "hr.events", "hr.leave", "hr.team", "guide", "status", "users", "tags", "budget", "dashboard"];
+const PARENT = { "sales.l1": "sales", "sales.l2": "sales", "sales.l2.okk": "sales.l2", "marketing.instagram": "marketing", "marketing.telegram": "marketing", "marketing.influence": "marketing", "marketing.youtube": "marketing", "marketing.fb": "marketing", "marketing.sitechat": "marketing", "marketing.site": "marketing", "hr.structure": "hr", "hr.events": "hr", "hr.leave": "hr", "hr.team": "hr" };
+// закрытые по умолчанию: видят только те, кому выдано явно, или у кого «правка» на отделе (сотрудники HR)
+const PRIVATE = { "hr.team": "hr" };
 
 export async function loadPerms(env, login, sectionsCsv) {
   const rows = await env.DB.prepare("SELECT section, level FROM perms WHERE login = ?").bind(login).all();
@@ -108,9 +110,13 @@ export function level(user, section) {
   if (!user) return 0;
   if (user.role === "admin" || user.login === "collector") return 2;
   if (user.role === "pending" || user.active === 0) return 0;
-  if (user.login === "shared") return (section === "users" || section === "tags" || section === "budget" || section === "dashboard") ? 0 : 1;   // общий пароль: смотрит всё
+  if (user.login === "shared") return (section === "users" || section === "tags" || section === "budget" || section === "dashboard" || PRIVATE[section]) ? 0 : 1;   // общий пароль: смотрит всё открытое
   if (section === "users" || section === "tags" || section === "budget" || section === "dashboard") return 0;   // dashboard — личный дашборд Никиты
   const p = user.perms || {};
+  if (PRIVATE[section]) {
+    if (p[section] != null) return p[section];
+    return (p[PRIVATE[section]] ?? 0) >= 2 ? 2 : 0;
+  }
   let s = section;
   while (s) { if (p[s] != null) return p[s]; s = PARENT[s] || null; }
   if (p["*"] != null) return p["*"];
@@ -134,6 +140,11 @@ export function sectionOf(pathname) {
   const mk = /^\/marketing\/([a-z]+)/.exec(p);
   if (mk) return "marketing." + mk[1];
   if (p.startsWith("/marketing")) return "marketing";
+  if (p.startsWith("/hr/structure")) return "hr.structure";
+  if (p.startsWith("/hr/team")) return "hr.team";
+  if (p.startsWith("/hr/events")) return "hr.events";
+  if (p.startsWith("/hr/leave")) return "hr.leave";
+  if (p === "/hr" || p.startsWith("/hr/")) return "hr";
   if (p === "/guide" || p.startsWith("/guide/")) return "guide";
   if (p === "/status") return "status";
   if (p === "/users") return "users";

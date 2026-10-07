@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Для HR</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.tile{background:var(--card);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.tile h2{margin:0;font-size:15px;font-weight:600;display:flex;gap:8px;align-items:baseline}
+.tile p{margin:0;font-size:13px;color:var(--dim)}
+.soon{font-size:10.5px;padding:2px 7px;border-radius:7px;background:var(--soft);color:var(--faint);font-weight:500}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">HR · <b>Для HR</b></div><h1>Для HR</h1><p class="sub">Закрытая часть: видят только сотрудники HR и администратор</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+</header>
+<main>
+  <div class="tiles">
+    <a class="tile" href="/hr/structure/" style="text-decoration:none;color:inherit"><h2>Правка структуры</h2><p>Добавить или перевести сотрудника, назначить руководителя, внести даты рождения, выхода и детей, отметить увольнение.</p></a>
+    <div class="tile"><h2>Найм <span class="soon">скоро</span></h2><p>Вакансии, кандидаты и этапы отбора.</p></div>
+    <div class="tile"><h2>Адаптация <span class="soon">скоро</span></h2><p>Чек-лист первых недель новичка и кто за что отвечает.</p></div>
+    <a class="tile" href="/hr/leave/" style="text-decoration:none;color:inherit"><h2>Отпуска и больничные</h2><p>Внести отпуск или больничный, посмотреть остатки по каждому сотруднику.</p></a>
+    <div class="tile"><h2>Кадровые заметки <span class="soon">скоро</span></h2><p>Заметки HR по сотрудникам, которые не видны остальным.</p></div>
+  </div>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script src="/nav.js"></script>
+</body>
+</html>

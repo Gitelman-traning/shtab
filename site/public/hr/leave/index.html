@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Отпуска</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+#hr{display:contents}#hr[hidden]{display:none}
+.bar-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bar-top input[type=search]{flex:1;min-width:180px;font:inherit;font-size:13.5px;padding:8px 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--page);color:var(--ink)}
+.btn{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:10px;border:0;cursor:pointer;background:var(--gold-soft);color:var(--gold);white-space:nowrap}
+.btn.ghost{background:none;border:1px solid var(--line-2);color:var(--dim);font-weight:500}
+.btn.mini{padding:3px 8px;font-size:11.5px}
+.aw{display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+.aw:first-child{border-top:0}
+.aw .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.aw .nm{font-weight:600;font-size:13.5px}.aw .ds{font-size:12.5px;color:var(--dim)}
+.aw .dt{font-size:12.5px;color:var(--ink);white-space:nowrap;text-align:right}
+.k{font-size:11px;padding:2px 8px;border-radius:7px;white-space:nowrap}
+.k.vacation{background:var(--ok-bg);color:var(--ok)}.k.away,.k.unpaid{background:var(--soft);color:var(--dim)}.k.sick{background:var(--bad-bg);color:var(--bad)}
+.k.now{background:var(--gold-soft);color:var(--gold);font-weight:600}
+td .left-neg{color:var(--bad);font-weight:600} td .left-ok{font-weight:600}
+td .muted{color:var(--faint)}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--zebra)}
+dialog{border:0;border-radius:16px;padding:0;background:var(--card);color:var(--ink);width:min(440px,calc(100vw - 32px));box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog .in{padding:20px;display:flex;flex-direction:column;gap:12px}
+dialog h3{margin:0;font-size:16px;font-weight:600}
+dialog label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim)}
+dialog input,dialog select{font:inherit;font-size:13.5px;padding:8px 10px;border:1px solid var(--line-2);border-radius:9px;background:var(--page);color:var(--ink);width:100%}
+dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+dialog .row{display:flex;gap:8px;justify-content:flex-end}
+dialog .err{color:var(--bad);font-size:12.5px;margin:0}
+dialog .hint{font-size:12px;color:var(--faint);margin:0}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">HR · <b>Отпуска</b></div><h1>Отпуска</h1><p class="sub" id="sub">Кто отсутствует сейчас и в ближайшие два месяца</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+</header>
+<main>
+  <div class="card"><h2>Кто отсутствует <small>сейчас и следующие 60 дней</small></h2><div id="away"><div class="empty">Загружаю…</div></div></div>
+  <div id="hr" hidden>
+    <div class="card bar-top">
+      <input type="search" id="q" placeholder="Найти сотрудника" aria-label="Поиск">
+      <button class="btn" type="button" id="add">+ Отпуск или больничный</button>
+    </div>
+    <div class="card"><h2>Остатки отпусков <small>начисляется по полным месяцам с даты выхода; поправка — в карточке сотрудника в «Структуре»</small></h2><div class="wide" id="bal"></div></div>
+    <div class="card"><h2>Все записи <small id="hist-for"></small></h2><div class="wide" id="hist"></div></div>
+  </div>
+</main>
+</div>
+</div>
+<dialog id="dlg"><div class="in" id="dlg-in"></div></dialog>
+<script src="/ui.js"></script>
+<script>
+(function () {
+  var MON = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+  var KIND = { vacation: "отпуск", sick: "больничный", unpaid: "за свой счёт", away: "отсутствует" };
+  var D = null, only = null;
+  var dlg = document.getElementById("dlg"), dIn = document.getElementById("dlg-in"), qEl = document.getElementById("q");
+  function d(iso) { return +iso.slice(8, 10) + " " + MON[+iso.slice(5, 7) - 1]; }
+  function range(a, b) { return a === b ? d(a) : (a.slice(5, 7) === b.slice(5, 7) ? +a.slice(8, 10) : d(a)) + "–" + d(b); }
+  function num(x) { return x == null ? '<span class="muted">—</span>' : String(x).replace(".", ","); }
+  function api(body) {
+    return fetch("/api/hr/leave", { method: body ? "POST" : "GET", credentials: "same-origin", headers: body ? { "content-type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined }).then(function (r) { return r.json(); });
+  }
+  function render() {
+    var ppl = {}, deps = {}; D.people.forEach(function (p) { ppl[p.id] = p; }); (D.depts || []).forEach(function (x) { deps[x.id] = x.name; });
+    var awayEl = document.getElementById("away");
+    awayEl.innerHTML = D.away.length ? D.away.map(function (a) {
+      var p = ppl[a.person] || { name: "?" }, now = a.date_from <= D.today && a.date_to >= D.today;
+      return '<div class="aw"><div class="tx"><span class="nm">' + esc(p.name) + '</span><span class="ds">' + esc(p.position || "") + (deps[p.dept] ? " · " + esc(deps[p.dept]) : "") + '</span></div>'
+        + (now ? '<span class="k now">сейчас</span>' : "") + '<span class="k ' + a.kind + '">' + KIND[a.kind] + '</span><span class="dt">' + range(a.date_from, a.date_to) + '</span></div>';
+    }).join("") : '<div class="empty">В ближайшие два месяца все на месте.</div>';
+    if (!D.is_hr) return;
+    var q = qEl.value.trim().toLowerCase();
+    var rows = D.people.filter(function (p) { return p.status === "active" && (!q || p.name.toLowerCase().indexOf(q) >= 0); });
+    document.getElementById("bal").innerHTML = rows.length ? '<table><thead><tr><th>Сотрудник</th><th>Отдел</th><th>В компании с</th><th class="num">Начислено</th><th class="num">Взято</th><th class="num">Запланировано</th><th class="num">Остаток</th><th class="num">Больничные в этом году</th></tr></thead><tbody>'
+      + rows.map(function (p) {
+        var b = p.balance, left = b.left == null ? '<span class="muted" title="нет даты выхода">—</span>' : '<span class="' + (b.left < 0 ? "left-neg" : "left-ok") + '">' + num(b.left) + '</span>';
+        return '<tr class="click" data-pp="' + p.id + '"><td>' + esc(p.name) + '</td><td class="muted">' + esc(deps[p.dept] || "") + '</td><td>' + (p.hired ? esc(d(p.hired) + " " + p.hired.slice(0, 4)) : '<span class="muted">нет даты</span>') + '</td>'
+          + '<td class="num">' + num(b.accrued) + (b.adj ? ' <span class="muted">' + (b.adj > 0 ? "+" : "") + num(b.adj) + '</span>' : "") + '</td><td class="num">' + num(b.taken) + '</td><td class="num">' + num(b.planned) + '</td><td class="num">' + left + '</td><td class="num">' + num(b.sick_year) + '</td></tr>';
+      }).join("") + '</tbody></table>' : '<div class="empty">Сотрудников нет. Их добавляют в «Структуре компании».</div>';
+    var hist = D.leaves.filter(function (l) { return !only || l.person === only; });
+    document.getElementById("hist-for").innerHTML = only ? esc((ppl[only] || {}).name || "") + ' · <a href="#" id="all">показать всех</a>' : "";
+    document.getElementById("hist").innerHTML = hist.length ? '<table><thead><tr><th>Сотрудник</th><th>Что</th><th>Даты</th><th class="num">Дней</th><th>Заметка</th><th>Внёс</th><th></th></tr></thead><tbody>'
+      + hist.map(function (l) {
+        return '<tr><td>' + esc((ppl[l.person] || {}).name || "?") + '</td><td><span class="k ' + l.kind + '">' + KIND[l.kind] + '</span></td><td>' + range(l.date_from, l.date_to) + " " + l.date_to.slice(0, 4) + '</td><td class="num">' + num(l.days) + '</td><td>' + esc(l.note || "") + '</td><td class="muted">' + esc(l.created_by || "") + '</td>'
+          + '<td><button class="btn ghost mini" type="button" data-del="' + l.id + '">удалить</button></td></tr>';
+      }).join("") + '</tbody></table>' : '<div class="empty">Записей пока нет.</div>';
+  }
+  function load() {
+    return api().then(function (r) {
+      if (!r.ok) { document.getElementById("away").innerHTML = '<div class="empty">' + esc(r.error || "Не удалось загрузить") + '</div>'; return; }
+      D = r; document.getElementById("hr").hidden = !r.is_hr;
+      if (r.is_hr) document.getElementById("sub").textContent = "Кто отсутствует, остатки отпусков и больничные. Больничные и остатки видят только сотрудники HR";
+      render();
+    });
+  }
+  function addDlg(pid) {
+    var opts = D.people.filter(function (p) { return p.status === "active"; }).map(function (p) { return '<option value="' + p.id + '"' + (p.id === pid ? " selected" : "") + '>' + esc(p.name) + '</option>'; }).join("");
+    dIn.innerHTML = '<h3>Отпуск или больничный</h3>'
+      + '<label>Сотрудник<select id="f-p"><option value="">выберите</option>' + opts + '</select></label>'
+      + '<label>Что<select id="f-k"><option value="vacation">отпуск</option><option value="sick">больничный</option><option value="unpaid">за свой счёт</option></select></label>'
+      + '<div class="row2"><label>С<input id="f-from" type="date"></label><label>По<input id="f-to" type="date"></label></div>'
+      + '<label>Дней к списанию<input id="f-days" type="number" min="0" step="0.5" placeholder="календарные"></label><p class="hint" id="f-hint">Пусто — посчитаю календарные дни. Если на отпуск выпали праздники, поправьте число.</p>'
+      + '<label>Заметка<input id="f-note" maxlength="200" placeholder="необязательно"></label>'
+      + '<p class="err"></p><div class="row"><button class="btn ghost" type="button" data-close>Отмена</button><button class="btn" type="button" data-save>Сохранить</button></div>';
+    dlg.showModal();
+    var hint = function () { var a = dIn.querySelector("#f-from").value, b = dIn.querySelector("#f-to").value; if (a && b && b >= a) dIn.querySelector("#f-days").placeholder = Math.round((Date.parse(b) - Date.parse(a)) / 864e5) + 1 + " календарных"; };
+    dIn.querySelector("#f-from").addEventListener("change", function () { var t = dIn.querySelector("#f-to"); if (!t.value) t.value = this.value; hint(); });
+    dIn.querySelector("#f-to").addEventListener("change", hint);
+  }
+  dlg.addEventListener("click", function (e) {
+    if (e.target === dlg || e.target.closest("[data-close]")) return dlg.close();
+    if (!e.target.closest("[data-save]")) return;
+    var v = function (id) { return dIn.querySelector(id).value; };
+    api({ action: "add", person: v("#f-p"), kind: v("#f-k"), date_from: v("#f-from"), date_to: v("#f-to"), days: v("#f-days"), note: v("#f-note") }).then(function (r) {
+      if (!r.ok) { dIn.querySelector(".err").textContent = r.error || "Не сохранилось"; return; }
+      dlg.close(); load();
+    });
+  });
+  document.getElementById("add").addEventListener("click", function () { addDlg(only); });
+  qEl.addEventListener("input", render);
+  document.querySelector("main").addEventListener("click", function (e) {
+    var del = e.target.closest("[data-del]");
+    if (del) { if (confirm("Удалить запись?")) api({ action: "del", id: +del.dataset.del }).then(load); return; }
+    if (e.target.id === "all") { e.preventDefault(); only = null; render(); return; }
+    var tr = e.target.closest("tr[data-pp]"); if (tr) { only = +tr.dataset.pp; render(); document.getElementById("hist").scrollIntoView({ behavior: "smooth", block: "start" }); }
+  });
+  load();
+})();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>

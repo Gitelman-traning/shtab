@@ -17,6 +17,7 @@
     gear: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6" stroke-linecap="round"/></svg>',
     coin: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 6v8M7.8 8.2c0-.9.9-1.5 2.2-1.5s2.2.6 2.2 1.5c0 1.9-4.4 1.1-4.4 3.1 0 .9.9 1.5 2.2 1.5s2.2-.6 2.2-1.5" stroke-linecap="round"/></svg>',
     tag: '<svg viewBox="0 0 20 20"><path d="M3 4h6l8 8-6 6-8-8z" stroke-linejoin="round"/><circle cx="7" cy="8" r="1.2"/></svg>',
+    org: '<svg viewBox="0 0 20 20"><rect x="7.5" y="2.5" width="5" height="4" rx="1"/><rect x="2.5" y="13.5" width="5" height="4" rx="1"/><rect x="12.5" y="13.5" width="5" height="4" rx="1"/><path d="M10 6.5v3.5M5 13.5V10h10v3.5" stroke-linejoin="round"/></svg>',
     users: '<svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2"/><path d="M4 17c.8-3.2 3.2-4.8 6-4.8s5.2 1.6 6 4.8" stroke-linecap="round"/></svg>',
     chev: '<svg class="chev" viewBox="0 0 20 20"><path d="M7 8l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
@@ -52,6 +53,12 @@
         { name: "Сайт gitelman.team", href: "/marketing/site/main/", sec: "marketing.site" },
         { name: "Журнал", href: "/marketing/site/journal/", sec: "marketing.site" }
       ] }
+    ] },
+    { id: "hr", name: "HR", icon: I.org, sec: "hr", children: [
+      { name: "Структура компании", href: "/hr/structure/", sec: "hr.structure" },
+      { name: "Праздники", href: "/hr/events/", sec: "hr.events" },
+      { name: "Отпуска", href: "/hr/leave/", sec: "hr.leave" },
+      { name: "Для HR", href: "/hr/team/", sec: "hr.team" }
     ] },
     { id: "help", name: "Справка", icon: I.help, children: [
       { name: "Гайд и вопросы", href: "/guide", icon: I.help, sec: "guide" },

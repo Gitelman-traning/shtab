@@ -1,0 +1,31 @@
+name: HR reminders
+
+# Раз в день сотрудникам HR в Telegram: дни рождения, годовщины в компании и дни рождения детей — сегодня и через 3 дня.
+# Текст собирает сам Штаб (/api/hr/remind), здесь только вызов по расписанию.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'        # каждый день, 09:00 МСК
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: 'Dry run: show text, send nothing (1 = yes)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send HR reminders
+        env:
+          SHTAB_URL: ${{ secrets.SHTAB_URL }}
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
+          DRY: ${{ inputs.dry }}
+        run: |
+          q=""; [ "$DRY" = "1" ] && q="?dry=1"
+          curl -sS --fail-with-body -X POST "${SHTAB_URL%/}/api/hr/remind$q" -H "Authorization: Bearer $SHTAB_TOKEN"

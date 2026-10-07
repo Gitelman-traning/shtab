@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Праздники</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.seg{display:inline-flex;background:var(--soft);border-radius:10px;padding:3px}
+.seg button{font:inherit;font-size:12.5px;border:0;background:none;color:var(--dim);padding:5px 11px;border-radius:7px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--card);color:var(--gold);font-weight:600}
+.bar-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bar-top .cnt{font-size:12.5px;color:var(--dim)}
+.day{background:var(--card);border-radius:16px;padding:14px 18px}
+.day h2{margin:0 0 8px;font-size:14px;font-weight:600;display:flex;gap:8px;align-items:baseline}
+.day h2 small{font-size:12px;font-weight:400;color:var(--faint)}
+.day.today{box-shadow:inset 0 0 0 2px var(--gold-b)}
+.ev{display:flex;align-items:center;gap:12px;padding:7px 0;border-top:1px solid var(--line)}
+.ev:first-of-type{border-top:0}
+.ic{width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:17px;background:var(--soft)}
+.ev.anniversary .ic{background:var(--gold-soft)}
+.ev .tx{display:flex;flex-direction:column;min-width:0}
+.ev .nm{font-size:13.5px;font-weight:600}
+.ev .ds{font-size:12.5px;color:var(--dim)}
+.list{display:flex;flex-direction:column;gap:12px}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">HR · <b>Праздники</b></div><h1>Праздники</h1><p class="sub">Дни рождения и годовщины в компании, чтобы никого не забыть поздравить</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+</header>
+<main>
+  <div class="card bar-top">
+    <div class="seg" id="range" role="group" aria-label="Период">
+      <button type="button" data-days="7" aria-pressed="false">Неделя</button>
+      <button type="button" data-days="30" aria-pressed="true">Месяц</button>
+      <button type="button" data-days="90" aria-pressed="false">3 месяца</button>
+    </div>
+    <span class="cnt" id="cnt"></span>
+  </div>
+  <div class="list" id="list"><div class="card empty">Загружаю…</div></div>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+(function () {
+  var MON = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+  var WD = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
+  var list = document.getElementById("list"), range = document.getElementById("range");
+  function plural(n, f) { var m = n % 10, h = n % 100; return f[m === 1 && h !== 11 ? 0 : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? 1 : 2]; }
+  function yrs(n) { return n + " " + plural(n, ["год", "года", "лет"]); }
+  function when(e) {
+    var d = new Date(e.date + "T12:00:00Z");
+    var head = e.in === 0 ? "Сегодня" : e.in === 1 ? "Завтра" : +e.date.slice(8) + " " + MON[+e.date.slice(5, 7) - 1];
+    return head + '<small>' + (e.in > 1 ? WD[d.getUTCDay()] + ", через " + e.in + " " + plural(e.in, ["день", "дня", "дней"]) : +e.date.slice(8) + " " + MON[+e.date.slice(5, 7) - 1] + ", " + WD[d.getUTCDay()]) + '</small>';
+  }
+  function row(e, depts) {
+    var ic = e.kind === "birthday" ? "🎂" : e.kind === "anniversary" ? "🎉" : "🧸";
+    var what = e.kind === "birthday" ? "День рождения" : e.kind === "anniversary" ? yrs(e.years) + " в компании" : "День рождения ребёнка: " + esc(e.child) + (e.age ? ", " + yrs(e.age) : "");
+    var dep = depts[e.dept] ? " · " + esc(depts[e.dept]) : "";
+    return '<div class="ev ' + e.kind + '"><span class="ic" aria-hidden="true">' + ic + '</span><span class="tx"><span class="nm">' + esc(e.name) + '</span><span class="ds">' + what + ' · ' + esc(e.position || "") + dep + '</span></span></div>';
+  }
+  function load(days) {
+    range.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.days === String(days) ? "true" : "false"); });
+    fetch("/api/hr/events?days=" + days, { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (r) {
+      if (!r.ok) { list.innerHTML = '<div class="card empty">' + esc(r.error || "Не удалось загрузить") + '</div>'; return; }
+      var depts = {}; (r.depts || []).forEach(function (d) { depts[d.id] = d.name; });
+      var by = {}, order = [];
+      r.events.forEach(function (e) { if (!by[e.date]) { by[e.date] = []; order.push(e.date); } by[e.date].push(e); });
+      document.getElementById("cnt").textContent = r.events.length ? r.events.length + " " + plural(r.events.length, ["событие", "события", "событий"]) + (r.is_hr ? " · дети сотрудников видны только HR" : "") : "";
+      list.innerHTML = order.length ? order.map(function (d) {
+        var e0 = by[d][0];
+        return '<section class="day' + (e0.in === 0 ? " today" : "") + '"><h2>' + when(e0) + '</h2>' + by[d].map(function (e) { return row(e, depts); }).join("") + '</section>';
+      }).join("") : '<div class="card empty">В этот период праздников нет. Если кажется, что кого-то не хватает, проверьте даты в карточке сотрудника в «Структуре».</div>';
+    }).catch(function () { list.innerHTML = '<div class="card empty">Не удалось загрузить</div>'; });
+  }
+  range.addEventListener("click", function (e) { var b = e.target.closest("button[data-days]"); if (b) load(+b.dataset.days); });
+  load(30);
+})();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>

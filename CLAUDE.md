@@ -14,6 +14,8 @@
   - `index.html` — общий экран, `tags.html`, `users.html`, `budget.html` — настройки (только админ),
     `settings/dashboard/` — личный дашборд проектов Никиты: три вкладки показывают страницы из KV (`/api/dashboard`), которые присылает его локальная сборка (`Local/dashboard/publish.mjs`); в git их нет.
     `api/tgtask.js` — вебхук бота Штаба: Никита пересылает сообщение коллеги или пишет задачу → очередь в KV, её забирает `Local/dashboard/sync.mjs`.
+  - `hr/` — HR: структура компании, праздники, отпуска (открыто всем) и «Для HR» (закрыто по умолчанию, открывается «правкой» на разделе HR);
+    API в `functions/api/hr/` (`_hr.js` — даты, праздники, остаток отпуска), напоминания HR в Telegram — `hr-remind.yml` → `/api/hr/remind`.
 - `site/functions/api/` — API (Cloudflare Functions). `_lib.js` — права, сессии, `sectionOf()` (какой раздел отвечает за адрес).
 - `site/public/nav.js` — единое меню: новый раздел добавляется в дерево `TREE` здесь и в `SECTIONS`/`sectionOf` в `_lib.js`.
 - `collector/` — ночные сборщики (GitHub Actions `shtab-collect.yml`): `collect.py` — из выгрузки amo в Google Sheets, `okna.py` — окна Первой линии прямо из amo, `metrika.py` — Яндекс Метрика.
