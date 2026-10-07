@@ -198,11 +198,11 @@ var RTREE=[
   {id:"hub",name:"Общий экран"},
   {id:"sales",name:"Отдел продаж",children:[{id:"sales.l1",name:"Первая линия"},{id:"sales.l2",name:"Вторая линия",children:[{id:"sales.l2.okk",name:"Встречи · Менеджеры · Сверка (ОКК)"}]}]},
   {id:"marketing",name:"Маркетинг",children:[{id:"marketing.instagram",name:"Instagram SMM"},{id:"marketing.telegram",name:"Телеграм-канал"},{id:"marketing.influence",name:"Инфлюенс"},{id:"marketing.youtube",name:"YouTube"},{id:"marketing.fb",name:"Реклама FB"},{id:"marketing.sitechat",name:"Чат на сайте"},{id:"marketing.site",name:"Сайт"}]},
-  {id:"hr",name:"HR",children:[{id:"hr.structure",name:"Структура компании"}]},
+  {id:"hr",name:"HR",children:[{id:"hr.structure",name:"Структура компании"},{id:"hr.team",name:"Для HR (закрыто по умолчанию)"}]},
   {id:"guide",name:"Гайд и вопросы"},
   {id:"status",name:"Витрина"}
 ];
-var PARENT={"sales.l1":"sales","sales.l2":"sales","sales.l2.okk":"sales.l2","marketing.instagram":"marketing","marketing.telegram":"marketing","marketing.influence":"marketing","marketing.youtube":"marketing","marketing.fb":"marketing","marketing.sitechat":"marketing","marketing.site":"marketing","hr.structure":"hr"};
+var PARENT={"sales.l1":"sales","sales.l2":"sales","sales.l2.okk":"sales.l2","marketing.instagram":"marketing","marketing.telegram":"marketing","marketing.influence":"marketing","marketing.youtube":"marketing","marketing.fb":"marketing","marketing.sitechat":"marketing","marketing.site":"marketing","hr.structure":"hr","hr.team":"hr"};
 var ADMIN_ONLY=["users","tags","budget","dashboard"];   // настройки — только админ, в дереве прав не показываем
 /* разделы, которые сервер уже знает, а дерево ещё нет, — добавляем в конец, чтобы новый раздел сразу был виден в правах */
 function extendTree(ids){
@@ -218,7 +218,7 @@ var PRESETS=[
   ["Руководитель Второй линии",{"hub":1,"sales":1,"sales.l2":2,"marketing":1,"hr":1,"guide":1,"status":1}],
   ["Маркетинг",{"hub":1,"sales":1,"marketing":2,"hr":1,"guide":1,"status":1}],
   ["Инфлюенс",{"hub":1,"sales":1,"marketing":1,"marketing.influence":2,"hr":1,"guide":1,"status":1}],
-  ["HR",{"hub":1,"sales":1,"marketing":1,"hr":2,"guide":1,"status":1}],
+  ["Сотрудник HR",{"hub":1,"sales":1,"marketing":1,"hr":2,"guide":1,"status":1}],
   ["Только своя линия (1-я)",{"hub":1,"sales":0,"sales.l1":2,"marketing":0,"hr":0,"guide":1,"status":0}],
   ["Всё закрыть",{"hub":0,"sales":0,"marketing":0,"hr":0,"guide":0,"status":0}]
 ];
@@ -226,7 +226,7 @@ var LV=["закрыт","просмотр","правка"];
 /* редактор прав: состояние живёт в el.__val */
 function rightsEditor(el, val){
   el.__val=val;
-  function eff(id){ var s=id; while(s){ if(val[s]!=null) return {v:val[s],own:s===id}; s=PARENT[s]||null; } return {v:1,own:false}; }
+  function eff(id){ if(id==="hr.team"&&val[id]==null){ var h=eff("hr"); return {v:h.v===2?2:0,own:false}; } var s=id; while(s){ if(val[s]!=null) return {v:val[s],own:s===id}; s=PARENT[s]||null; } return {v:1,own:false}; }
   function seg(id){ var e=eff(id); return '<span class="seg" data-rs="'+esc(id)+'">'+LV.map(function(n,i){return '<span data-lv="'+i+'" class="'+(e.v===i?('on'+i+(e.own?'':' inh')):'')+'">'+n+'</span>'}).join("")+'</span>'; }
   function node(n,depth){ var h=depth===0?'<div class="dept"><div class="hd">'+esc(n.name)+seg(n.id)+'</div>':'<div class="rw'+(depth>1?' rw2':'')+'">'+esc(n.name)+seg(n.id)+'</div>';
     (n.children||[]).forEach(function(c){ h+=node(c,depth+1); }); if(depth===0) h+='</div>'; return h; }
