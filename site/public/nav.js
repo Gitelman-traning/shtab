@@ -19,11 +19,13 @@
     tag: '<svg viewBox="0 0 20 20"><path d="M3 4h6l8 8-6 6-8-8z" stroke-linejoin="round"/><circle cx="7" cy="8" r="1.2"/></svg>',
     org: '<svg viewBox="0 0 20 20"><rect x="7.5" y="2.5" width="5" height="4" rx="1"/><rect x="2.5" y="13.5" width="5" height="4" rx="1"/><rect x="12.5" y="13.5" width="5" height="4" rx="1"/><path d="M10 6.5v3.5M5 13.5V10h10v3.5" stroke-linejoin="round"/></svg>',
     users: '<svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="3.2"/><path d="M4 17c.8-3.2 3.2-4.8 6-4.8s5.2 1.6 6 4.8" stroke-linecap="round"/></svg>',
+    task: '<svg viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="13" height="13" rx="3"/><path d="M7 10l2.2 2.2L13.5 8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     chev: '<svg class="chev" viewBox="0 0 20 20"><path d="M7 8l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
   // дерево разделов; href — чистые адреса (Cloudflare Pages убирает .html)
   var TREE = [
     { name: "Общий экран", href: "/", icon: I.hub, sec: "hub" },
+    { name: "Задачи", href: "/tasks/", icon: I.task, sec: "tasks" },
     { id: "sales", name: "Отдел продаж", icon: I.sales, href: "/sales/", sec: "sales", children: [
       { name: "Сводка отдела", href: "/sales/", sec: "sales" },
       { name: "Первая линия", href: "/sales/l1/", sec: "sales.l1", children: [

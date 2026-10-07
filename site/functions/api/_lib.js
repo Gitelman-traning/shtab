@@ -89,7 +89,7 @@ export async function currentUser(request, env) {
 
 // ---------- права по разделам ----------
 // дерево разделов: подраздел наследует уровень отдела, если своей строки нет
-export const SECTIONS = ["hub", "sales", "sales.l1", "sales.l2", "sales.l2.okk", "marketing", "marketing.instagram", "marketing.telegram", "marketing.influence", "marketing.youtube", "marketing.fb", "marketing.sitechat", "marketing.site", "hr", "hr.structure", "hr.events", "hr.leave", "hr.team", "guide", "status", "users", "tags", "budget", "dashboard"];
+export const SECTIONS = ["hub", "tasks", "sales", "sales.l1", "sales.l2", "sales.l2.okk", "marketing", "marketing.instagram", "marketing.telegram", "marketing.influence", "marketing.youtube", "marketing.fb", "marketing.sitechat", "marketing.site", "hr", "hr.structure", "hr.events", "hr.leave", "hr.team", "guide", "status", "users", "tags", "budget", "dashboard"];
 const PARENT = { "sales.l1": "sales", "sales.l2": "sales", "sales.l2.okk": "sales.l2", "marketing.instagram": "marketing", "marketing.telegram": "marketing", "marketing.influence": "marketing", "marketing.youtube": "marketing", "marketing.fb": "marketing", "marketing.sitechat": "marketing", "marketing.site": "marketing", "hr.structure": "hr", "hr.events": "hr", "hr.leave": "hr", "hr.team": "hr" };
 // закрытые по умолчанию: видят только те, кому выдано явно, или у кого «правка» на отделе (сотрудники HR)
 const PRIVATE = { "hr.team": "hr" };
@@ -146,6 +146,7 @@ export function sectionOf(pathname) {
   if (p.startsWith("/hr/leave")) return "hr.leave";
   if (p === "/hr" || p.startsWith("/hr/")) return "hr";
   if (p === "/guide" || p.startsWith("/guide/")) return "guide";
+  if (p === "/tasks" || p.startsWith("/tasks/")) return "tasks";
   if (p === "/status") return "status";
   if (p === "/users") return "users";
   if (p === "/tags") return "tags";

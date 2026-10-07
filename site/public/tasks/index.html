@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Задачи</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.bar-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bar-top input[type=search]{flex:1;min-width:180px;font:inherit;font-size:13.5px;padding:8px 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--page);color:var(--ink)}
+.bar-top select{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line-2);border-radius:10px;background:var(--page);color:var(--ink)}
+.bar-top label{font-size:12.5px;color:var(--dim);display:flex;gap:6px;align-items:center;white-space:nowrap}
+.btn{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:10px;border:0;cursor:pointer;background:var(--gold-soft);color:var(--gold);white-space:nowrap}
+.btn.ghost{background:none;border:1px solid var(--line-2);color:var(--dim);font-weight:500}
+.btn.danger{background:var(--bad-bg);color:var(--bad)}
+.btn.ok{background:var(--ok-bg);color:var(--ok)}
+.btn:hover{filter:brightness(.97)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tabs button{font:inherit;font-size:13px;font-weight:500;border:0;background:none;color:var(--dim);padding:6px 11px;border-radius:9px;cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--gold-soft);color:var(--gold);font-weight:600}
+.tabs .n{font-size:11.5px;color:var(--faint);margin-left:4px}
+.tabs button[aria-pressed=true] .n{color:var(--gold)}
+.grp{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:6px 0 4px}
+.grp.late{color:var(--bad)}
+.rows{display:flex;flex-direction:column}
+.t{display:grid;grid-template-columns:1fr auto auto;gap:4px 14px;align-items:center;padding:10px 8px;border-radius:10px;cursor:pointer;border:0;background:none;font:inherit;color:inherit;text-align:left;width:100%;border-bottom:1px solid var(--line)}
+.t:hover{background:var(--soft)}
+.t .ti{font-weight:600;font-size:13.5px;line-height:1.3;min-width:0}
+.t .ti .imp{color:var(--bad);margin-right:4px}
+.t .who{font-size:12px;color:var(--dim);grid-column:1}
+.t .due{font-size:12.5px;color:var(--dim);white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.t .due.late{color:var(--bad);font-weight:600} .t .due.today{color:var(--mid);font-weight:600}
+.t.closed .ti{color:var(--faint);text-decoration:line-through;text-decoration-color:var(--line-2)}
+.st{font-size:11px;font-weight:600;padding:2px 8px;border-radius:7px;white-space:nowrap;background:var(--soft);color:var(--dim)}
+.st.work{background:var(--gold-soft);color:var(--gold)} .st.review{background:var(--mid-bg);color:var(--mid)}
+.st.done{background:var(--ok-bg);color:var(--ok)} .st.cancelled{color:var(--faint)}
+.board{display:grid;grid-template-columns:repeat(5,minmax(200px,1fr));gap:12px;overflow-x:auto;align-items:start}
+.col{background:var(--card);border-radius:16px;padding:12px;min-height:120px}
+.col h3{margin:0 0 8px;font-size:13px;font-weight:600;display:flex;gap:6px;align-items:baseline}
+.col h3 .n{font-size:12px;color:var(--faint);font-weight:400}
+.kc{display:flex;flex-direction:column;gap:4px;background:var(--soft);border-radius:10px;padding:9px 10px;margin-bottom:6px;cursor:pointer;border:0;font:inherit;color:inherit;text-align:left;width:100%}
+.kc:hover{filter:brightness(.98)}
+.kc .ti{font-size:13px;font-weight:600;line-height:1.3}
+.kc .mt{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--dim)}
+.kc .mt .late{color:var(--bad);font-weight:600} .kc .mt .today{color:var(--mid);font-weight:600}
+dialog{border:0;border-radius:16px;padding:0;background:var(--card);color:var(--ink);width:min(560px,calc(100vw - 32px));box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog .in{padding:20px;display:flex;flex-direction:column;gap:12px;max-height:calc(100vh - 40px);overflow:auto}
+dialog h3{margin:0;font-size:16px;font-weight:600;line-height:1.35}
+dialog .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+dialog .row .sp{flex:1}
+dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+dialog label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim)}
+dialog label.c{display:flex;gap:8px;align-items:center;font-size:13px}
+dialog input:not([type=checkbox]),dialog select,dialog textarea{font:inherit;font-size:13.5px;padding:8px 10px;border:1px solid var(--line-2);border-radius:9px;background:var(--page);color:var(--ink);width:100%}
+dialog textarea{min-height:90px;resize:vertical}
+dialog dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
+dialog dt{color:var(--faint)} dialog dd{margin:0}
+dialog .err{color:var(--bad);font-size:12.5px;margin:0}
+dialog .body{white-space:pre-wrap;font-size:13.5px;background:var(--soft);border-radius:10px;padding:10px 12px}
+dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--gold);border-top:1px solid var(--line);padding-top:10px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;background:var(--soft);border-radius:8px;padding:3px 4px 3px 9px;display:inline-flex;gap:4px;align-items:center}
+.chip button{border:0;background:none;color:var(--faint);cursor:pointer;font:inherit;padding:0 4px}
+.feed{display:flex;flex-direction:column;gap:8px}
+.ev{font-size:12.5px;color:var(--dim)}
+.ev b{color:var(--ink);font-weight:600}
+.cm{background:var(--soft);border-radius:10px;padding:8px 11px;font-size:13px}
+.cm .hd{font-size:11.5px;color:var(--faint);margin-bottom:2px} .cm .hd b{color:var(--dim)}
+.cm .tx{white-space:pre-wrap}
+.hint{font-size:12px;color:var(--faint);margin:0}
+@media (max-width:760px){main{padding:16px}.t{grid-template-columns:1fr auto}.t .st{display:none}.board{grid-template-columns:repeat(5,82vw)}dialog .row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs"><b>Задачи</b></div><h1>Задачи</h1><p class="sub">Ставьте задачи коллегам со сроком. Исполнитель сдаёт работу на проверку, постановщик принимает</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+</header>
+<main>
+  <div class="card bar-top">
+    <div class="tabs" id="tabs" role="group" aria-label="Чьи задачи"></div>
+    <span style="flex:1"></span>
+    <button class="btn" type="button" id="add">+ Задача</button>
+  </div>
+  <div class="card bar-top">
+    <input type="search" id="q" placeholder="Найти задачу или человека" aria-label="Поиск">
+    <select id="who" aria-label="Сотрудник" hidden></select>
+    <div class="tabs" id="view" role="group" aria-label="Вид">
+      <button type="button" data-v="list" aria-pressed="true">Список</button>
+      <button type="button" data-v="board" aria-pressed="false">Доска</button>
+    </div>
+    <label><input type="checkbox" id="closed"> закрытые</label>
+  </div>
+  <div id="out"><div class="card empty">Загружаю…</div></div>
+</main>
+</div>
+</div>
+<dialog id="dlg"><div class="in" id="dlg-in"></div></dialog>
+<script src="/ui.js"></script>
+<script>
+(function () {
+  var D = { tasks: [], people: [], depts: [], team: [], me: {}, statuses: {} };
+  var tab = "mine", view = "list";
+  try { view = localStorage.getItem("tasks-view") || "list"; } catch (e) {}
+  var out = document.getElementById("out"), dlg = document.getElementById("dlg"), dIn = document.getElementById("dlg-in");
+  var qEl = document.getElementById("q"), whoEl = document.getElementById("who"), closedEl = document.getElementById("closed");
+  var COLS = ["new", "work", "review", "deferred", "done"];
+  var OPEN = { new: 1, work: 1, review: 1, deferred: 1 };
+
+  function api(body, qs) {
+    return fetch("/api/tasks" + (qs || ""), { method: body ? "POST" : "GET", credentials: "same-origin",
+      headers: body ? { "content-type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "нет связи" }; });
+  }
+  function person(l) { for (var i = 0; i < D.people.length; i++) if (D.people[i].login === l) return D.people[i]; return null; }
+  function nm(l) { var p = person(l); return p ? p.name : l; }
+  function short(l) { var w = nm(l).split(/\s+/); return w.length > 1 ? w[0] + " " + w[1][0] + "." : w[0]; }
+  function plural(n, f) { var m = n % 10, h = n % 100; return f[m === 1 && h !== 11 ? 0 : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? 1 : 2]; }
+  var MON = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+  function dueShort(due) {
+    if (!due) return "без срока";
+    var d = due.slice(0, 10), s;
+    if (d === D.today) s = "сегодня"; else if (d === shift(D.today, 1)) s = "завтра"; else if (d === shift(D.today, -1)) s = "вчера";
+    else s = +d.slice(8, 10) + " " + MON[+d.slice(5, 7) - 1] + (d.slice(0, 4) !== D.today.slice(0, 4) ? " " + d.slice(0, 4) : "");
+    return s + (due.length > 10 ? ", " + due.slice(11, 16) : "");
+  }
+  function shift(iso, n) { var x = new Date(iso + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+  function dueCls(t) { if (!t.due || !OPEN[t.status] || t.status === "review") return ""; var d = t.due.slice(0, 10); return d < D.today ? "late" : d === D.today ? "today" : ""; }
+  function when(at) { var d = new Date(at); return dmy(d) + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+
+  // какие задачи во вкладке
+  function inTab(t) {
+    var me = D.me.login;
+    if (tab === "mine") return t.assignee === me;
+    if (tab === "given") return t.author === me && t.assignee !== me;
+    if (tab === "watch") return t.watchers.indexOf(me) >= 0;
+    if (tab === "team") return (D.team.indexOf(t.assignee) >= 0) && (!whoEl.value || t.assignee === whoEl.value);
+    if (tab === "all") return !whoEl.value || t.assignee === whoEl.value || t.author === whoEl.value;
+    return false;
+  }
+  function filtered() {
+    var q = qEl.value.trim().toLowerCase();
+    return D.tasks.filter(function (t) {
+      if (!inTab(t)) return false;
+      if (!closedEl.checked && (t.status === "done" || t.status === "cancelled") && view === "list") return false;
+      if (t.status === "cancelled" && view === "board") return false;
+      if (!q) return true;
+      return (t.title + " " + t.body + " " + nm(t.author) + " " + nm(t.assignee)).toLowerCase().indexOf(q) >= 0;
+    });
+  }
+  function count(k) { var keep = tab; tab = k; var n = D.tasks.filter(function (t) { return inTab(t) && OPEN[t.status]; }).length; tab = keep; return n; }
+
+  function renderTabs() {
+    var list = [["mine", "Мне"], ["given", "Я поставил"], ["watch", "Наблюдаю"]];
+    if (D.team.length) list.push(["team", "Подчинённые"]);
+    if (D.me.admin) list.push(["all", "Все"]);
+    document.getElementById("tabs").innerHTML = list.map(function (x) {
+      var n = count(x[0]);
+      return '<button type="button" data-tab="' + x[0] + '" aria-pressed="' + (tab === x[0]) + '">' + x[1] + (n ? '<span class="n">' + n + '</span>' : "") + '</button>';
+    }).join("");
+    // выбор человека — в «Подчинённых» и «Все»
+    var pool = tab === "team" ? D.team : tab === "all" ? D.people.map(function (p) { return p.login; }) : null;
+    whoEl.hidden = !pool;
+    if (pool) {
+      var cur = whoEl.value;
+      whoEl.innerHTML = '<option value="">все сотрудники</option>' + pool.map(function (l) { return [l, nm(l)]; })
+        .sort(function (a, b) { return a[1].localeCompare(b[1], "ru"); })
+        .map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === cur ? " selected" : "") + '>' + esc(x[1]) + '</option>'; }).join("");
+    }
+    [].forEach.call(document.querySelectorAll("#view button"), function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-v") === view); });
+  }
+
+  // в строке — второй участник: в «Мне» постановщик, в остальных исполнитель
+  function whoLine(t) {
+    var me = D.me.login;
+    if (t.assignee === me && t.author === me) return "себе";
+    if (t.assignee === me) return "от " + short(t.author);
+    if (t.author === me) return "→ " + short(t.assignee);
+    return short(t.author) + " → " + short(t.assignee);
+  }
+  function row(t) {
+    var closed = t.status === "done" || t.status === "cancelled";
+    return '<button type="button" class="t' + (closed ? " closed" : "") + '" data-t="' + t.id + '">'
+      + '<span class="ti">' + (t.important ? '<span class="imp" title="важная">!</span>' : "") + esc(t.title) + '</span>'
+      + '<span class="st ' + t.status + '">' + esc(D.statuses[t.status] || t.status) + '</span>'
+      + '<span class="due ' + dueCls(t) + '">' + esc(dueShort(t.due)) + '</span>'
+      + '<span class="who">' + esc(whoLine(t)) + (t.watchers.length ? " · наблюдатели: " + t.watchers.length : "") + '</span></button>';
+  }
+  // список: по срокам, «на контроле» отдельно — там ход за постановщиком
+  function renderList(list) {
+    var g = { late: [], today: [], tomorrow: [], week: [], later: [], none: [], review: [], deferred: [], closed: [] };
+    var week = shift(D.today, 7);
+    list.forEach(function (t) {
+      if (t.status === "done" || t.status === "cancelled") return g.closed.push(t);
+      if (t.status === "review") return g.review.push(t);
+      if (t.status === "deferred") return g.deferred.push(t);
+      if (!t.due) return g.none.push(t);
+      var d = t.due.slice(0, 10);
+      g[d < D.today ? "late" : d === D.today ? "today" : d === shift(D.today, 1) ? "tomorrow" : d <= week ? "week" : "later"].push(t);
+    });
+    var by = function (a, b) { return (a.due || "9999").localeCompare(b.due || "9999") || b.important - a.important || a.id - b.id; };
+    var names = [["late", "Просрочено"], ["today", "Сегодня"], ["tomorrow", "Завтра"], ["week", "На неделе"], ["later", "Позже"], ["none", "Без срока"], ["review", "На контроле"], ["deferred", "Отложены"], ["closed", "Закрытые"]];
+    var html = names.filter(function (x) { return g[x[0]].length; }).map(function (x) {
+      return '<div class="grp' + (x[0] === "late" ? " late" : "") + '">' + x[1] + ' · ' + g[x[0]].length + '</div><div class="rows">' + g[x[0]].sort(by).map(row).join("") + '</div>';
+    }).join("");
+    return '<div class="card">' + (html || '<div class="empty">' + emptyText() + '</div>') + '</div>';
+  }
+  function renderBoard(list) {
+    return '<div class="board">' + COLS.map(function (s) {
+      var items = list.filter(function (t) { return t.status === s; }).sort(function (a, b) { return (a.due || "9999").localeCompare(b.due || "9999"); });
+      if (s === "done") items = items.sort(function (a, b) { return (b.done_at || "").localeCompare(a.done_at || ""); }).slice(0, 30);
+      return '<div class="col"><h3>' + esc(D.statuses[s]) + '<span class="n">' + items.length + '</span></h3>' + items.map(function (t) {
+        return '<button type="button" class="kc" data-t="' + t.id + '"><span class="ti">' + (t.important ? '<span style="color:var(--bad)">! </span>' : "") + esc(t.title) + '</span>'
+          + '<span class="mt"><span>' + esc(whoLine(t)) + '</span><span class="' + dueCls(t) + '">' + esc(dueShort(t.due)) + '</span></span></button>';
+      }).join("") + '</div>';
+    }).join("") + '</div>';
+  }
+  function emptyText() {
+    if (qEl.value.trim()) return "Ничего не нашлось.";
+    return { mine: "Вам задач нет.", given: "Вы пока никому не ставили задач. Нажмите «+ Задача».", watch: "Вы ни за чем не наблюдаете.", team: "У подчинённых открытых задач нет.", all: "Задач пока нет." }[tab] || "";
+  }
+  function render() {
+    renderTabs();
+    var list = filtered();
+    out.innerHTML = view === "board" ? renderBoard(list) : renderList(list);
+  }
+
+  function load() {
+    return api(null, closedEl.checked ? "?archive=1" : "").then(function (r) {
+      if (!r.ok) { out.innerHTML = '<div class="card empty">' + esc(r.error || "Не удалось загрузить") + '</div>'; return; }
+      D = r; render();
+    });
+  }
+
+  // ---------- окна ----------
+  function open(html) { dIn.innerHTML = html; if (!dlg.open) dlg.showModal(); }
+  function close() { dlg.close(); if (location.search) history.replaceState(null, "", location.pathname); }
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) close(); });
+  dlg.addEventListener("cancel", function () { if (location.search) history.replaceState(null, "", location.pathname); });
+  function deptName(id) { for (var i = 0; i < D.depts.length; i++) if (D.depts[i].id === id) return D.depts[i].name; return ""; }
+  // исполнитель: группы по отделам из структуры HR
+  function peopleOpts(cur, skip) {
+    var groups = {};
+    D.people.forEach(function (p) { if (skip && skip.indexOf(p.login) >= 0) return; var g = deptName(p.dept) || "Без отдела"; (groups[g] = groups[g] || []).push(p); });
+    return Object.keys(groups).sort(function (a, b) { return a === "Без отдела" ? 1 : b === "Без отдела" ? -1 : a.localeCompare(b, "ru"); }).map(function (g) {
+      return '<optgroup label="' + esc(g) + '">' + groups[g].map(function (p) {
+        return '<option value="' + esc(p.login) + '"' + (p.login === cur ? " selected" : "") + '>' + esc(p.name + (p.login === D.me.login ? " (я)" : "") + (p.position ? " — " + p.position : "")) + '</option>';
+      }).join("") + '</optgroup>';
+    }).join("");
+  }
+
+  var cur = null;   // открытая задача {task, log, actions, can_edit}
+  function showTask(id) {
+    api(null, "?id=" + id).then(function (r) {
+      if (!r.ok) { open('<h3>Задача недоступна</h3><p class="err">' + esc(r.error || "") + '</p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button></div>'); return; }
+      cur = r; var t = r.task;
+      if (location.search !== "?t=" + id) history.replaceState(null, "", "?t=" + id);
+      var feed = r.log.map(function (e) {
+        if (e.kind === "comment") return '<div class="cm"><div class="hd"><b>' + esc(nm(e.login)) + '</b> · ' + esc(when(e.at)) + '</div><div class="tx">' + esc(e.text) + '</div></div>';
+        var what = e.kind === "create" ? "поставил задачу" : e.kind === "status" ? "→ " + (D.statuses[e.text.split(">")[1]] || e.text) : "изменил " + e.text;
+        return '<div class="ev"><b>' + esc(short(e.login)) + '</b> ' + esc(what) + ' · ' + esc(when(e.at)) + '</div>';
+      }).join("");
+      var a = r.actions.map(function (x) {
+        var cls = x.to === "done" ? "btn ok" : x.to === "cancelled" ? "btn danger" : x.to === "work" && t.status === "review" ? "btn ghost" : "btn";
+        return '<button type="button" class="' + cls + '" data-to="' + x.to + '">' + esc(x.label) + '</button>';
+      }).join("");
+      var h = '<h3>' + (t.important ? '<span style="color:var(--bad)">! </span>' : "") + esc(t.title) + '</h3>'
+        + '<div class="row"><span class="st ' + t.status + '">' + esc(D.statuses[t.status]) + '</span><span class="hint">№ ' + t.id + '</span></div>'
+        + '<dl><dt>Срок</dt><dd class="' + dueCls(t) + '"' + (dueCls(t) === "late" ? ' style="color:var(--bad);font-weight:600"' : "") + '>' + esc(dueShort(t.due)) + '</dd>'
+        + '<dt>Постановщик</dt><dd>' + esc(nm(t.author)) + '</dd>'
+        + '<dt>Исполнитель</dt><dd>' + esc(nm(t.assignee)) + (person(t.assignee) && !person(t.assignee).tg ? ' <span class="hint" style="display:inline">· нет Telegram, уведомления не придут</span>' : "") + '</dd>'
+        + (t.watchers.length ? '<dt>Наблюдатели</dt><dd>' + t.watchers.map(function (l) { return esc(nm(l)); }).join(", ") + '</dd>' : "")
+        + '<dt>Создана</dt><dd>' + esc(when(t.created_at)) + '</dd></dl>'
+        + (t.body ? '<div class="body">' + esc(t.body) + '</div>' : "")
+        + (a || r.can_edit ? '<div class="row">' + a + '<span class="sp"></span>' + (r.can_edit ? '<button type="button" class="btn ghost" data-edit>Изменить</button>' : "") + '</div>' : "")
+        + '<div class="sect">Обсуждение и история</div><div class="feed">' + feed + '</div>'
+        + '<label class="f"><textarea id="f-cm" placeholder="Комментарий: вопрос, результат, ссылка" style="min-height:60px"></textarea></label>'
+        + '<p class="err"></p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button><button class="btn" type="button" data-comment>Отправить</button></div>';
+      open(h);
+    });
+  }
+
+  var watchers = [];
+  function editTask(t) {
+    t = t || { title: "", body: "", assignee: D.me.login, due: "", important: 0, watchers: [] };
+    watchers = t.watchers.slice();
+    var due = t.due || "", date = due.slice(0, 10), time = due.length > 10 ? due.slice(11, 16) : "";
+    var h = '<h3>' + (t.id ? "Изменить задачу" : "Новая задача") + '</h3>'
+      + '<label class="f">Что сделать<input id="f-title" maxlength="200" value="' + esc(t.title) + '"></label>'
+      + '<label class="f">Подробности<textarea id="f-body" maxlength="5000" placeholder="Что нужно получить в итоге, ссылки, материалы">' + esc(t.body) + '</textarea></label>'
+      + '<label class="f">Исполнитель<select id="f-as">' + peopleOpts(t.assignee) + '</select></label>'
+      + '<div class="row2"><label class="f">Срок<input id="f-date" type="date" value="' + esc(date) + '"></label>'
+      + '<label class="f">Время (если важно)<input id="f-time" type="time" value="' + esc(time) + '"></label></div>'
+      + '<div class="row" style="gap:6px"><span class="hint">Быстро:</span>' + [["сегодня", 0], ["завтра", 1], ["через 3 дня", 3], ["через неделю", 7]].map(function (x) { return '<button type="button" class="btn ghost" data-quick="' + x[1] + '">' + x[0] + '</button>'; }).join("") + '</div>'
+      + '<label class="c"><input type="checkbox" id="f-imp"' + (t.important ? " checked" : "") + '> Важная</label>'
+      + '<label class="f">Наблюдатели<select id="f-w"><option value="">+ добавить</option>' + peopleOpts("", []) + '</select></label><div class="chips" id="f-chips"></div>'
+      + '<p class="err"></p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Отмена</button><button class="btn" type="button" data-save="' + (t.id || "") + '">' + (t.id ? "Сохранить" : "Поставить") + '</button></div>';
+    open(h); chips(); dIn.querySelector("#f-title").focus();
+    dIn.querySelector("#f-w").addEventListener("change", function (e) { var l = e.target.value; if (l && watchers.indexOf(l) < 0) watchers.push(l); e.target.value = ""; chips(); });
+  }
+  function chips() { var el = dIn.querySelector("#f-chips"); if (el) el.innerHTML = watchers.map(function (l) { return '<span class="chip">' + esc(nm(l)) + '<button type="button" data-unw="' + esc(l) + '" aria-label="убрать">×</button></span>'; }).join(""); }
+  function err(m) { var e = dIn.querySelector(".err"); if (e) e.textContent = m || ""; }
+
+  dIn.addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    if (b.hasAttribute("data-close")) return close();
+    if (b.hasAttribute("data-quick")) { dIn.querySelector("#f-date").value = shift(D.today, +b.getAttribute("data-quick")); return; }
+    if (b.hasAttribute("data-unw")) { var l = b.getAttribute("data-unw"); watchers = watchers.filter(function (x) { return x !== l; }); chips(); return; }
+    if (b.hasAttribute("data-edit")) return editTask(cur.task);
+    if (b.hasAttribute("data-save")) {
+      var id = b.getAttribute("data-save"), v = function (s) { return dIn.querySelector(s).value; };
+      var due = v("#f-date") ? v("#f-date") + (v("#f-time") ? "T" + v("#f-time") : "") : "";
+      if (!v("#f-title").trim()) return err("Напишите, что сделать");
+      b.disabled = true;
+      return api({ action: id ? "edit" : "create", id: id || undefined, title: v("#f-title"), body: v("#f-body"), assignee: v("#f-as"), due: due, important: dIn.querySelector("#f-imp").checked, watchers: watchers })
+        .then(function (r) { b.disabled = false; if (!r.ok) return err(r.error || "Не сохранилось"); load().then(function () { showTask(id || r.id); }); });
+    }
+    if (b.hasAttribute("data-to")) {
+      var to = b.getAttribute("data-to"), text = dIn.querySelector("#f-cm").value;
+      if (to === "work" && cur.task.status === "review" && !text.trim()) return err("Напишите в комментарии, что доделать");
+      if (to === "cancelled" && !confirm("Отменить задачу?")) return;
+      b.disabled = true;
+      return api({ action: "status", id: cur.task.id, to: to, text: text }).then(function (r) { if (!r.ok) { b.disabled = false; return err(r.error); } load(); showTask(cur.task.id); });
+    }
+    if (b.hasAttribute("data-comment")) {
+      var tx = dIn.querySelector("#f-cm").value.trim(); if (!tx) return;
+      b.disabled = true;
+      return api({ action: "comment", id: cur.task.id, text: tx }).then(function (r) { if (!r.ok) { b.disabled = false; return err(r.error); } showTask(cur.task.id); });
+    }
+  });
+
+  out.addEventListener("click", function (e) { var t = e.target.closest("[data-t]"); if (t) showTask(+t.getAttribute("data-t")); });
+  document.getElementById("tabs").addEventListener("click", function (e) { var b = e.target.closest("[data-tab]"); if (!b) return; tab = b.getAttribute("data-tab"); whoEl.value = ""; render(); });
+  document.getElementById("view").addEventListener("click", function (e) { var b = e.target.closest("[data-v]"); if (!b) return; view = b.getAttribute("data-v"); try { localStorage.setItem("tasks-view", view); } catch (x) {} render(); });
+  document.getElementById("add").addEventListener("click", function () { editTask(null); });
+  qEl.addEventListener("input", render);
+  whoEl.addEventListener("change", render);
+  closedEl.addEventListener("change", load);
+  load().then(function () {
+    var m = /[?&]t=(\d+)/.exec(location.search);
+    if (m) showTask(+m[1]);
+    else if (!count("mine") && count("given")) { tab = "given"; render(); }
+  });
+})();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>

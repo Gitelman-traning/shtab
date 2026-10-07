@@ -1,0 +1,31 @@
+name: Tasks reminders
+
+# По будням утром каждому в Telegram: просроченные задачи, срок сегодня и завтра, что ждёт проверки.
+# Текст собирает сам Штаб (/api/tasks/remind), здесь только вызов по расписанию.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'      # пн–пт, 09:00 МСК
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: 'Dry run: show text, send nothing (1 = yes)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send task reminders
+        env:
+          SHTAB_URL: ${{ secrets.SHTAB_URL }}
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
+          DRY: ${{ inputs.dry }}
+        run: |
+          q=""; [ "$DRY" = "1" ] && q="?dry=1"
+          curl -sS --fail-with-body -X POST "${SHTAB_URL%/}/api/tasks/remind$q" -H "Authorization: Bearer $SHTAB_TOKEN"
