@@ -95,6 +95,17 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 .v-changed b{color:var(--gold);font-weight:600}
 .v-bridge{margin-top:14px;padding:12px 16px;border-radius:12px;border:1px dashed var(--gold-b);font-size:14.5px;font-weight:500}
 .v-note{margin-top:10px;font-size:12.5px;color:var(--dim)}
+.v-chk{align-self:flex-start;font-size:11px;padding:2px 8px;border-radius:7px;background:var(--soft);color:var(--faint);border:1px solid var(--line-2)}
+.v-chk.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.calc-rate{font-size:12.5px;color:var(--dim);margin:0 0 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap} .calc-rate input{width:80px}
+.calc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px} @media (max-width:900px){.calc-grid{grid-template-columns:1fr}}
+.calc-b{background:var(--soft);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.calc-h b{display:block;font-size:14px} .calc-h span{font-size:12px;color:var(--faint)}
+.calc-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.calc-f label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--dim)} .calc-f input{width:100%;background:var(--card);font-variant-numeric:tabular-nums}
+.calc-r{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+.calc-total{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:14px;padding:16px 18px;border-radius:14px;background:var(--bad-bg)}
+.calc-total span{font-size:13px;color:var(--bad);font-weight:600} .calc-total b{font-size:40px;line-height:1;color:var(--bad);font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -210,8 +221,10 @@ function v3facts(L){
     var lv = v3label(it);
     if (/гипотеза про/i.test(lv[0])) return;   // убрано по решению 07.10.2026
     if (/главный вопрос/i.test(lv[0])) { thesis.push('<div><p class="v-lbl">' + esc(lv[0]) + '</p>' + inline(lv[1]) + '</div>'); return; }
+    var mark = "", mm = it.match(/\s*\[(✓|\?)\]\s*$/); if (mm) { mark = mm[1]; it = it.slice(0, mm.index); }
+    var badge = mark === "✓" ? '<span class="v-chk ok" title="цифры и цитаты найдены на странице источника">✓ проверено</span>' : mark === "?" ? '<span class="v-chk" title="проверить по источнику не удалось">не проверено</span>' : "";
     var k = it.lastIndexOf(" → ");
-    cards.push('<div class="v-fact"><div>' + inline(k > 0 ? it.slice(0, k) : it) + '</div>' + (k > 0 ? '<div class="m">' + inline(it.slice(k + 3)) + '</div>' : "") + '</div>'); });
+    cards.push('<div class="v-fact"><div>' + inline(k > 0 ? it.slice(0, k) : it) + '</div>' + (k > 0 ? '<div class="m">' + inline(it.slice(k + 3)) + '</div>' : "") + badge + '</div>'); });
   return '<div class="card" id="v-facts"><h2>Что интересного <small>показать, что изучили не поверхностно</small></h2><div class="v-facts">' + cards.join("") + '</div>' + (thesis.length ? '<div class="v-thesis">' + thesis.join("") + '</div>' : "") + '</div>';
 }
 function v3open(L){
@@ -247,29 +260,81 @@ function v3hyp(L){
   }).join("");
   return '<div class="card" id="v-hyp"><h2>Гипотезы и вопросы <small>отмечайте вопросы по ходу встречи</small></h2><div class="v-hyps">' + html + '</div>' + (more.length ? '<div class="v-more">' + more.join("") + '</div>' : "") + '</div>';
 }
-function v3loss(L){
-  var finalQ = "", ask = "", head = [];
-  L.forEach(function(t){ var lv = v3label(t);
-    if (/итоговый вопрос/i.test(lv[0])) finalQ = lv[1]; else if (/^спросить/i.test(lv[0])) ask = t; else head.push(t); });
-  var body = head.join(" "), items = [], total = "";
-  var am = body.match(/\s*Спросить[^:]*:[\s\S]*$/i); if (am) { if (!ask) ask = am[0].trim(); body = body.slice(0, am.index); }
-  var mt = body.match(/Итого[:\s]*([^.]+)/i); if (mt) total = mt[1].trim();
-  var core = body.replace(/Итого[^.]*\.?/i, "");
-  var c = core.indexOf(":"); if (c >= 0) core = core.slice(c + 1);
-  core.split(/\s·\s/).forEach(function(seg){ seg = seg.trim().replace(/\.$/, ""); var v = v3num(seg); if (v == null) return;
-    var shown = (seg.match(/[−~≈]?\s*\d+(?:[.,]\d+)?\+?\s*(млрд|млн)/) || [""])[0];
-    var label = seg.replace(shown, "").replace(/₽/g, "").replace(/\s+/g, " ").trim(), bare = label.replace(/\(.*?\)/g, "").trim();
-    if (bare.length >= 14) label = bare;
-    items.push({ label: label || seg, v: v, shown: shown, fact: /факт/i.test(seg) }); });
-  var bars = "";
-  if (items.length >= 2) {
-    var max = Math.max.apply(null, items.map(function(x){ return x.v; }));
-    bars = '<div class="v-legend"><span><i style="background:var(--gold-b)"></i>факт из отчётности</span><span><i style="background:repeating-linear-gradient(135deg,var(--gold-a) 0 3px,transparent 3px 5px);border:1px solid var(--gold-a)"></i>гипотеза, уточнить у клиента</span></div><div class="v-loss">'
-      + items.map(function(x){ return '<div class="v-lr"><span>' + esc(x.label) + '</span><span class="tr"><i class="' + (x.fact ? '' : 'hyp') + '" style="width:' + Math.max(6, Math.round(100 * x.v / max)) + '%"></i></span><span class="v">' + esc(x.shown) + '</span></div>'; }).join("")
-      + (total ? '<div class="v-total"><span>Итого, порядок <span class="v-chip">гипотеза</span></span><b>' + esc(total.replace(/\(.*?\)/g, "").trim()) + '</b></div>' : "") + '</div>';
-  } else bars = '<div class="md" style="padding:0">' + md(head.join("\n")) + '</div>';
-  return '<div class="card" id="v-loss"><h2>Сколько теряет <small>порядок цифр в год</small></h2>' + bars + (ask ? '<p class="hint" style="margin-top:8px">' + inline(ask) + '</p>' : "")
-    + (finalQ ? '<div class="v-final"><small>Итоговый вопрос</small>' + inline(finalQ) + '</div>' : "") + '</div>';
+function v3loss(L, calc){
+  var finalQ = "", ask = [], rest = [];
+  L.forEach(function(t){
+    var it = v3item(t), lv = v3label(it == null ? t : it);
+    if (/итоговый вопрос/i.test(lv[0])) finalQ = lv[1];
+    else if (/^спросить/i.test(lv[0])) ask.push(lv[1]);
+    else rest.push(t);
+  });
+  calc = calc || {};
+  var role = calc.key_role || "ключевого специалиста", dept = calc.dept_name || "главное подразделение";
+  var html = '<div class="card" id="v-loss"><h2>Сколько теряет <small>калькулятор на встрече: вводите ответы клиента, цифры — в долларах за год</small></h2>'
+    + '<div class="calc-rate">Курс <input type="number" id="c-rate" step="0.1" min="1"> ₽ за $ <span class="hint" id="c-rate-src"></span></div>'
+    + '<div class="calc-grid">'
+    + calcBlock("profit", "Падение прибыли", "факт из отчётности" + (calc.profit_years ? " · " + esc(calc.profit_years) : ""), [
+        ["c-p1", "Прибыль раньше, $", "money"], ["c-p2", "Прибыль сейчас, $", "money"]])
+    + calcBlock("half", "Команда работает вполсилы", "оценка команды от 1 до 10, никого не разделяя", [
+        ["c-n", "Сотрудников", "int"], ["c-sal", "Средняя зарплата в месяц, $", "money"], ["c-score", "Оценка команды, 1–10", "score"]])
+    + calcBlock("star", "Уход: " + esc(role), "сколько ушло за год и сколько искали замену", [
+        ["c-per", "Выручка на одного в год, $", "money"], ["c-left", "Ушло за год", "int"], ["c-months", "Месяцев на замену", "int"]])
+    + calcBlock("dept", "Недобор: " + esc(dept), "на сколько процентов могло бы зарабатывать больше", [
+        ["c-dept", "Выручка за год, $", "money"], ["c-pct", "Недобор, %", "int"]])
+    + '</div>'
+    + '<div class="calc-total"><span>Теряет в год, порядок</span><b id="c-total">—</b></div>'
+    + (calc.note ? '<p class="hint" style="margin-top:6px">Заполнено заранее: ' + esc(calc.note) + '. Всё можно поправить на встрече.</p>' : "")
+    + (ask.length ? '<div class="v-more">' + ask.map(function(a){ return '<div><b>Спросить для калькулятора</b>' + inline(a) + '</div>'; }).join("") + '</div>' : "")
+    + (rest.length && !ask.length && !finalQ ? '<div class="md" style="padding:0">' + md(rest.join("\n")) + '</div>' : "")
+    + (finalQ ? '<div class="v-final"><small>Итоговый вопрос</small>' + inline(finalQ) + '</div>' : "")
+    + '</div>';
+  return html;
+}
+function calcBlock(id, title, sub, fields){
+  return '<div class="calc-b" data-b="' + id + '"><div class="calc-h"><b>' + title + '</b><span>' + sub + '</span></div><div class="calc-f">'
+    + fields.map(function(f){ return '<label><span>' + esc(f[1]) + '</span><input type="number" id="' + f[0] + '" data-kind="' + f[2] + '" min="0"' + (f[2] === "score" ? ' max="10" step="1"' : f[2] === "money" ? ' step="1000"' : ' step="1"') + '></label>'; }).join("")
+    + '</div><div class="calc-r" id="c-r-' + id + '">—</div></div>';
+}
+function fmtUSD(x){
+  if (!isFinite(x) || x <= 0) return "$0";
+  if (x >= 1e6) return "$" + (x / 1e6).toFixed(x >= 1e8 ? 0 : 1).replace(".", ",") + " млн";
+  if (x >= 1e3) return "$" + Math.round(x / 1e3) + " тыс";
+  return "$" + Math.round(x);
+}
+// заполнить поля из блока calc подготовки (₽ → $ по курсу) и пересчитывать на каждый ввод
+function calcInit(calc){
+  calc = calc || {};
+  var $ = function(id){ return document.getElementById(id); };
+  if (!$("c-rate")) return;
+  function prefill(){
+    var r = Number($("c-rate").value) || 95, mln = function(v){ return v == null || v === "" ? "" : Math.round(Number(v) * 1e6 / r); };
+    $("c-p1").value = mln(calc.profit_prev); $("c-p2").value = mln(calc.profit_cur);
+    $("c-n").value = calc.staff || ""; $("c-sal").value = calc.avg_salary_month ? Math.round(Number(calc.avg_salary_month) * 1000 / r) : "";
+    if (!$("c-score").value) $("c-score").value = 7;
+    $("c-per").value = calc.revenue && calc.key_count ? Math.round(Number(calc.revenue) * 1e6 / Number(calc.key_count) / r) : "";
+    if (!$("c-left").value) $("c-left").value = 1; if (!$("c-months").value) $("c-months").value = 6;
+    $("c-dept").value = mln(calc.dept_revenue); if (!$("c-pct").value) $("c-pct").value = 10;
+    recalc();
+  }
+  function recalc(){
+    var v = function(id){ return Math.max(0, Number($(id).value) || 0); };
+    var res = {
+      profit: Math.max(0, v("c-p1") - v("c-p2")),
+      half: v("c-n") * v("c-sal") * 12 * Math.max(0, 10 - Math.min(10, v("c-score"))) / 10,
+      star: v("c-per") * v("c-left") * v("c-months") / 12,
+      dept: v("c-dept") * v("c-pct") / 100
+    }, total = 0;
+    Object.keys(res).forEach(function(k){ $("c-r-" + k).textContent = fmtUSD(res[k]); total += res[k]; });
+    $("c-total").textContent = "≈ " + fmtUSD(total);
+  }
+  $("c-rate").value = 95; $("c-rate-src").textContent = "по умолчанию";
+  [].forEach.call(document.querySelectorAll("#v-loss input[type=number]"), function(i){ i.addEventListener("input", i.id === "c-rate" ? prefill : recalc); });
+  prefill();
+  // курс ЦБ на сегодня, если доступен
+  fetch("https://www.cbr-xml-daily.ru/daily_json.js").then(function(r){ return r.json(); }).then(function(j){
+    var usd = j && j.Valute && j.Valute.USD && j.Valute.USD.Value;
+    if (usd) { $("c-rate").value = usd.toFixed(1); $("c-rate-src").textContent = "курс ЦБ на " + String(j.Date || "").slice(0, 10).split("-").reverse().join("."); prefill(); }
+  }).catch(function(){});
 }
 function v3cases(L){
   var cases = [], bridge = "", notes = [], cur = null;
@@ -299,13 +364,13 @@ function v3cases(L){
     + (bridge ? '<div class="v-bridge"><small>Мостик после кейсов</small>' + inline(bridge) + '</div>' : "") + (notes.length ? '<div class="v-note">' + notes.map(inline).join("<br>") + '</div>' : "") + '</div>';
 }
 // разложить подготовку по блокам; null — если это не структура v3 (тогда прежний вид с раскрывающимися разделами)
-function renderV3(secs){
+function renderV3(secs, calc){
   var by = {}, kinds = 0;
   secs.forEach(function(s){ var k = v3kind(s.title); if (k && !by[k]) { by[k] = v3lines(s.body); kinds++; } });
   if (!(by.hyp && (by.cmp || by.open) && kinds >= 4)) return null;
   var top = (by.cheat ? v3cheat(by.cheat) : "") + (by.cmp ? v3cmp(by.cmp) : "");
   var html = (top ? '<div class="v-top">' + top + '</div>' : "") + (by.facts ? v3facts(by.facts) : "") + (by.open ? v3open(by.open) : "")
-    + v3hyp(by.hyp) + (by.loss ? v3loss(by.loss) : "") + (by.cases ? v3cases(by.cases) : "");
+    + v3hyp(by.hyp) + (by.loss ? v3loss(by.loss, calc) : "") + (by.cases ? v3cases(by.cases) : "");
   var toc = Object.keys(V3_TOC).filter(function(k){ return by[k]; }).map(function(k){ return '<a href="#v-' + k + '" data-v="v-' + k + '">' + V3_TOC[k] + '</a>'; }).join("") ;
   return { html: html, toc: toc };
 }
@@ -384,11 +449,13 @@ function showDetail(deal){
       + (r.updated_at ? "<br>обновлено " + esc(r.updated_at.slice(0, 16).replace("T", " ")) + " UTC" : "") + (r.model ? "<br>" + esc(r.model) + " · " + (r.tokens_in + r.tokens_out).toLocaleString("ru") + " токенов · " + r.searches + " поисков" : "");
     document.getElementById("d-amo").href = r.amo_url || ("https://pavelgitelman.amocrm.ru/leads/detail/" + r.deal);
     var q = document.getElementById("d-quiz"); q.hidden = !r.quiz_url; if (r.quiz_url) q.href = r.quiz_url;
-    var secs = sections(r.brief), cheat = secs.filter(function(s){ return /ШПАРГАЛКА/i.test(s.title); })[0];
-    var v3 = renderV3(secs);
+    var calc = null, brief = String(r.brief || "").replace(/```calc\s*([\s\S]*?)```/, function(_, j){ try { calc = JSON.parse(j); } catch (e) { calc = null; } return ""; });
+    var secs = sections(brief), cheat = secs.filter(function(s){ return /ШПАРГАЛКА/i.test(s.title); })[0];
+    var v3 = renderV3(secs, calc);
     document.getElementById("d-v3").hidden = !v3; document.getElementById("d-toc").hidden = !v3;
     document.getElementById("d-v3").innerHTML = v3 ? v3.html : "";
     document.querySelector("#d-toc .in").innerHTML = v3 ? v3.toc : "";
+    if (v3) calcInit(calc);
     document.getElementById("d-sections-card").hidden = !!v3; document.getElementById("d-cases-card").hidden = !!v3; document.getElementById("v-dossier").hidden = !!v3;
     if (v3) cheat = null;
     document.getElementById("d-cheat").hidden = !cheat;

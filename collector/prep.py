@@ -396,6 +396,116 @@ def alumni_growth(case):
 HEROES_PATH = os.environ.get("PREP_HEROES", os.path.join(os.path.dirname(__file__), "prep_heroes.md"))
 
 
+# ---------- фактчекинг раздела «Что интересного» (решение 07.10.2026: варианты 1 + 2 + 4) ----------
+# 1. Без модели: открываем страницу-источник и ищем в тексте цифры и цитаты факта.
+# 2. Что не нашлось — проверяет дешёвая модель (по тексту страницы или поиском): подтверждено / искажено / нет в источнике.
+# 4. Метка у факта: [✓] проверено, [?] не удалось проверить. Искажённое и ненайденное — выкидываем.
+
+RE_LINK = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
+RE_QUOTE = re.compile(r"«([^»]{12,})»")
+RE_NUM = re.compile(r"\d+(?:[.,]\d+)?")
+_page_cache = {}
+
+
+def _norm(t):
+    t = (t or "").lower().replace("ё", "е").replace("\xa0", " ")
+    t = re.sub(r"[«»\"“”„'’]", "", t)
+    return re.sub(r"\s+", " ", t)
+
+
+def page_text(url):
+    if url in _page_cache:
+        return _page_cache[url]
+    import html as _html
+    text = ""
+    try:
+        r = requests.get(url, timeout=25, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+                                                   "Accept-Language": "ru,en;q=0.8"})
+        if r.status_code == 200 and "html" in r.headers.get("content-type", "html"):
+            t = re.sub(r"(?is)<(script|style|noscript)[^>]*>.*?</\1>", " ", r.text)
+            text = _html.unescape(re.sub(r"<[^>]+>", " ", t))
+    except requests.RequestException:
+        text = ""
+    _page_cache[url] = _norm(text)
+    return _page_cache[url]
+
+
+def _claims(fact):
+    body = RE_LINK.sub(" ", fact.rsplit(" → ", 1)[0])   # вывод «→ что значит» — после последней стрелки
+    quotes = [_norm(q)[:70] for q in RE_QUOTE.findall(body)]
+    nums = [n for n in RE_NUM.findall(RE_QUOTE.sub(" ", body)) if len(n.replace(",", "").replace(".", "")) >= 2]
+    return quotes, nums
+
+
+def _num_in(n, text):
+    variants = {n, n.replace(",", "."), n.replace(".", ",")}
+    return any(re.search(r"(?<![\d])%s(?![\d])" % re.escape(v), text) for v in variants)
+
+
+VERIFY_SYS = """Ты проверяешь факт по источнику. Тебе дадут утверждение, адрес источника и, если удалось скачать, текст страницы.
+Сверь каждую цифру и каждую цитату. Ответь ОДНОЙ строкой, без пояснений до неё:
+ПОДТВЕРЖДЕНО — если всё совпадает (допустимы округления и пересказ без искажения смысла);
+ИСКАЖЕНО: <как правильно, с цифрой> — если цифра или цитата в источнике другая;
+НЕ НАЙДЕНО — если в источнике этого нет или источник недоступен."""
+
+
+def verify_fact(fact):
+    """→ (метка, комментарий, usage): ok / bad / unknown"""
+    links = RE_LINK.findall(fact)
+    if not links:
+        return "unknown", "нет ссылки на источник", {}
+    texts = [page_text(u) for _, u in links[:2]]
+    quotes, nums = _claims(fact)
+    joined = " ".join(texts)
+    if joined.strip() and (quotes or nums):
+        q_ok = all(q[:40] in joined for q in quotes)
+        n_ok = sum(1 for n in nums if _num_in(n, joined)) >= max(1, round(len(nums) * 0.7)) if nums else True
+        if q_ok and n_ok:
+            return "ok", "найдено на странице", {}
+    excerpt = ""
+    if joined.strip():
+        # кусок страницы вокруг первой цифры/цитаты, чтобы не гнать в модель всю страницу
+        key = (quotes[0][:20] if quotes else (nums[0] if nums else ""))
+        i = joined.find(key) if key else -1
+        excerpt = joined[max(0, i - 4000): i + 4000] if i >= 0 else joined[:15000]
+    user = "Утверждение: %s\nИсточник: %s\n%s" % (RE_LINK.sub(r"\1", fact), ", ".join(u for _, u in links[:2]),
+                                                  ("Текст страницы (фрагмент):\n" + excerpt) if excerpt else "Страницу скачать не удалось — проверь поиском.")
+    try:
+        text, _, usage = claude(VERIFY_SYS, user, search_uses=0 if excerpt else 2, max_tokens=200, model=MODEL_GROWTH)
+    except Exception as e:
+        return "unknown", "проверка не удалась: %s" % str(e)[:60], {}
+    head = text.strip().splitlines()[0] if text.strip() else ""
+    if head.upper().startswith("ПОДТВЕРЖДЕНО"):
+        return "ok", "подтверждено моделью", usage
+    if head.upper().startswith("ИСКАЖЕНО") or head.upper().startswith("НЕ НАЙДЕНО"):
+        return "bad", head[:160], usage
+    return "unknown", head[:120], usage
+
+
+def factcheck_brief(brief, usage):
+    """Проверить пункты раздела «Что интересного»: подтверждённые — с [✓], непроверяемые — с [?], искажённые — убрать."""
+    lines, out, in_sec, report = brief.splitlines(), [], False, []
+    for line in lines:
+        if re.match(r"^##\s+\d+\.", line):
+            in_sec = bool(re.search(r"ИНТЕРЕСН", line, re.I))
+        m = re.match(r"^(\s*[-*•]\s+)(.*)$", line)
+        if in_sec and m and not re.match(r"(?i)\**главный вопрос", m.group(2)):
+            mark, note, u = verify_fact(m.group(2))
+            if u:
+                add_usage(usage, u, cheap=True)
+            report.append((mark, m.group(2)[:80], note))
+            if mark == "bad":
+                continue
+            line = line.rstrip() + (" [✓]" if mark == "ok" else " [?]")
+        out.append(line)
+    ok = sum(1 for r in report if r[0] == "ok")
+    bad = [r for r in report if r[0] == "bad"]
+    log("  фактчекинг: пунктов %d, подтверждено %d, убрано %d, не проверено %d" % (len(report), ok, len(bad), len(report) - ok - len(bad)))
+    for r in bad:
+        log("    убран: %s… — %s" % (r[1], r[2]))
+    return "\n".join(out)
+
+
 def build_brief(ctx, facts, picked, prompt, owner=""):
     cases_txt = []
     for i, c in enumerate(picked, 1):
@@ -760,6 +870,7 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
     facts_full = facts + ("\n\n## О собственнике: интервью, победы, факты\n" + owner if owner else "")
     brief, _, u = build_brief(ctx, facts, picked, prompt, owner)
     add_usage(usage, u)
+    brief = factcheck_brief(brief, usage)
     log("  подготовка: %d символов, всего токенов %d/%d, поисков %d, %d сек, ≈ %.0f ₽" % (
         len(brief), usage["in"], usage["out"], usage["search"], time.time() - t0, usage.get("rub", 0)))
     row = {"deal": deal, "contact": ctx["contact"], "meet_at": ctx["meet_at"], "manager": ctx["manager"], "client": ctx["card"].get("Имя", ""),
