@@ -16,8 +16,10 @@
 .btn.ghost{background:none;border:1px solid var(--line-2);color:var(--dim);font-weight:500}
 .btn.danger{background:var(--bad-bg);color:var(--bad)}
 .btn:hover{filter:brightness(.97)}
-.org{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:16px;align-items:start}
-.org .top{grid-column:1/-1}
+/* раскладка «кирпичами»: карточки отделов раскладываются по колонкам в самую короткую, без дыр под высокими карточками */
+.org{display:flex;flex-direction:column;gap:16px}
+.org .cols{display:flex;gap:16px;align-items:flex-start}
+.org .col{flex:1;min-width:0;display:flex;flex-direction:column;gap:16px}
 .dept{background:var(--card);border-radius:16px;padding:16px 16px 12px}
 .dept>.hd,.subd>.hd{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
 .dept>.hd h2{margin:0;font-size:15px;font-weight:600}
@@ -59,7 +61,7 @@ dialog .kid{display:flex;gap:6px}dialog .kid .k-name{flex:1}dialog .kid .k-birth
 dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 dialog .in{max-height:calc(100vh - 40px);overflow:auto}
 .ttl .av{width:44px;height:44px;font-size:15px}
-@media (max-width:760px){main{padding:16px}.org{grid-template-columns:1fr}.org .top .ppl{grid-template-columns:1fr}}
+@media (max-width:760px){main{padding:16px}.org .top .ppl{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -149,7 +151,30 @@ dialog .in{max-height:calc(100vh - 40px);overflow:auto}
     document.getElementById("cnt").textContent = n + " " + plural(n, ["сотрудник", "сотрудника", "сотрудников"]) + " · " + tops.length + " " + plural(tops.length, ["отдел", "отдела", "отделов"]);
     if (!html) html = '<div class="card empty">' + (q ? "Никого не нашлось." : D.can_edit ? "Сотрудников пока нет. Добавьте вручную или загрузите из таблицы." : "Структура пока не заполнена.") + '</div>';
     orgEl.innerHTML = html;
+    layout();
   }
+  // раскладываем карточки по колонкам: число колонок от ширины, каждая карточка — в самую короткую колонку
+  var lastCols = 0;
+  function layout(force) {
+    var cards = [].slice.call(orgEl.querySelectorAll("section.dept:not(.top)"));
+    if (!cards.length) return;
+    var n = Math.max(1, Math.floor((orgEl.clientWidth + 16) / 326));
+    if (!force && n === lastCols && orgEl.querySelector(".cols")) return;
+    lastCols = n;
+    var old = orgEl.querySelector(".cols"); if (old) old.remove();
+    var wrap = document.createElement("div"); wrap.className = "cols";
+    var cols = [], h = [];
+    for (var i = 0; i < n; i++) { var c = document.createElement("div"); c.className = "col"; wrap.appendChild(c); cols.push(c); h.push(0); }
+    orgEl.appendChild(wrap);
+    cards.forEach(function (card) {
+      var k = h.indexOf(Math.min.apply(null, h));
+      cols[k].appendChild(card); h[k] += card.offsetHeight + 16;
+    });
+  }
+  // ширина меняется от окна, масштаба браузера и свёрнутого меню — следим за самим блоком
+  var rt, relayout = function () { clearTimeout(rt); rt = setTimeout(function () { layout(false); }, 100); };
+  if (window.ResizeObserver) new ResizeObserver(relayout).observe(orgEl);
+  window.addEventListener("resize", relayout);
   function plural(n, f) { var m = n % 10, h = n % 100; return f[m === 1 && h !== 11 ? 0 : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? 1 : 2]; }
 
   function load() {
