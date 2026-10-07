@@ -9,10 +9,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
 <style>
-:root{--page:#faf8f4;--card:#fff;--soft:#f3f1ec;--zebra:#faf9f6;--line:#f1eee8;--line-2:#e7e3da;--ink:#2b2721;--dim:#7b766f;--faint:#a29d95;--gold:#8a6f3d;--gold-soft:#efe7d6;--gold-b:#b59f76;--ok:#38765a;--ok-bg:#e8f2ec;--bad:#ad4636;--bad-bg:#fbe9e6}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--page:#161718;--card:#1e2021;--soft:#232526;--zebra:#202223;--line:#282a2b;--line-2:#333637;--ink:#eceae5;--dim:#9a958d;--faint:#75716a;--gold:#c9b487;--gold-soft:#2a2721;--ok:#7cc396;--ok-bg:#1b2b23;--bad:#e58975;--bad-bg:#2f1e1a}}
-:root[data-theme="dark"]{--page:#161718;--card:#1e2021;--soft:#232526;--zebra:#202223;--line:#282a2b;--line-2:#333637;--ink:#eceae5;--dim:#9a958d;--faint:#75716a;--gold:#c9b487;--gold-soft:#2a2721;--ok:#7cc396;--ok-bg:#1b2b23;--bad:#e58975;--bad-bg:#2f1e1a}
-*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font-family:Inter,Arial,sans-serif;font-size:14px;line-height:1.5}
+:root{--page:#faf8f4;--card:#fff;--soft:#f3f1ec;--zebra:#faf9f6;--line:#f1eee8;--line-2:#e7e3da;--ink:#2b2721;--dim:#7b766f;--faint:#a29d95;--gold:#8a6f3d;--gold-soft:#efe7d6;--gold-b:#b59f76;--ok:#38765a;--ok-bg:#e8f2ec;--bad:#ad4636;--bad-bg:#fbe9e6;--shade:rgba(20,18,15,.35)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--page:#161718;--card:#1e2021;--soft:#232526;--zebra:#202223;--line:#282a2b;--line-2:#333637;--ink:#eceae5;--dim:#9a958d;--faint:#75716a;--gold:#c9b487;--gold-soft:#2a2721;--ok:#7cc396;--ok-bg:#1b2b23;--bad:#e58975;--bad-bg:#2f1e1a;--shade:rgba(0,0,0,.55)}}
+:root[data-theme="dark"]{--page:#161718;--card:#1e2021;--soft:#232526;--zebra:#202223;--line:#282a2b;--line-2:#333637;--ink:#eceae5;--dim:#9a958d;--faint:#75716a;--gold:#c9b487;--gold-soft:#2a2721;--ok:#7cc396;--ok-bg:#1b2b23;--bad:#e58975;--bad-bg:#2f1e1a;--shade:rgba(0,0,0,.55)}
+[hidden]{display:none!important}*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font-family:Inter,Arial,sans-serif;font-size:14px;line-height:1.5}
 a{color:var(--gold)}
 .layout{display:flex;min-height:100vh}
 .side{width:216px;flex:none;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;padding:16px 12px 14px;overflow:hidden;transition:width .16s ease;position:sticky;top:0;height:100vh}
@@ -33,26 +33,90 @@ a{color:var(--gold)}
 :root[data-menu="mini"] .side nav a,:root[data-menu="mini"] .side .collapse{justify-content:center;padding:11px 0}
 .pane{flex:1;min-width:0;display:flex;flex-direction:column}
 @media (max-width:760px){.side{width:66px}.side .txt,.side nav a span,.side .collapse span,.side nav .grp{display:none}.side nav a,.side .collapse{justify-content:center;padding:11px 0}}
-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 24px;background:var(--card);border-bottom:1px solid var(--line)}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 24px;background:var(--card);border-bottom:1px solid var(--line);position:relative}
 header h1{margin:0;font-size:15px;font-weight:600}header .sub{margin:0;font-size:12px;color:var(--dim)}header .spacer{flex:1}
-main{padding:22px 24px 70px;display:flex;flex-direction:column;gap:18px;max-width:1200px}
+main{padding:18px 24px 70px;display:flex;flex-direction:column;gap:14px;max-width:1240px;width:100%}
 .card{background:var(--card);border-radius:16px;padding:18px 20px}
-h2{margin:0 0 10px;font-size:14.5px;font-weight:600}table{border-collapse:collapse;width:100%;font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{font-weight:500;color:var(--faint);font-size:11.5px;white-space:nowrap}
 tbody tr:last-child td{border-bottom:0}
 .sub{color:var(--dim);font-size:12.5px}.err{color:var(--bad)}.ok{color:var(--ok)}
-.pill{font-size:11px;padding:2px 8px;border-radius:7px;background:var(--soft);color:var(--dim)}
+.pill{display:inline-block;font-size:11px;line-height:1.5;padding:2px 8px;border-radius:7px;background:var(--soft);color:var(--dim);white-space:nowrap}
 .pill.admin{background:var(--gold-soft);color:var(--gold)}.pill.head{background:var(--ok-bg);color:var(--ok)}.pill.off{background:var(--bad-bg);color:var(--bad)}
-input,select{font:inherit;padding:8px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--page);color:var(--ink)}
-button{font:inherit;font-size:12.5px;padding:7px 12px;border:0;border-radius:8px;background:var(--gold);color:#fff;cursor:pointer}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--page);color:var(--ink);min-width:0}
+input:focus,select:focus{outline:none;border-color:var(--gold-b)}
+button{font:inherit;font-size:12.5px;padding:7px 12px;border:0;border-radius:8px;background:var(--gold);color:#fff;cursor:pointer;white-space:nowrap}
 button.ghost{background:var(--soft);color:var(--ink)}button.danger{background:var(--bad-bg);color:var(--bad)}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .temp{background:var(--gold-soft);color:var(--gold);padding:10px 12px;border-radius:10px;font-size:13px;margin-top:10px}
 .temp code{font-size:15px;font-weight:600;user-select:all}
-.actions button{margin-right:4px;padding:5px 9px;font-size:12px}
-details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font-size:12.5px}
+/* вкладки страницы */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line-2)}
+.tabs span{padding:8px 12px;font-size:13.5px;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;user-select:none}
+.tabs span:hover{color:var(--ink)}.tabs span.on{color:var(--ink);font-weight:600;border-bottom-color:var(--gold)}
+.tabs small{color:var(--faint);font-weight:400;margin-left:4px}
+/* плашка заявок */
+.pend{background:var(--gold-soft);color:var(--gold);border-radius:14px;padding:12px 16px}
+.pend .hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13.5px}.pend .hd b{font-weight:600}.pend .hd button{margin-left:auto}
+.pend .list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.preq{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px}
+.preq .who{flex:1;min-width:160px}
+/* панель инструментов */
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tools input[type=search]{flex:1;min-width:200px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips span{font-size:12.5px;padding:6px 11px;border-radius:8px;background:var(--card);border:1px solid var(--line-2);color:var(--dim);cursor:pointer;user-select:none}
+.chips span:hover{color:var(--ink)}.chips span.on{background:var(--ink);border-color:var(--ink);color:var(--page)}
+.chips small{opacity:.7;margin-left:3px}
+/* список + панель */
+.split{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:14px;align-items:start}
+.split.nopanel{grid-template-columns:minmax(0,1fr)}
+.people{background:var(--card);border-radius:16px;padding:6px}
+.u{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer}
+.u+.u{border-top:1px solid var(--line)}.u:hover{background:var(--soft)}.u.on{background:var(--gold-soft)}.u.on+.u,.u:hover+.u{border-top-color:transparent}
+.u.inactive .nm,.u.inactive .av{opacity:.5}
+.u .nm{flex:1;min-width:0}.u .nm b{font-weight:500;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.u .nm .sub{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.u .tags{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.av{width:34px;height:34px;flex:none;border-radius:50%;background:var(--soft);color:var(--dim);display:grid;place-items:center;font-size:12px;font-weight:600;overflow:hidden}
+.av img{width:100%;height:100%;object-fit:cover}
+.av.lg{width:46px;height:46px;font-size:15px}
+.av.c1{background:var(--gold-soft);color:var(--gold)}.av.c2{background:var(--ok-bg);color:var(--ok)}.av.c3{background:var(--bad-bg);color:var(--bad)}
+.empty{padding:28px 12px;text-align:center;color:var(--faint);font-size:13px}
+.panel{background:var(--card);border-radius:16px;padding:18px 20px;position:sticky;top:14px;max-height:calc(100vh - 28px);overflow:auto}
+.panel .top{display:flex;align-items:center;gap:12px}.panel .top .nm{flex:1;min-width:0}.panel .top b{font-size:15px;font-weight:600;display:block}
+.panel .x{background:none;color:var(--faint);font-size:20px;line-height:1;padding:4px 8px}.panel .x:hover{color:var(--ink)}
+.panel .tabs{margin:14px 0 14px}.panel .tabs span{padding:7px 10px;font-size:13px}
+.fld{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}.fld>span{font-size:12px;color:var(--faint)}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px;margin:4px 0 14px}.facts dt{color:var(--faint)}.facts dd{margin:0}
+.actrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}.actrow:first-child{border-top:0;padding-top:0}
+.actrow .t{flex:1}.actrow .t b{font-weight:500;display:block}
+.foot{display:flex;gap:10px;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.hist{display:flex;flex-direction:column}.hist div{padding:8px 0;border-top:1px solid var(--line);font-size:13px}.hist div:first-child{border-top:0}
+.hist .sub{font-size:12px}
+.note{font-size:12.5px;color:var(--dim);background:var(--soft);border-radius:10px;padding:10px 12px;margin-bottom:12px}
+.shade{display:none}
+@media (max-width:1000px){
+  .split{grid-template-columns:minmax(0,1fr)}
+  .panel{position:fixed;z-index:70;top:0;right:0;bottom:0;width:min(440px,100%);max-height:none;border-radius:0;box-shadow:-8px 0 30px rgba(0,0,0,.18)}
+  .shade.show{display:block;position:fixed;inset:0;z-index:69;background:var(--shade)}
+}
+@media (max-width:560px){main{padding:14px 12px 60px}header{padding:14px 14px}.u .tags .pill:not(.role){display:none}}
+/* права */
+.rights{display:flex;flex-direction:column;gap:8px}
+.presets{display:flex;gap:6px;flex-wrap:wrap}.presets span{font-size:12px;padding:5px 10px;border-radius:8px;background:var(--soft);color:var(--dim);cursor:pointer}.presets span:hover{color:var(--ink)}
+.dept{border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.dept .hd,.dept .rw{display:flex;align-items:center;gap:10px;font-size:13px}
+.dept .hd{font-weight:600;font-size:13px}.dept .rw{padding:5px 0 5px 12px;color:var(--dim)}.dept .rw.rw2{padding-left:24px}
+.dept .hd .seg,.dept .rw .seg{margin-left:auto;flex:none}
+.seg{display:inline-flex;background:var(--soft);border-radius:8px;padding:2px}.seg span{font-size:11.5px;padding:4px 9px;border-radius:6px;color:var(--dim);cursor:pointer;user-select:none}
+.seg span.on0{background:var(--card);color:var(--ink)}.seg span.on1{background:var(--gold-soft);color:var(--gold);font-weight:600}.seg span.on2{background:var(--ok-bg);color:var(--ok);font-weight:600}
+.seg span.inh{opacity:.55}
+/* мой пароль */
+.mepop{position:absolute;right:24px;top:calc(100% + 6px);z-index:30;background:var(--card);border:1px solid var(--line-2);border-radius:14px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.14);width:min(320px,calc(100vw - 28px));display:flex;flex-direction:column;gap:8px}
+.mepop b{font-weight:600}
 .pick{position:relative;display:inline-block}
-.pick>button{font:inherit;font-size:13px;padding:8px 30px 8px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--page);color:var(--ink);cursor:pointer;min-width:220px;text-align:left;position:relative}
+.pick>button{font:inherit;font-size:13px;padding:8px 30px 8px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--page);color:var(--ink);cursor:pointer;min-width:200px;text-align:left;position:relative}
 .pick>button::after{content:"";position:absolute;right:11px;top:50%;width:7px;height:7px;border-right:1.6px solid var(--dim);border-bottom:1.6px solid var(--dim);transform:translateY(-70%) rotate(45deg)}
 .pick>button .ph{color:var(--faint)}
 .pick .menu{position:absolute;z-index:20;top:calc(100% + 4px);left:0;min-width:240px;background:var(--card);border:1px solid var(--line-2);border-radius:10px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);display:none}
@@ -60,53 +124,51 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font-size:12.5px
 .pick label{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:7px;cursor:pointer;font-size:13px}
 .pick label:hover{background:var(--soft)}.pick label small{color:var(--faint);margin-left:auto}
 .pick input[type=checkbox]{width:15px;height:15px;margin:0;accent-color:var(--gold)}
-.rights{display:flex;flex-direction:column;gap:8px;padding:6px 0 2px}
-.presets{display:flex;gap:6px;flex-wrap:wrap}.presets span{font-size:12px;padding:5px 10px;border-radius:8px;background:var(--soft);color:var(--dim);cursor:pointer}.presets span:hover{color:var(--ink)}
-.dept{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
-.dept .hd{display:flex;align-items:center;gap:10px;font-weight:600;font-size:13.5px}.dept .hd .seg{margin-left:auto}
-.dept .rw{display:flex;align-items:center;gap:10px;padding:5px 0 5px 14px;font-size:13px;color:var(--dim)}.dept .rw.rw2{padding-left:30px}.dept .rw .seg{margin-left:auto}
-.seg{display:inline-flex;background:var(--soft);border-radius:8px;padding:2px}.seg span{font-size:11.5px;padding:4px 10px;border-radius:6px;color:var(--dim);cursor:pointer;user-select:none}
-.seg span.on0{background:var(--card);color:var(--ink)}.seg span.on1{background:var(--gold-soft);color:var(--gold);font-weight:600}.seg span.on2{background:var(--ok-bg);color:var(--ok);font-weight:600}
-.seg span.inh{opacity:.55}
 </style>
 </head>
 <body>
 <div class="layout">
 <aside class="side" id="side"></aside>
 <div class="pane">
-<header><div><h1>Штаб · Пользователи</h1><p class="sub">кто заходит, что может, что менял</p></div><div class="spacer"></div><div id="who" class="sub"></div></header>
+<header><div><h1>Штаб · Пользователи</h1><p class="sub">кто заходит, что может, что менял</p></div><div class="spacer"></div><button class="ghost" id="me-btn" hidden>Мой пароль</button>
+  <div class="mepop" id="me-pop" hidden><b>Сменить мой пароль</b>
+    <form autocomplete="off" onsubmit="return false" style="display:contents"><input id="p-old" type="password" placeholder="Текущий пароль" autocomplete="off" name="x-old"><input id="p-new" type="password" placeholder="Новый пароль, от 8 символов" autocomplete="new-password" name="x-new"></form>
+    <div class="row"><button id="p-save">Сменить</button><span id="p-msg" class="sub"></span></div>
+  </div>
+</header>
 <main>
   <div class="card" id="denied" hidden><p class="err">Раздел только для администратора. Вы вошли под общим паролем или без прав.</p></div>
-  <div class="card" id="me-card" hidden><h2>Мой пароль</h2>
-    <div class="row"><form autocomplete="off" onsubmit="return false" style="display:contents"><input id="p-old" type="password" placeholder="Текущий пароль" autocomplete="off" name="x-old"><input id="p-new" type="password" placeholder="Новый пароль, от 8 символов" autocomplete="new-password" name="x-new"></form><button id="p-save">Сменить</button><span id="p-msg" class="sub"></span></div>
-  </div>
-  <div class="card" id="pending-card" hidden><h2>Заявки на доступ <small class="sub">зарегистрировались и ждут подтверждения: выберите роль и разделы</small></h2><div id="pending"></div></div>
-  <div class="card" id="list-card" hidden><h2>Пользователи <small class="sub" id="cnt"></small></h2><div id="list"></div><div id="u-out"></div></div>
-  <div class="card" id="add-card" hidden><h2>Добавить пользователя</h2>
-    <div class="row">
-      <input id="n-login" placeholder="логин, латиницей" style="width:170px" autocomplete="off" name="new-user-login">
-      <input id="n-name" placeholder="Имя Фамилия" style="width:200px" autocomplete="off" name="new-user-name">
-      <select id="n-role"><option value="head">руководитель раздела</option><option value="member">сотрудник</option><option value="viewer">только смотрит</option><option value="admin">администратор</option></select>
-      <span class="sub">права по разделам настраиваются после создания, кнопкой «изменить»</span><div class="pick" id="n-sections" hidden></div>
-      <button id="n-add">Создать</button>
+  <div id="app" style="display:none">
+  <div class="tabs" id="tabs"><span data-t="people" class="on">Люди<small id="cnt"></small></span><span data-t="log">Журнал действий</span></div>
+
+  <section id="t-people" style="display:flex;flex-direction:column;gap:14px">
+    <div class="pend" id="pend" hidden>
+      <div class="hd"><span id="pend-txt"></span><button class="ghost" id="pend-btn">Разобрать</button></div>
+      <div class="list" id="pend-list" hidden></div>
     </div>
-    <p class="sub" style="margin:8px 0 0">Роли: администратор видит всё и управляет пользователями; руководитель и сотрудник видят всё, но менять вид могут только в своих разделах; «только смотрит» — как общий пароль, но под своим именем. Временный пароль показывается один раз, при первом входе его нужно сменить.</p>
-    <div id="n-out"></div>
+    <div class="tools">
+      <input type="search" id="q" placeholder="Поиск по имени, логину, Telegram" autocomplete="off">
+      <div class="chips" id="chips"></div>
+      <button id="add-btn">+ Добавить</button>
+    </div>
+    <div id="out"></div>
+    <div class="split nopanel" id="split">
+      <div class="people" id="people"><div class="empty">загружаю…</div></div>
+      <aside class="panel" id="panel" hidden></aside>
+    </div>
+  </section>
+
+  <section id="t-log" hidden>
+    <div class="card">
+      <div class="tools" style="margin-bottom:10px"><input type="search" id="lq" placeholder="Поиск по журналу: логин, действие, подробности" autocomplete="off"><span class="sub" id="lcnt"></span></div>
+      <div id="log"><p class="sub">загружаю…</p></div>
+    </div>
+  </section>
   </div>
-  <div class="card" id="rights-card" hidden><h2>Что дают роли и разделы</h2>
-    <table><thead><tr><th>Роль</th><th>Видит</th><th>Меняет вид разделов</th><th>Пользователи и заявки</th><th>Кому подходит</th></tr></thead><tbody>
-      <tr><td><span class="pill admin">администратор</span></td><td>всё</td><td>любой раздел, включая общий экран</td><td>создаёт, подтверждает, сбрасывает пароли, отключает</td><td>Никита, собственники, операционный директор</td></tr>
-      <tr><td><span class="pill head">руководитель</span></td><td>всё</td><td>только разделы, отмеченные галочками</td><td>нет</td><td>руководитель линии или отдела: Илона, Татьяна, инфлюенс</td></tr>
-      <tr><td><span class="pill">сотрудник</span></td><td>всё</td><td>только разделы, отмеченные галочками</td><td>нет</td><td>сотрудник, которому доверили менять вид своего раздела</td></tr>
-      <tr><td><span class="pill">смотрит</span></td><td>всё</td><td>ничего</td><td>нет</td><td>все остальные: как общий пароль, но под своим именем</td></tr>
-    </tbody></table>
-    <p class="sub" style="margin:10px 0 0">Галочки разделов: <b>Общий экран</b>, <b>Отдел продаж</b>, <b>Маркетинг</b> и те, что появятся. Галочка открывает «Изменить через Claude», «Версии», публикацию и откат в этом разделе. Просмотр данных от галочек не зависит: пока все, кто вошёл, видят все цифры. Если понадобится скрыть раздел от кого-то, например деньги, скажите — добавим отдельное право «видит только свои разделы».</p>
-    <p class="sub" style="margin:6px 0 0">Заявки: человек регистрируется сам, попадает в «Заявки на доступ» без прав; вы выбираете роль и разделы и подтверждаете. Временные пароли показываются один раз.</p>
-  </div>
-  <div class="card" id="log-card" hidden><h2>Журнал действий <small class="sub">последние 100</small></h2><div id="log"></div></div>
 </main>
 </div>
 </div>
+<div class="shade" id="shade"></div>
 <script>
 (function(){var KEY="okk-menu";function read(){try{return localStorage.getItem(KEY)}catch(e){return null}}
 function store(v){try{localStorage.setItem(KEY,v)}catch(e){}}
@@ -114,136 +176,288 @@ function paint(m){document.documentElement.setAttribute("data-menu",m)}
 paint(read()||"full");var b=document.getElementById("menu-toggle");
 if(b)b.addEventListener("click",function(){var n=document.documentElement.getAttribute("data-menu")==="mini"?"full":"mini";store(n);paint(n)});})();
 (function(){var KEY="okk-theme";var m=null;try{m=localStorage.getItem(KEY)}catch(e){}if(m==="light"||m==="dark")document.documentElement.setAttribute("data-theme",m);})();
+function $(id){return document.getElementById(id)}
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function api(path,opt){opt=opt||{};opt.credentials="same-origin";if(opt.body){opt.headers={"content-type":"application/json"};opt.body=JSON.stringify(opt.body)}return fetch(path,opt).then(function(r){return r.json()})}
 function dt(s){return s?String(s).replace("T"," ").slice(0,16):"—"}
+/* «сегодня 14:05», «вчера», «5 дн. назад», дальше — дата */
+function ago(s){
+  if(!s) return "";
+  var d=new Date(String(s).replace(" ","T")); if(isNaN(d)) return dt(s);
+  var now=new Date(), day=function(x){return new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime()};
+  var n=Math.round((day(now)-day(d))/864e5), hm=String(s).replace("T"," ").slice(11,16);
+  if(n<=0) return "сегодня "+hm; if(n===1) return "вчера "+hm; if(n<7) return n+" дн. назад";
+  return String(s).slice(8,10)+"."+String(s).slice(5,7)+"."+String(s).slice(0,4);
+}
 var ROLE={admin:"администратор",head:"руководитель",member:"сотрудник",viewer:"смотрит"};
-var SECTIONS=[];   // [{id,name}] — из /api/sections
+var ROLE_OPTS=[["member","сотрудник"],["head","руководитель раздела"],["viewer","только смотрит"],["admin","администратор"]];
+function roleSelect(id,cur){return '<select id="'+id+'">'+ROLE_OPTS.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>'}).join("")+'</select>'}
+var SECTIONS=[];   // [{id,name}] — из /api/sections, для заявок
 /* дерево разделов для прав: отдел → подразделы (наследуют уровень отдела, если не задано своё) */
 var RTREE=[
   {id:"hub",name:"Общий экран"},
   {id:"sales",name:"Отдел продаж",children:[{id:"sales.l1",name:"Первая линия"},{id:"sales.l2",name:"Вторая линия",children:[{id:"sales.l2.okk",name:"Встречи · Менеджеры · Сверка (ОКК)"}]}]},
   {id:"marketing",name:"Маркетинг",children:[{id:"marketing.instagram",name:"Instagram SMM"},{id:"marketing.telegram",name:"Телеграм-канал"},{id:"marketing.influence",name:"Инфлюенс"},{id:"marketing.youtube",name:"YouTube"},{id:"marketing.fb",name:"Реклама FB"},{id:"marketing.sitechat",name:"Чат на сайте"},{id:"marketing.site",name:"Сайт"}]},
+  {id:"hr",name:"HR",children:[{id:"hr.structure",name:"Структура компании"}]},
   {id:"guide",name:"Гайд и вопросы"},
   {id:"status",name:"Витрина"}
 ];
-var PARENT={"sales.l1":"sales","sales.l2":"sales","sales.l2.okk":"sales.l2","marketing.instagram":"marketing","marketing.telegram":"marketing","marketing.influence":"marketing","marketing.youtube":"marketing","marketing.fb":"marketing","marketing.sitechat":"marketing","marketing.site":"marketing"};
+var PARENT={"sales.l1":"sales","sales.l2":"sales","sales.l2.okk":"sales.l2","marketing.instagram":"marketing","marketing.telegram":"marketing","marketing.influence":"marketing","marketing.youtube":"marketing","marketing.fb":"marketing","marketing.sitechat":"marketing","marketing.site":"marketing","hr.structure":"hr"};
+var ADMIN_ONLY=["users","tags","budget","dashboard"];   // настройки — только админ, в дереве прав не показываем
+/* разделы, которые сервер уже знает, а дерево ещё нет, — добавляем в конец, чтобы новый раздел сразу был виден в правах */
+function extendTree(ids){
+  var known={}; (function walk(a){a.forEach(function(n){known[n.id]=1; if(n.children) walk(n.children)})})(RTREE);
+  (ids||[]).forEach(function(id){ if(known[id]||ADMIN_ONLY.indexOf(id)>=0) return; known[id]=1;
+    var p=id.split(".").slice(0,-1).join("."), host=null;
+    (function find(a){a.forEach(function(n){ if(n.id===p) host=n; else if(n.children) find(n.children)})})(RTREE);
+    var node={id:id,name:id}; if(host){ (host.children=host.children||[]).push(node); PARENT[id]=p; } else RTREE.push(node); });
+}
 var PRESETS=[
-  ["Смотрит всё",{"hub":1,"sales":1,"marketing":1,"guide":1,"status":1}],
-  ["Руководитель Первой линии",{"hub":1,"sales":1,"sales.l1":2,"marketing":1,"guide":1,"status":1}],
-  ["Руководитель Второй линии",{"hub":1,"sales":1,"sales.l2":2,"marketing":1,"guide":1,"status":1}],
-  ["Маркетинг",{"hub":1,"sales":1,"marketing":2,"guide":1,"status":1}],
-  ["Инфлюенс",{"hub":1,"sales":1,"marketing":1,"marketing.influence":2,"guide":1,"status":1}],
-  ["Только своя линия (1-я)",{"hub":1,"sales":0,"sales.l1":2,"marketing":0,"guide":1,"status":0}],
-  ["Всё закрыть",{"hub":0,"sales":0,"marketing":0,"guide":0,"status":0}]
+  ["Смотрит всё",{"hub":1,"sales":1,"marketing":1,"hr":1,"guide":1,"status":1}],
+  ["Руководитель Первой линии",{"hub":1,"sales":1,"sales.l1":2,"marketing":1,"hr":1,"guide":1,"status":1}],
+  ["Руководитель Второй линии",{"hub":1,"sales":1,"sales.l2":2,"marketing":1,"hr":1,"guide":1,"status":1}],
+  ["Маркетинг",{"hub":1,"sales":1,"marketing":2,"hr":1,"guide":1,"status":1}],
+  ["Инфлюенс",{"hub":1,"sales":1,"marketing":1,"marketing.influence":2,"hr":1,"guide":1,"status":1}],
+  ["HR",{"hub":1,"sales":1,"marketing":1,"hr":2,"guide":1,"status":1}],
+  ["Только своя линия (1-я)",{"hub":1,"sales":0,"sales.l1":2,"marketing":0,"hr":0,"guide":1,"status":0}],
+  ["Всё закрыть",{"hub":0,"sales":0,"marketing":0,"hr":0,"guide":0,"status":0}]
 ];
 var LV=["закрыт","просмотр","правка"];
-function rightsEditor(el, perms, sectionsCsv){
-  if(!el) return;
-  var val=Object.assign({}, perms||{});
-  if(!perms&&sectionsCsv){ String(sectionsCsv).split(",").forEach(function(s){ s=s.trim(); if(s) val[s]=2; }); }
+/* редактор прав: состояние живёт в el.__val */
+function rightsEditor(el, val){
   el.__val=val;
   function eff(id){ var s=id; while(s){ if(val[s]!=null) return {v:val[s],own:s===id}; s=PARENT[s]||null; } return {v:1,own:false}; }
-  function seg(id){ var e=eff(id); return '<span class="seg" data-sec="'+id+'">'+LV.map(function(n,i){return '<span data-lv="'+i+'" class="'+(e.v===i?('on'+i+(e.own?'':' inh')):'')+'">'+n+'</span>'}).join("")+'</span>'; }
+  function seg(id){ var e=eff(id); return '<span class="seg" data-rs="'+esc(id)+'">'+LV.map(function(n,i){return '<span data-lv="'+i+'" class="'+(e.v===i?('on'+i+(e.own?'':' inh')):'')+'">'+n+'</span>'}).join("")+'</span>'; }
   function node(n,depth){ var h=depth===0?'<div class="dept"><div class="hd">'+esc(n.name)+seg(n.id)+'</div>':'<div class="rw'+(depth>1?' rw2':'')+'">'+esc(n.name)+seg(n.id)+'</div>';
     (n.children||[]).forEach(function(c){ h+=node(c,depth+1); }); if(depth===0) h+='</div>'; return h; }
-  el.innerHTML='<div class="presets">'+PRESETS.map(function(p,i){return '<span data-preset="'+i+'">'+p[0]+'</span>'}).join("")+'</div>'+RTREE.map(function(n){return node(n,0)}).join("")
+  el.innerHTML='<div class="presets">'+PRESETS.map(function(p,i){return '<span data-preset="'+i+'">'+esc(p[0])+'</span>'}).join("")+'</div>'+RTREE.map(function(n){return node(n,0)}).join("")
     +'<p class="sub" style="margin:0">Подраздел без своей настройки наследует уровень отдела (показано полупрозрачно). «Закрыт» убирает раздел из меню и по ссылке, «правка» открывает «Изменить через Claude», версии и планы.</p>';
   el.onclick=function(e){
-    var ps=e.target.closest("[data-preset]"); if(ps){ val=Object.assign({},PRESETS[+ps.getAttribute("data-preset")][1]); el.__val=val; rightsEditor.rerender(el); return; }
-    var lv=e.target.closest("[data-lv]"); if(!lv) return; var sec=lv.closest("[data-sec]").getAttribute("data-sec"); val[sec]=+lv.getAttribute("data-lv"); el.__val=val; rightsEditor.rerender(el);
+    var ps=e.target.closest("[data-preset]"); if(ps){ rightsEditor(el, Object.assign({},PRESETS[+ps.getAttribute("data-preset")][1])); return; }
+    var lv=e.target.closest("[data-lv]"); if(!lv) return; var sec=lv.closest("[data-rs]").getAttribute("data-rs"); val[sec]=+lv.getAttribute("data-lv"); rightsEditor(el, val);
   };
-  rightsEditor.rerender=function(target){ var v=target.__val; rightsEditor(target, v, ""); };
 }
-function rightsValue(el){ return (el&&el.__val)||{}; }
+function legacyPerms(perms, csv){ var v=Object.assign({}, perms||{}); if(!perms&&csv){ String(csv).split(",").forEach(function(s){ s=s.trim(); if(s) v[s]=2; }); } return v; }
+/* выпадающий список разделов (для заявок) */
 function pickValue(el){ return el ? [].map.call(el.querySelectorAll('input:checked'), function(c){ return c.value; }).join(',') : ''; }
-function picker(el, csv){
-  var sel = String(csv||'').split(',').map(function(s){return s.trim()}).filter(Boolean);
+function picker(el){
+  var sel=[];
   function label(){ var names = SECTIONS.filter(function(s){ return sel.indexOf(s.id)>=0; }).map(function(s){ return s.name; });
     return names.length ? esc(names.join(', ')) : '<span class="ph">разделы: не выбраны</span>'; }
   el.innerHTML = '<button type="button">'+label()+'</button><div class="menu">'
-    + (SECTIONS.length ? SECTIONS.map(function(s){ return '<label><input type="checkbox" value="'+esc(s.id)+'"'+(sel.indexOf(s.id)>=0?' checked':'')+'> '+esc(s.name)+'<small>'+esc(s.id)+'</small></label>'; }).join('') : '<div class="sub" style="padding:6px 8px">разделов нет</div>')
+    + (SECTIONS.length ? SECTIONS.map(function(s){ return '<label><input type="checkbox" value="'+esc(s.id)+'"> '+esc(s.name)+'<small>'+esc(s.id)+'</small></label>'; }).join('') : '<div class="sub" style="padding:6px 8px">разделов нет</div>')
     + '</div>';
   var btn = el.querySelector('button');
   btn.addEventListener('click', function(e){ e.stopPropagation(); document.querySelectorAll('.pick.open').forEach(function(o){ if(o!==el) o.classList.remove('open'); }); el.classList.toggle('open'); });
   el.querySelector('.menu').addEventListener('click', function(e){ e.stopPropagation(); });
   el.addEventListener('change', function(){ sel = [].map.call(el.querySelectorAll('input:checked'), function(c){ return c.value; }); btn.innerHTML = label(); });
 }
-document.addEventListener('click', function(){ document.querySelectorAll('.pick.open').forEach(function(o){ o.classList.remove('open'); }); });
-var ME=null;
+document.addEventListener('click', function(e){
+  document.querySelectorAll('.pick.open').forEach(function(o){ o.classList.remove('open'); });
+  var pop=$("me-pop"); if(!pop.hidden && !e.target.closest("#me-pop") && !e.target.closest("#me-btn")) pop.hidden=true;
+});
+
+/* ---------- состояние ---------- */
+var ME=null, USERS=[], PENDING=[], AUDIT=[], FILTER="all", SEL=null, PTAB="profile", NEWMODE=false, LAST_PW=null;
+var FILTERS=[["all","Все"],["admin","Админы"],["head","Руководители"],["member","Сотрудники"],["viewer","Смотрят"],["off","Отключены"]];
+function initials(u){ var n=String(u.name||u.login||"?").trim().split(/\s+/); return ((n[0]||"")[0]||"").toUpperCase()+((n[1]||"")[0]||"").toUpperCase(); }
+function avatar(u,lg){
+  var c=u.role==="admin"?" c1":u.role==="head"?" c2":"";
+  return '<div class="av'+(lg?' lg':'')+c+'">'+(u.photo?'<img src="'+esc(u.photo)+'" alt="">':esc(initials(u)))+'</div>';
+}
+function rolePill(u){ return u.active?'<span class="pill role '+esc(u.role)+'">'+esc(ROLE[u.role]||u.role)+'</span>':'<span class="pill role off">отключён</span>'; }
+
 api("/api/me").then(function(m){
-  if(!m.ok){document.getElementById("denied").hidden=false;return}
-  ME=m.user;document.getElementById("who").textContent=(m.user.name||m.user.login)+" · "+(ROLE[m.user.role]||m.user.role);
-  if(m.user.personal)document.getElementById("me-card").hidden=false;
-  if(m.user.role!=="admin"){document.getElementById("denied").hidden=false;return}
-  ["list-card","add-card","rights-card","log-card"].forEach(function(id){document.getElementById(id).hidden=false});
-  api("/api/sections").then(function(r){ SECTIONS = (r.ok && r.sections) || []; picker(document.getElementById("n-sections"), ""); loadUsers(); });
+  if(!m.ok){$("denied").hidden=false;return}
+  ME=m.user;
+  if(m.user.personal)$("me-btn").hidden=false;
+  if(m.user.role!=="admin"){$("denied").hidden=false;return}
+  $("app").style.display="contents";
+  var h=decodeURIComponent((location.hash.match(/u=([^&]+)/)||[])[1]||""); if(h) SEL=h;
+  api("/api/sections").then(function(r){ SECTIONS=(r.ok&&r.sections)||[]; loadUsers(); });
   loadLog();
 });
+
+/* ---------- вкладки страницы ---------- */
+$("tabs").addEventListener("click",function(e){
+  var t=e.target.closest("[data-t]"); if(!t) return;
+  [].forEach.call(this.children,function(s){s.classList.toggle("on",s===t)});
+  $("t-people").hidden=t.getAttribute("data-t")!=="people"; $("t-log").hidden=t.getAttribute("data-t")!=="log";
+  $("t-people").style.display=$("t-people").hidden?"none":"flex";
+});
+
+/* ---------- люди ---------- */
 function loadUsers(){
-  api("/api/users").then(function(r){
-    if(!r.ok){document.getElementById("list").innerHTML='<p class="err">'+esc(r.error)+'</p>';return}
-    var pend=r.users.filter(function(u){return u.role==="pending"}); r.users=r.users.filter(function(u){return u.role!=="pending"});
-    document.getElementById("pending-card").hidden=!pend.length;
-    document.getElementById("pending").innerHTML=pend.map(function(u){return '<div class="row" style="padding:8px 0;border-bottom:1px solid var(--line)">'
-      +(u.photo?'<img src="'+esc(u.photo)+'" alt="" style="width:32px;height:32px;border-radius:50%">':'')
-      +'<b>'+esc(u.name||u.login)+'</b><span class="sub">'+(u.tg_username?'@'+esc(u.tg_username)+' · ':'')+dt(u.created_at)+'</span>'
-      +'<select id="a-role-'+esc(u.login)+'"><option value="head">руководитель раздела</option><option value="member" selected>сотрудник</option><option value="viewer">только смотрит</option><option value="admin">администратор</option></select>'
-      +'<div class="pick" id="a-sec-'+esc(u.login)+'" data-value=""></div>'
-      +'<button data-a="approve" data-l="'+esc(u.login)+'">Подтвердить</button><button class="danger" data-a="reject" data-l="'+esc(u.login)+'">Отклонить</button></div>'}).join("");
-    document.querySelectorAll('#pending .pick').forEach(function(el){ picker(el, ''); });
-    document.getElementById("cnt").textContent=r.users.length+" чел.";
-    document.getElementById("list").innerHTML='<table><thead><tr><th>Логин</th><th>Имя</th><th>Роль</th><th>Разделы</th><th>Создан</th><th>Последний вход</th><th></th></tr></thead><tbody>'
-      +r.users.map(function(u){return '<tr'+(u.active?'':' style="opacity:.55"')+'><td><b>'+esc(u.login)+'</b>'+(u.must_change?' <span class="pill">временный пароль</span>':'')+(u.active?'':' <span class="pill off">отключён</span>')+(u.tg_id?' <span class="pill">Telegram'+(u.tg_username?' @'+esc(u.tg_username):'')+'</span>':'')+'</td><td>'+esc(u.name)+'</td><td><span class="pill '+esc(u.role)+'">'+esc(ROLE[u.role]||u.role)+'</span></td><td>'+esc(u.sections||"—")+'</td><td>'+dt(u.created_at)+'</td><td>'+dt(u.last_login)+'</td>'
-        +'<td class="actions"><button class="ghost" data-a="edit" data-l="'+esc(u.login)+'">изменить</button><button class="ghost" data-a="reset" data-l="'+esc(u.login)+'">сбросить пароль</button>'
-        +(u.active?'<button class="danger" data-a="disable" data-l="'+esc(u.login)+'">отключить</button>':'<button data-a="enable" data-l="'+esc(u.login)+'">включить</button>')+'</td></tr>'
-        +'<tr hidden id="edit-'+esc(u.login)+'"><td colspan="7"><div class="row"><input value="'+esc(u.name)+'" id="e-name-'+esc(u.login)+'" placeholder="Имя"><select id="e-role-'+esc(u.login)+'">'+Object.keys(ROLE).map(function(k){return '<option value="'+k+'"'+(k===u.role?' selected':'')+'>'+ROLE[k]+'</option>'}).join("")+'</select><span class="sub">администратор видит и меняет всё, права ниже для остальных ролей</span></div>'
-        +'<div class="rights" id="e-rights-'+esc(u.login)+'"></div><div class="row"><button data-a="save" data-l="'+esc(u.login)+'">Сохранить</button></div></td></tr>'}).join("")
-      +'</tbody></table>';
-    r.users.forEach(function(u){ rightsEditor(document.getElementById("e-rights-"+u.login), u.perms, u.sections); });
+  return api("/api/users").then(function(r){
+    if(!r.ok){$("people").innerHTML='<p class="err" style="padding:12px">'+esc(r.error)+'</p>';return}
+    extendTree(r.sections);
+    PENDING=r.users.filter(function(u){return u.role==="pending"});
+    USERS=r.users.filter(function(u){return u.role!=="pending"});
+    USERS.sort(function(a,b){ var o={admin:0,head:1,member:2,viewer:3}; return (b.active-a.active)||((o[a.role]||9)-(o[b.role]||9))||String(a.name||a.login).localeCompare(String(b.name||b.login),"ru"); });
+    $("cnt").textContent=USERS.length;
+    renderPending(); renderChips(); renderList(); renderPanel();
   });
 }
-document.getElementById("list").addEventListener("click",function(e){
-  var b=e.target.closest("button[data-a]");if(!b)return;var a=b.getAttribute("data-a"),l=b.getAttribute("data-l"),out=document.getElementById("u-out");
-  if(a==="edit"){var r=document.getElementById("edit-"+l);r.hidden=!r.hidden;return}
-  if(a==="save"){api("/api/users",{method:"PATCH",body:{login:l,action:"perms",name:document.getElementById("e-name-"+l).value,role:document.getElementById("e-role-"+l).value,perms:rightsValue(document.getElementById("e-rights-"+l))}}).then(function(r){out.innerHTML=r.ok?'<p class="ok">Сохранено</p>':'<p class="err">'+esc(r.error)+'</p>';loadUsers();loadLog()});return}
-  if(a==="reset"&&!confirm(l===(ME&&ME.login)?"Сбросить свой пароль? Новый временный пароль появится ниже, текущий вход сохранится — смените пароль в блоке «Мой пароль».":"Сбросить пароль пользователю "+l+"? Его текущие сессии закроются."))return;
-  if(a==="disable"&&!confirm("Отключить "+l+"?"))return;
-  api("/api/users",{method:"PATCH",body:{login:l,action:a}}).then(function(r){
-    if(!r.ok){out.innerHTML='<p class="err">'+esc(r.error)+'</p>';return}
-    out.innerHTML=r.password?'<div class="temp">Новый временный пароль для <b>'+esc(l)+'</b>: <code>'+esc(r.password)+'</code> — передайте лично, повторно показать нельзя.</div>':'<p class="ok">Готово</p>';
-    loadUsers();loadLog();
-  });
-});
-document.getElementById("pending").addEventListener("click",function(e){
+function renderPending(){
+  var n=PENDING.length; $("pend").hidden=!n; if(!n) return;
+  var names=PENDING.slice(0,3).map(function(u){return esc(u.name||u.login)}).join(", ")+(n>3?" и ещё "+(n-3):"");
+  $("pend-txt").innerHTML='<b>'+n+' '+(n===1?'заявка ждёт':n<5?'заявки ждут':'заявок ждут')+' подтверждения:</b> '+names;
+  $("pend-list").innerHTML=PENDING.map(function(u){ var l=esc(u.login); return '<div class="preq">'+avatar(u)
+    +'<div class="who"><b>'+esc(u.name||u.login)+'</b><div class="sub">'+(u.tg_username?'@'+esc(u.tg_username)+' · ':'')+'заявка '+ago(u.created_at)+'</div></div>'
+    +roleSelect("a-role-"+l,"member")+'<div class="pick" id="a-sec-'+l+'"></div>'
+    +'<button data-a="approve" data-l="'+l+'">Подтвердить</button><button class="danger" data-a="reject" data-l="'+l+'">Отклонить</button></div>'}).join("");
+  document.querySelectorAll('#pend-list .pick').forEach(function(el){ picker(el); });
+}
+$("pend-btn").addEventListener("click",function(){ var l=$("pend-list"); l.hidden=!l.hidden; this.textContent=l.hidden?"Разобрать":"Свернуть"; });
+$("pend-list").addEventListener("click",function(e){
   var b=e.target.closest("button[data-a]");if(!b)return;var a=b.getAttribute("data-a"),l=b.getAttribute("data-l");
   if(a==="reject"&&!confirm("Отклонить заявку "+l+"?"))return;
-  var body={login:l,action:a};if(a==="approve"){body.role=document.getElementById("a-role-"+l).value;body.sections=pickValue(document.getElementById("a-sec-"+l))}
-  api("/api/users",{method:"PATCH",body:body}).then(function(r){var out=document.getElementById("u-out");out.innerHTML=r.ok?'<p class="ok">'+(a==="approve"?"Доступ открыт, человеку ушло сообщение в Telegram":"Заявка отклонена")+'</p>':'<p class="err">'+esc(r.error)+'</p>';loadUsers();loadLog()});
-});
-document.getElementById("n-add").addEventListener("click",function(){
-  var body={login:document.getElementById("n-login").value,name:document.getElementById("n-name").value,role:document.getElementById("n-role").value,sections:pickValue(document.getElementById("n-sections"))};
-  api("/api/users",{method:"POST",body:body}).then(function(r){
-    var out=document.getElementById("n-out");
-    if(!r.ok){out.innerHTML='<p class="err">'+esc(r.error)+'</p>';return}
-    out.innerHTML='<div class="temp">Создан <b>'+esc(r.login)+'</b>. Временный пароль: <code>'+esc(r.password)+'</code> — передайте лично, повторно показать нельзя.</div>';
-    document.getElementById("n-login").value="";document.getElementById("n-name").value="";picker(document.getElementById("n-sections"),"");
+  var body={login:l,action:a};if(a==="approve"){body.role=$("a-role-"+l).value;body.sections=pickValue($("a-sec-"+l))}
+  api("/api/users",{method:"PATCH",body:body}).then(function(r){
+    flash(r.ok?(a==="approve"?"Доступ открыт, человеку ушло сообщение в Telegram. Права можно уточнить в его карточке.":"Заявка отклонена"):r.error, r.ok);
+    if(r.ok&&a==="approve") SEL=l;
     loadUsers();loadLog();
   });
 });
-document.getElementById("p-save").addEventListener("click",function(){
-  api("/api/me",{method:"PUT",body:{password:document.getElementById("p-old").value,new_password:document.getElementById("p-new").value}}).then(function(r){
-    var m=document.getElementById("p-msg");m.className=r.ok?"ok":"err";m.textContent=r.ok?"пароль изменён":r.error;
-    if(r.ok){document.getElementById("p-old").value="";document.getElementById("p-new").value=""}
-  });
-});
-function loadLog(){
-  api("/api/audit?limit=100").then(function(r){
-    if(!r.ok)return;
-    document.getElementById("log").innerHTML=r.rows.length?'<table><thead><tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Что</th><th>Подробности</th></tr></thead><tbody>'
-      +r.rows.map(function(x){return '<tr><td>'+dt(x.at)+'</td><td>'+esc(x.login)+'</td><td>'+esc(x.action)+'</td><td>'+esc(x.target)+'</td><td class="sub">'+esc(x.note)+'</td></tr>'}).join("")+'</tbody></table>':'<p class="sub">пока пусто</p>';
+function flash(msg,ok){ $("out").innerHTML=msg?'<p class="'+(ok?'ok':'err')+'" style="margin:0">'+esc(msg)+'</p>':''; }
+function countOf(f){ return USERS.filter(function(u){ return f==="all"?true:f==="off"?!u.active:(u.active&&u.role===f); }).length; }
+function renderChips(){
+  $("chips").innerHTML=FILTERS.map(function(f){ var n=countOf(f[0]); if(!n&&f[0]!=="all"&&f[0]!==FILTER) return ""; return '<span data-f="'+f[0]+'" class="'+(FILTER===f[0]?'on':'')+'">'+f[1]+'<small>'+n+'</small></span>'; }).join("");
+}
+$("chips").addEventListener("click",function(e){ var c=e.target.closest("[data-f]"); if(!c) return; FILTER=c.getAttribute("data-f"); renderChips(); renderList(); });
+$("q").addEventListener("input",renderList);
+function visible(){
+  var q=$("q").value.trim().toLowerCase().replace(/^@/,"");
+  return USERS.filter(function(u){
+    if(FILTER==="off"&&u.active) return false;
+    if(FILTER!=="all"&&FILTER!=="off"&&(!u.active||u.role!==FILTER)) return false;
+    if(!q) return true;
+    return [u.login,u.name,u.tg_username].join(" ").toLowerCase().indexOf(q)>=0;
   });
 }
+function renderList(){
+  var list=visible();
+  if(!list.length){ $("people").innerHTML='<div class="empty">'+(USERS.length?'никого не нашлось':'пользователей пока нет')+'</div>'; return; }
+  $("people").innerHTML=list.map(function(u){
+    var meta=[esc(u.login)];
+    meta.push(u.last_login?'вход '+ago(u.last_login):'ещё не входил');
+    var tags=rolePill(u)+(u.must_change&&u.active?'<span class="pill">временный пароль</span>':'');
+    return '<div class="u'+(u.active?'':' inactive')+(SEL===u.login&&!NEWMODE?' on':'')+'" data-l="'+esc(u.login)+'">'+avatar(u)
+      +'<div class="nm"><b>'+esc(u.name||u.login)+'</b><span class="sub">'+meta.join(" · ")+'</span></div><div class="tags">'+tags+'</div></div>';
+  }).join("");
+}
+$("people").addEventListener("click",function(e){ var r=e.target.closest(".u[data-l]"); if(!r) return; openUser(r.getAttribute("data-l")); });
+$("add-btn").addEventListener("click",function(){ NEWMODE=true; SEL=null; LAST_PW=null; setHash(); renderList(); renderPanel(); setTimeout(function(){ var i=$("n-login"); if(i) i.focus(); },0); });
+
+/* ---------- боковая панель ---------- */
+function setHash(){ try{ history.replaceState(null,"",SEL?"#u="+encodeURIComponent(SEL):location.pathname+location.search); }catch(e){} }
+function openUser(l, tab){ if(SEL!==l){ PTAB=tab||"profile"; LAST_PW=null; } else if(tab) PTAB=tab; SEL=l; NEWMODE=false; setHash(); renderList(); renderPanel(); }
+function closePanel(){ SEL=null; NEWMODE=false; LAST_PW=null; setHash(); renderList(); renderPanel(); }
+$("shade").addEventListener("click",closePanel);
+document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&(SEL||NEWMODE)) closePanel(); });
+function renderPanel(){
+  var p=$("panel"), u=USERS.filter(function(x){return x.login===SEL})[0];
+  var show=NEWMODE||!!u;
+  p.hidden=!show; $("split").classList.toggle("nopanel",!show); $("shade").classList.toggle("show",show);
+  if(!show){ if(SEL&&USERS.length){ SEL=null; setHash(); } return; }
+  if(NEWMODE){ p.innerHTML=newForm(); return; }
+  var tabs=[["profile","Профиль"],["rights","Права"],["access","Доступ"],["history","История"]];
+  p.innerHTML='<div class="top">'+avatar(u,true)+'<div class="nm"><b>'+esc(u.name||u.login)+'</b><span class="sub">'+esc(u.login)+(u.tg_username?' · @'+esc(u.tg_username):'')+'</span></div>'+rolePill(u)+'<button class="x" data-p="close" aria-label="Закрыть">×</button></div>'
+    +'<div class="tabs" id="ptabs">'+tabs.map(function(t){return '<span data-pt="'+t[0]+'" class="'+(PTAB===t[0]?'on':'')+'">'+t[1]+'</span>'}).join("")+'</div>'
+    +'<div id="pbody"></div>';
+  var b=$("pbody");
+  if(PTAB==="profile"||PTAB==="rights"){
+    b.innerHTML='<div id="pp-profile"'+(PTAB==="profile"?'':' hidden')+'>'
+      +'<label class="fld"><span>Имя</span><input id="e-name" value="'+esc(u.name)+'" placeholder="Имя Фамилия"></label>'
+      +'<label class="fld"><span>Роль</span>'+roleSelect("e-role",u.role)+'</label>'
+      +'<dl class="facts"><dt>Логин</dt><dd>'+esc(u.login)+'</dd><dt>Telegram</dt><dd>'+(u.tg_id?(u.tg_username?'@'+esc(u.tg_username):'привязан'):'не привязан')+'</dd><dt>Создан</dt><dd>'+dt(u.created_at)+'</dd><dt>Последний вход</dt><dd>'+(u.last_login?dt(u.last_login):'ещё не входил')+'</dd></dl>'
+      +'<p class="sub" style="margin:0">Администратор видит всё и управляет пользователями. Руководитель и сотрудник меняют вид только в разделах с «правкой», «смотрит» ничего не меняет.</p>'
+      +'</div><div id="pp-rights"'+(PTAB==="rights"?'':' hidden')+'>'+(u.role==="admin"?'<div class="note">Администратор видит и меняет всё, права ниже действуют, если роль сменить.</div>':'')+'<div class="rights" id="e-rights"></div></div>'
+      +'<div class="foot"><button data-p="save">Сохранить</button><span class="sub" id="p-out"></span></div>';
+    rightsEditor($("e-rights"), legacyPerms(u.perms,u.sections));
+  } else if(PTAB==="access"){
+    var self=ME&&u.login===ME.login;
+    b.innerHTML='<div class="actrow"><div class="t"><b>Пароль</b><span class="sub">'+(u.must_change?'выдан временный, человек ещё не сменил':'установлен самим человеком')+'</span></div><button class="ghost" data-p="reset">Сбросить</button></div>'
+      +'<div class="actrow"><div class="t"><b>'+(u.active?'Доступ открыт':'Доступ отключён')+'</b><span class="sub">'+(u.active?'отключение сразу закрывает все его входы':'человек не может войти, права сохранены')+'</span></div>'
+      +(u.active?(self?'<span class="sub">себя отключить нельзя</span>':'<button class="danger" data-p="disable">Отключить</button>'):'<button data-p="enable">Включить</button>')+'</div>'
+      +(LAST_PW?'<div class="temp">Новый временный пароль для <b>'+esc(u.login)+'</b>: <code>'+esc(LAST_PW)+'</code><br>Передайте лично, повторно показать нельзя.</div>':'')
+      +'<p class="sub" id="p-out" style="margin:10px 0 0"></p>';
+  } else {
+    var rows=AUDIT.filter(function(x){return x.target===u.login||x.login===u.login});
+    b.innerHTML=rows.length?'<div class="hist">'+rows.map(function(x){ return '<div><b style="font-weight:500">'+esc(actName(x.action))+'</b>'+(x.login===u.login&&x.target!==u.login?' <span class="sub">— сам, '+esc(x.target||'')+'</span>':x.login!==u.login?' <span class="sub">· '+esc(x.login)+'</span>':'')
+      +'<br><span class="sub">'+dt(x.at)+(x.note?' · '+esc(x.note):'')+'</span></div>'; }).join("")+'</div>':'<p class="sub">В последних '+AUDIT.length+' записях журнала о нём ничего нет.</p>';
+  }
+}
+function newForm(){
+  return '<div class="top"><div class="av lg">+</div><div class="nm"><b>Новый пользователь</b><span class="sub">временный пароль покажем один раз</span></div><button class="x" data-p="close" aria-label="Закрыть">×</button></div>'
+    +'<div style="height:14px"></div>'
+    +'<label class="fld"><span>Логин, латиницей</span><input id="n-login" placeholder="ivan.petrov" autocomplete="off" name="new-user-login"></label>'
+    +'<label class="fld"><span>Имя</span><input id="n-name" placeholder="Иван Петров" autocomplete="off" name="new-user-name"></label>'
+    +'<label class="fld"><span>Роль</span>'+roleSelect("n-role","member")+'</label>'
+    +'<p class="sub" style="margin:0">Права по разделам настроите сразу после создания, панель откроется на вкладке «Права».</p>'
+    +'<div class="foot"><button data-p="create">Создать</button><span class="sub" id="p-out"></span></div>';
+}
+$("panel").addEventListener("click",function(e){
+  var t=e.target.closest("[data-pt]"); if(t){ PTAB=t.getAttribute("data-pt");
+    if(PTAB==="profile"||PTAB==="rights"){ var a=$("pp-profile"), r=$("pp-rights"); if(a&&r){ a.hidden=PTAB!=="profile"; r.hidden=PTAB!=="rights"; [].forEach.call($("ptabs").children,function(s){s.classList.toggle("on",s===t)}); return; } }
+    renderPanel(); return; }
+  var b=e.target.closest("[data-p]"); if(!b) return; var a=b.getAttribute("data-p"), l=SEL, out=$("p-out");
+  if(a==="close") return closePanel();
+  if(a==="create"){
+    var body={login:$("n-login").value,name:$("n-name").value,role:$("n-role").value,sections:""};
+    api("/api/users",{method:"POST",body:body}).then(function(r){
+      if(!r.ok){out.className="err";out.textContent=r.error;return}
+      SEL=r.login; NEWMODE=false; PTAB="rights"; LAST_PW=null; setHash();
+      flash("",true); $("out").innerHTML='<div class="temp" style="margin:0">Создан <b>'+esc(r.login)+'</b>. Временный пароль: <code>'+esc(r.password)+'</code> — передайте лично, повторно показать нельзя.</div>';
+      loadUsers(); loadLog();
+    }); return;
+  }
+  if(a==="save"){
+    var role=$("e-role").value;
+    if(ME&&l===ME.login&&role!=="admin"){ out.className="err"; out.textContent="нельзя снять с себя администратора"; return; }
+    b.disabled=true;
+    api("/api/users",{method:"PATCH",body:{login:l,action:"perms",name:$("e-name").value,role:role,perms:$("e-rights").__val||{}}}).then(function(r){
+      b.disabled=false; if(!r.ok){out.className="err";out.textContent=r.error;return}
+      loadUsers().then(function(){ var o=$("p-out"); if(o){o.className="ok";o.textContent="сохранено";} }); loadLog();
+    }); return;
+  }
+  if(a==="reset"&&!confirm(ME&&l===ME.login?"Сбросить свой пароль? Новый временный пароль появится здесь, текущий вход сохранится — затем смените его через «Мой пароль».":"Сбросить пароль пользователю "+l+"? Его текущие входы закроются."))return;
+  if(a==="disable"&&!confirm("Отключить "+l+"? Все его входы закроются."))return;
+  if(a==="reset"||a==="disable"||a==="enable"){
+    api("/api/users",{method:"PATCH",body:{login:l,action:a}}).then(function(r){
+      if(!r.ok){out.className="err";out.textContent=r.error;return}
+      LAST_PW=r.password||null; loadUsers(); loadLog();
+    });
+  }
+});
+
+/* ---------- журнал ---------- */
+var ACT={"user.create":"создан пользователь","user.reset":"сброшен пароль","user.disable":"отключён","user.enable":"включён","user.approve":"заявка подтверждена","user.reject":"заявка отклонена","user.perms":"изменены права","user.update":"изменён профиль","user.password":"сменил свой пароль","login":"вход по паролю","login.tg":"вход через Telegram","login.fail":"неудачный вход","register":"заявка на доступ","tg.request":"запрос входа через Telegram","section.draft":"черновик раздела","section.draft.fail":"черновик раздела не собрался","section.publish":"раздел опубликован","section.unpublish":"раздел откатан","chat.ask":"вопрос Claude","chat.fail":"ошибка вопроса Claude","budget.add":"бюджет: добавлено","budget.delete":"бюджет: удалено","budget.plan":"бюджет: план","tags.kind":"теги: тип","tags.owner":"теги: владелец","tags.rule_add":"теги: правило добавлено","tags.rule_del":"теги: правило удалено","okna.goal":"окна: цель","prep.feedback":"подготовка: отзыв","prep.hook":"подготовка: вебхук","prep.manager":"подготовка: менеджер","prep.recalc":"подготовка: пересчёт","influence.links.save":"ссылки блогеров","hr.person_add":"HR: сотрудник добавлен","hr.person_edit":"HR: сотрудник изменён","hr.person_del":"HR: сотрудник удалён","hr.dept_add":"HR: отдел добавлен","hr.dept_edit":"HR: отдел изменён","hr.dept_del":"HR: отдел удалён","hr.import":"HR: импорт"};
+function actName(a){ return ACT[a]||a; }
+function loadLog(){
+  api("/api/audit?limit=500").then(function(r){
+    if(!r.ok)return; AUDIT=r.rows||[]; renderLog();
+    if(SEL&&PTAB==="history") renderPanel();
+  });
+}
+$("lq").addEventListener("input",renderLog);
+function renderLog(){
+  var q=$("lq").value.trim().toLowerCase();
+  var rows=AUDIT.filter(function(x){ return !q||[x.login,x.action,actName(x.action),x.target,x.note].join(" ").toLowerCase().indexOf(q)>=0; });
+  $("lcnt").textContent=rows.length+" из "+AUDIT.length;
+  $("log").innerHTML=rows.length?'<div style="overflow-x:auto"><table><thead><tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Над кем / чем</th><th>Подробности</th></tr></thead><tbody>'
+    +rows.map(function(x){return '<tr><td style="white-space:nowrap">'+dt(x.at)+'</td><td>'+esc(x.login)+'</td><td>'+esc(actName(x.action))+'</td><td>'+(USERS.some(function(u){return u.login===x.target})?'<a href="#u='+encodeURIComponent(x.target)+'" data-open="'+esc(x.target)+'">'+esc(x.target)+'</a>':esc(x.target))+'</td><td class="sub">'+esc(x.note)+'</td></tr>'}).join("")+'</tbody></table></div>':'<p class="sub">пусто</p>';
+}
+$("log").addEventListener("click",function(e){ var a=e.target.closest("[data-open]"); if(!a) return; e.preventDefault(); $("tabs").children[0].click(); openUser(a.getAttribute("data-open"),"history"); });
+
+/* ---------- мой пароль ---------- */
+$("me-btn").addEventListener("click",function(){ $("me-pop").hidden=!$("me-pop").hidden; if(!$("me-pop").hidden) $("p-old").focus(); });
+$("p-save").addEventListener("click",function(){
+  api("/api/me",{method:"PUT",body:{password:$("p-old").value,new_password:$("p-new").value}}).then(function(r){
+    var m=$("p-msg");m.className=r.ok?"ok":"err";m.textContent=r.ok?"пароль изменён":r.error;
+    if(r.ok){$("p-old").value="";$("p-new").value=""}
+  });
+});
 </script>
 <script src="/nav.js"></script>
 </body>
