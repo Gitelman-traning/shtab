@@ -34,6 +34,67 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 .fb{display:flex;gap:10px;flex-wrap:wrap;align-items:center} .fb .was{font-size:12px;color:var(--faint)}
 .hint{font-size:12px;color:var(--faint)}
 .msg{font-size:12.5px;color:var(--dim);padding:8px 0}
+/* ---------- подготовка v3: раскладка по блокам ---------- */
+.v-toc{position:sticky;top:0;z-index:4;background:var(--page);padding:8px 0;margin:-8px 0}
+.v-toc[hidden]{display:none}
+.v-toc .in{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}.v-toc .in::-webkit-scrollbar{display:none}
+.v-toc a{font-size:12.5px;color:var(--dim);text-decoration:none;padding:6px 11px;border-radius:9px;background:var(--card);white-space:nowrap}
+.v-toc a.on{color:var(--gold);background:var(--gold-soft);font-weight:600}
+#d-v3{display:flex;flex-direction:column;gap:20px} #d-v3[hidden]{display:none}
+.v-lbl{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin:0 0 6px}
+.v-chip{font-size:11px;padding:2px 8px;border-radius:7px;background:var(--mid-bg);color:var(--mid);white-space:nowrap}
+.v-chip.gold{background:var(--gold-soft);color:var(--gold)}
+.v-top{display:grid;grid-template-columns:1.35fr 1fr;gap:20px} @media (max-width:1250px){.v-top{grid-template-columns:1fr}}
+.v-cheat{background:var(--gold-soft);border-radius:16px;padding:18px 20px}
+.v-cheat h2{margin:0 0 12px;font-size:15px;color:var(--gold)}
+.v-line{font-size:15px;font-weight:600;line-height:1.45;margin:0 0 12px} .v-line .ar{color:var(--gold-b);margin:0 4px}
+.v-dl{display:grid;grid-template-columns:150px 1fr;gap:8px 14px;font-size:13.5px;margin:0}
+.v-dl dt{color:var(--gold);font-size:12px;padding-top:2px} .v-dl dd{margin:0}
+@media (max-width:520px){.v-dl{grid-template-columns:1fr;gap:2px}.v-dl dd{margin-bottom:8px}}
+.v-cmp{width:100%;font-size:13px} .v-cmp td{padding:7px 8px}
+.v-cmp tr.crm td{background:var(--mid-bg)}
+.v-verdict{margin-top:10px;font-size:12.5px;color:var(--dim);padding:10px 12px;border-radius:10px;background:var(--soft)}
+.v-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}
+.v-fact{background:var(--soft);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.v-fact .m{font-size:13px;color:var(--gold);font-weight:500} .v-fact .m::before{content:"→ "}
+.v-thesis{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px} @media (max-width:760px){.v-thesis{grid-template-columns:1fr}}
+.v-thesis div{border:1px solid var(--line-2);border-radius:12px;padding:12px 14px;font-size:13.5px}
+.v-opener{border-left:4px solid var(--gold-b);padding:4px 0 4px 16px;font-size:16px;line-height:1.55;font-weight:500}
+.v-why{font-size:12.5px;color:var(--dim)}
+.v-hyps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px} @media (max-width:1100px){.v-hyps{grid-template-columns:1fr}}
+.v-hyp{border:1px solid var(--line-2);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.v-hyp h3{margin:0;font-size:14px;font-weight:600;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.v-hyp .n{color:var(--gold-b);font-variant-numeric:tabular-nums} .v-hyp .basis{font-size:12.5px;color:var(--dim)}
+.v-step{display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:start;font-size:13.5px}
+.v-step .k{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--soft);color:var(--dim)}
+.v-step.q .k{background:var(--gold-soft);color:var(--gold)} .v-step.money .k{background:var(--ok-bg);color:var(--ok)}
+.v-step small{display:block;font-size:11.5px;color:var(--faint);margin-bottom:2px}
+.v-step label{display:flex;gap:6px;align-items:flex-start;cursor:pointer} .v-step input{margin-top:3px;accent-color:var(--gold-b)}
+.v-more{margin-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}
+.v-more div{font-size:13px;padding:10px 12px;border-radius:10px;background:var(--soft)} .v-more b{display:block;font-size:11.5px;color:var(--faint);font-weight:500;margin-bottom:3px}
+.v-loss{display:flex;flex-direction:column;gap:10px}
+.v-lr{display:grid;grid-template-columns:260px 1fr 90px;gap:12px;align-items:center;font-size:13px}
+@media (max-width:640px){.v-lr{grid-template-columns:1fr 80px}.v-lr .tr{grid-column:1 / -1;order:3}}
+.v-lr .tr{height:12px;border-radius:6px;background:var(--soft);position:relative;overflow:hidden}
+.v-lr .tr i{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--gold-b)}
+.v-lr .tr i.hyp{background:repeating-linear-gradient(135deg,var(--gold-a) 0 6px,transparent 6px 10px);border:1px solid var(--gold-a)}
+.v-lr .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.v-total{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line-2);padding-top:10px}
+.v-total b{font-size:22px;font-variant-numeric:tabular-nums}
+.v-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--faint);margin:0 0 12px}
+.v-legend i{display:inline-block;width:12px;height:8px;border-radius:4px;margin-right:5px;vertical-align:0}
+.v-final{margin-top:14px;padding:14px 16px;border-radius:12px;background:var(--gold-soft);font-size:15px;font-weight:500;line-height:1.5}
+.v-final small,.v-bridge small{display:block;font-size:11.5px;color:var(--gold);font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px}
+.v-cases{display:grid;grid-template-columns:1fr 1fr;gap:14px} @media (max-width:900px){.v-cases{grid-template-columns:1fr}}
+.v-case{border:1px solid var(--line-2);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.v-case h3{margin:0;font-size:15px} .v-case .who{font-size:12.5px;color:var(--dim)}
+.v-grow{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;font-variant-numeric:tabular-nums}
+.v-grow .bars{display:flex;flex-direction:column;gap:4px} .v-grow .b{height:9px;border-radius:5px;background:var(--gold-b)} .v-grow .b.then{background:var(--line-2)}
+.v-grow .pct{font-weight:700;color:var(--ok);font-size:15px}
+.v-say{font-size:13.5px;font-style:italic;background:var(--soft);border-radius:10px;padding:10px 12px}
+.v-changed b{color:var(--gold);font-weight:600}
+.v-bridge{margin-top:14px;padding:12px 16px;border-radius:12px;border:1px dashed var(--gold-b);font-size:14.5px;font-weight:500}
+.v-note{margin-top:10px;font-size:12.5px;color:var(--dim)}
 </style>
 </head>
 <body>
@@ -67,10 +128,12 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 <main id="detail" hidden>
   <div class="bar-row"><a class="btn ghost" href="#">← К списку</a><span class="spacer" style="flex:1"></span><a class="btn" id="d-amo" target="_blank" rel="noopener">Сделка в amo ↗</a><a class="btn" id="d-quiz" target="_blank" rel="noopener" hidden>Анкета клиента ↗</a><button class="btn" id="d-recalc" type="button">Пересчитать</button></div>
   <div class="card head"><div class="who"><h2 id="d-title">—</h2><div class="meta" id="d-meta"></div></div><div class="meta" id="d-tech"></div></div>
+  <nav class="v-toc" id="d-toc" hidden><div class="in"></div></nav>
+  <div id="d-v3" hidden></div>
   <div class="cheat" id="d-cheat" hidden><h2>Шпаргалка на 30 секунд</h2><div id="d-cheat-body"></div></div>
   <div class="card" id="d-sections-card"><h2>Подготовка <small>раскрой нужный раздел</small></h2><div id="d-sections"></div></div>
   <div class="card" id="d-cases-card"><h2>Участники из базы <small>похожие по бизнесу, с проверкой роста</small></h2><div class="cases" id="d-cases"></div></div>
-  <div class="card"><h2>Досье по открытым источникам <small>факты с источниками и гипотезы</small></h2><details class="sec" open><summary>Текст досье</summary><div class="md" id="d-facts"></div></details><details class="sec"><summary>Источники</summary><div class="src" id="d-src"></div></details></div>
+  <div class="card" id="v-dossier"><h2>Досье по открытым источникам <small>факты с источниками и гипотезы</small></h2><details class="sec" open><summary>Текст досье</summary><div class="md" id="d-facts"></div></details><details class="sec"><summary>Источники</summary><div class="src" id="d-src"></div></details></div>
   <div class="card"><h2>Была ли подготовка полезна?</h2><div class="fb"><button class="btn" data-useful="1" type="button">Полезно</button><button class="btn" data-useful="0" type="button">Не полезно</button><span class="was" id="fb-was"></span></div><textarea id="fb-comment" placeholder="Что было лишним, чего не хватило, где ошиблась — это пойдёт в правку промпта" style="margin-top:10px"></textarea><div class="msg" id="fb-msg"></div></div>
 </main>
 </div>
@@ -120,6 +183,142 @@ function sections(brief){
   return parts.filter(function(p){ return p.n || p.body.join("").trim(); });
 }
 
+// ---------- подготовка v3: раскладка по блокам (по названиям разделов промпта) ----------
+var V3_KIND = [["cheat", /ШПАРГАЛКА/i], ["cmp", /СВЕРКА/i], ["facts", /ИНТЕРЕСН/i], ["open", /ЗАХОД/i], ["hyp", /ГИПОТЕЗ/i], ["loss", /ТЕРЯ/i], ["cases", /КЕЙС/i]];
+var V3_TOC = { cheat: "Шпаргалка", cmp: "Сверка цифр", facts: "Интересное", open: "Заход", hyp: "Гипотезы", loss: "Потери", cases: "Кейсы" };
+function v3kind(title){ for (var i = 0; i < V3_KIND.length; i++) if (V3_KIND[i][1].test(title)) return V3_KIND[i][0]; return ""; }
+function v3lines(body){ return body.map(function(l){ return l.trim(); }).filter(Boolean); }
+function v3item(t){ var m = t.match(/^[-*•]\s+(.*)$/); return m ? m[1] : null; }
+function v3label(t){ var m = t.match(/^\*{0,2}([^:«»"]{2,70}?)\*{0,2}:\s*(.*)$/); return m ? [m[1].replace(/\*\*/g, "").trim(), m[2].trim()] : ["", t]; }
+function v3arrows(t){ return inline(t).replace(/→/g, '<span class="ar">→</span>'); }
+function v3num(t){ var m = String(t).match(/(\d+(?:[.,]\d+)?)\+?\s*(млрд|млн)/); if (!m) return null; var v = parseFloat(m[1].replace(",", ".")); return m[2] === "млрд" ? v * 1000 : v; }
+
+function v3cheat(L){
+  var line = "", dl = [];
+  L.forEach(function(t){ var it = v3item(t); if (it == null) return; var lv = v3label(it);
+    if (/линия/i.test(lv[0])) line = lv[1]; else dl.push("<dt>" + esc(lv[0] || "•") + "</dt><dd>" + inline(lv[1]).replace(/\(гипотеза\)/gi, '<span class="v-chip">гипотеза</span>') + "</dd>"); });
+  return '<div class="v-cheat" id="v-cheat"><h2>Шпаргалка на 30 секунд</h2>' + (line ? '<p class="v-line">' + v3arrows(line) + '</p>' : "") + '<dl class="v-dl">' + dl.join("") + '</dl></div>';
+}
+function v3cmp(L){
+  var rows = [], rest = [];
+  L.forEach(function(t){ var it = v3item(t); if (it != null) { var lv = v3label(it); rows.push('<tr' + (/карточк|crm/i.test(lv[0]) ? ' class="crm"' : '') + '><td>' + inline(lv[0]) + '</td><td>' + inline(lv[1]) + '</td></tr>'); } else if (!/^\|/.test(t)) rest.push(t); });
+  return '<div class="card" id="v-cmp"><p class="v-lbl">Сверка цифр</p><table class="v-cmp"><tbody>' + rows.join("") + '</tbody></table>' + (rest.length ? '<div class="v-verdict">' + inline(rest.join(" ")) + '</div>' : "") + '</div>';
+}
+function v3facts(L){
+  var cards = [], thesis = [];
+  L.forEach(function(t){ var it = v3item(t); if (it == null) return;
+    var lv = v3label(it);
+    if (/гипотеза про|главный вопрос/i.test(lv[0])) { thesis.push('<div><p class="v-lbl">' + esc(lv[0]) + '</p>' + inline(lv[1]) + '</div>'); return; }
+    var k = it.lastIndexOf(" → ");
+    cards.push('<div class="v-fact"><div>' + inline(k > 0 ? it.slice(0, k) : it) + '</div>' + (k > 0 ? '<div class="m">' + inline(it.slice(k + 3)) + '</div>' : "") + '</div>'); });
+  return '<div class="card" id="v-facts"><h2>Что интересного <small>показать, что изучили не поверхностно</small></h2><div class="v-facts">' + cards.join("") + '</div>' + (thesis.length ? '<div class="v-thesis">' + thesis.join("") + '</div>' : "") + '</div>';
+}
+function v3open(L){
+  var q = [], why = [];
+  L.forEach(function(t){ (/^хотим услышать/i.test(t) ? why : q).push(t); });
+  return '<div class="card" id="v-open"><h2>Заход <small>первый вопрос после знакомства</small></h2><div class="v-opener" id="v-opener">' + inline(q.join(" ")) + '</div>'
+    + '<div class="bar-row" style="margin-top:10px"><button class="btn" type="button" data-copy="v-opener">Скопировать</button>' + (why.length ? '<span class="v-why">' + inline(why.join(" ")) + '</span>' : "") + '</div></div>';
+}
+function v3hyp(L){
+  var hyps = [], more = [], cur = null, inMore = false;
+  L.forEach(function(t){
+    var m = t.match(/^\*\*(?:Гипотеза\s*)?(\d+)[.\s—-]*\s*(.+?)\*\*\s*(.*)$/i);
+    if (m) { cur = { n: m[1], title: m[2].replace(/\.$/, ""), basis: m[3], steps: [] }; hyps.push(cur); inMore = false; return; }
+    if (/^ещё спросить/i.test(t)) { inMore = true; return; }
+    var it = v3item(t);
+    if (inMore) { if (it != null) { var lv = v3label(it); more.push('<div><b>' + esc(lv[0]) + '</b>' + inline(lv[1]) + '</div>'); } return; }
+    if (!cur) return;
+    if (it == null) { cur.basis += (cur.basis ? " " : "") + t; return; }
+    cur.steps.push(it);
+  });
+  var html = hyps.map(function(h){
+    var trap = /ловушка/i.test(h.title);
+    var steps = h.steps.map(function(st, i){
+      var lv = v3label(st);
+      if (/^деньги|^во что/i.test(lv[0])) return '<div class="v-step money"><span class="k">₽</span><div>' + inline(lv[1]) + '</div></div>';
+      if (/^если/i.test(lv[0])) return '<div class="v-step"><span class="k">↳</span><div><small>' + esc(lv[0]) + '</small>' + inline(lv[1]) + '</div></div>';
+      var text = /^вопрос$/i.test(lv[0]) ? lv[1] : st;
+      return '<div class="v-step' + (i === 0 ? ' q' : '') + '"><span class="k">' + (i === 0 ? '?' : '•') + '</span><label><input type="checkbox"><span>' + inline(text) + '</span></label></div>';
+    }).join("");
+    return '<div class="v-hyp"><h3><span class="n">' + esc(h.n) + '</span>' + inline(h.title.replace(/\s*\(ловушка ниши\)/i, "")) + (trap ? ' <span class="v-chip gold">ловушка ниши</span>' : '') + '</h3>'
+      + (h.basis ? '<div class="basis">' + inline(h.basis) + '</div>' : '') + steps + '</div>';
+  }).join("");
+  return '<div class="card" id="v-hyp"><h2>Гипотезы и вопросы <small>отмечайте вопросы по ходу встречи</small></h2><div class="v-hyps">' + html + '</div>' + (more.length ? '<div class="v-more">' + more.join("") + '</div>' : "") + '</div>';
+}
+function v3loss(L){
+  var finalQ = "", ask = "", head = [];
+  L.forEach(function(t){ var lv = v3label(t);
+    if (/итоговый вопрос/i.test(lv[0])) finalQ = lv[1]; else if (/^спросить/i.test(lv[0])) ask = t; else head.push(t); });
+  var body = head.join(" "), items = [], total = "";
+  var am = body.match(/\s*Спросить[^:]*:[\s\S]*$/i); if (am) { if (!ask) ask = am[0].trim(); body = body.slice(0, am.index); }
+  var mt = body.match(/Итого[:\s]*([^.]+)/i); if (mt) total = mt[1].trim();
+  var core = body.replace(/Итого[^.]*\.?/i, "");
+  var c = core.indexOf(":"); if (c >= 0) core = core.slice(c + 1);
+  core.split(/\s·\s/).forEach(function(seg){ seg = seg.trim().replace(/\.$/, ""); var v = v3num(seg); if (v == null) return;
+    var shown = (seg.match(/[−~≈]?\s*\d+(?:[.,]\d+)?\+?\s*(млрд|млн)/) || [""])[0];
+    var label = seg.replace(shown, "").replace(/₽/g, "").replace(/\s+/g, " ").trim(), bare = label.replace(/\(.*?\)/g, "").trim();
+    if (bare.length >= 14) label = bare;
+    items.push({ label: label || seg, v: v, shown: shown, fact: /факт/i.test(seg) }); });
+  var bars = "";
+  if (items.length >= 2) {
+    var max = Math.max.apply(null, items.map(function(x){ return x.v; }));
+    bars = '<div class="v-legend"><span><i style="background:var(--gold-b)"></i>факт из отчётности</span><span><i style="background:repeating-linear-gradient(135deg,var(--gold-a) 0 3px,transparent 3px 5px);border:1px solid var(--gold-a)"></i>гипотеза, уточнить у клиента</span></div><div class="v-loss">'
+      + items.map(function(x){ return '<div class="v-lr"><span>' + esc(x.label) + '</span><span class="tr"><i class="' + (x.fact ? '' : 'hyp') + '" style="width:' + Math.max(6, Math.round(100 * x.v / max)) + '%"></i></span><span class="v">' + esc(x.shown) + '</span></div>'; }).join("")
+      + (total ? '<div class="v-total"><span>Итого, порядок <span class="v-chip">гипотеза</span></span><b>' + esc(total.replace(/\(.*?\)/g, "").trim()) + '</b></div>' : "") + '</div>';
+  } else bars = '<div class="md" style="padding:0">' + md(head.join("\n")) + '</div>';
+  return '<div class="card" id="v-loss"><h2>Сколько теряет <small>порядок цифр в год</small></h2>' + bars + (ask ? '<p class="hint" style="margin-top:8px">' + inline(ask) + '</p>' : "")
+    + (finalQ ? '<div class="v-final"><small>Итоговый вопрос</small>' + inline(finalQ) + '</div>' : "") + '</div>';
+}
+function v3cases(L){
+  var cases = [], bridge = "", notes = [], cur = null;
+  L.forEach(function(t){
+    var m = t.match(/^\*\*(.+?)\*\*\s*(.*)$/);
+    if (m) { cur = { title: m[1].replace(/\.$/, ""), parts: m[2].split(/\s·\s/), say: "" }; cases.push(cur); return; }
+    var lv = v3label(t);
+    if (/^мостик/i.test(lv[0])) { bridge = lv[1]; cur = null; return; }
+    if (/^в запасе/i.test(lv[0]) || !cur) { notes.push(t); return; }
+    if (/^«/.test(t)) { cur.say += (cur.say ? " " : "") + t; return; }
+    cur.parts.push(t);
+  });
+  var html = cases.map(function(c){
+    var who = [], grow = "", changed = "";
+    c.parts.forEach(function(p){ p = p.trim(); if (!p) return;
+      if (/^поменялось/i.test(p)) changed = p.replace(/^поменялось:\s*/i, "");
+      else if (/→/.test(p) && !grow) grow = p; else who.push(p); });
+    var gm = grow.match(/(\d+(?:[.,]\d+)?)\s*(млн|млрд)[^→]*→\s*(\d+(?:[.,]\d+)?)\s*(млн|млрд)/), gh = "";
+    if (gm) { var a = v3num(gm[1] + " " + gm[2]), b = v3num(gm[3] + " " + gm[4]);
+      if (a && b && b > a) gh = '<div class="v-grow"><span class="bars"><span class="b then" style="width:' + Math.round(100 * a / b) + '%"></span><span class="b" style="width:100%"></span></span><span class="pct">+' + Math.round(100 * (b / a - 1)) + '%</span></div>'; }
+    if (!gh) { var pm = c.parts.join(" ").match(/\+\s?(\d+)\s?%/); if (pm) gh = '<div class="v-grow"><span class="bars"><span class="b then" style="width:' + Math.round(10000 / (100 + Number(pm[1]))) + '%"></span><span class="b" style="width:100%"></span></span><span class="pct">+' + pm[1] + '%</span></div>'; }
+    return '<div class="v-case"><div><h3>' + inline(c.title) + '</h3><div class="who">' + inline(who.join(" · ")) + '</div></div>' + gh
+      + (grow ? '<div>' + inline(grow) + '</div>' : "") + (changed ? '<div class="v-changed"><b>Что поменялось:</b> ' + inline(changed) + '</div>' : "")
+      + (c.say ? '<div class="v-say">' + inline(c.say) + '</div>' : "") + '</div>';
+  }).join("");
+  return '<div class="card" id="v-cases"><h2>Кейсы <small>рост после тренинга подтверждён</small></h2><div class="v-cases">' + html + '</div>'
+    + (bridge ? '<div class="v-bridge"><small>Мостик после кейсов</small>' + inline(bridge) + '</div>' : "") + (notes.length ? '<div class="v-note">' + notes.map(inline).join("<br>") + '</div>' : "") + '</div>';
+}
+// разложить подготовку по блокам; null — если это не структура v3 (тогда прежний вид с раскрывающимися разделами)
+function renderV3(secs){
+  var by = {}, kinds = 0;
+  secs.forEach(function(s){ var k = v3kind(s.title); if (k && !by[k]) { by[k] = v3lines(s.body); kinds++; } });
+  if (!(by.hyp && (by.cmp || by.open) && kinds >= 4)) return null;
+  var top = (by.cheat ? v3cheat(by.cheat) : "") + (by.cmp ? v3cmp(by.cmp) : "");
+  var html = (top ? '<div class="v-top">' + top + '</div>' : "") + (by.facts ? v3facts(by.facts) : "") + (by.open ? v3open(by.open) : "")
+    + v3hyp(by.hyp) + (by.loss ? v3loss(by.loss) : "") + (by.cases ? v3cases(by.cases) : "");
+  var toc = Object.keys(V3_TOC).filter(function(k){ return by[k]; }).map(function(k){ return '<a href="#v-' + k + '" data-v="v-' + k + '">' + V3_TOC[k] + '</a>'; }).join("") + '<a href="#v-dossier" data-v="v-dossier">Досье</a>';
+  return { html: html, toc: toc };
+}
+document.addEventListener("click", function(e){
+  var a = e.target.closest && e.target.closest(".v-toc a");
+  if (a) { e.preventDefault(); var t = document.getElementById(a.getAttribute("data-v")); if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 56, behavior: "smooth" }); return; }
+  var b = e.target.closest && e.target.closest("[data-copy]");
+  if (b) { var el = document.getElementById(b.getAttribute("data-copy")); if (el && navigator.clipboard) navigator.clipboard.writeText(el.textContent.trim()).then(function(){ b.textContent = "Скопировано"; setTimeout(function(){ b.textContent = "Скопировать"; }, 1500); }); }
+});
+window.addEventListener("scroll", function(){
+  var links = [].slice.call(document.querySelectorAll(".v-toc a")); if (!links.length || document.getElementById("d-toc").hidden) return;
+  var cur = 0; links.forEach(function(a, i){ var t = document.getElementById(a.getAttribute("data-v")); if (t && t.getBoundingClientRect().top < 140) cur = i; });
+  links.forEach(function(a, i){ a.classList.toggle("on", i === cur); });
+}, { passive: true });
+
 // ---------- список ----------
 function dateLabel(s){ if (!s) return "<span class='sub'>дата встречи не указана</span>"; var d = s.slice(0,10).split("-"); return d[2] + "." + d[1] + "." + d[0] + (s.length > 10 ? " <span class='sub'>" + s.slice(11) + " МСК</span>" : ""); }
 function renderList(){
@@ -166,7 +365,7 @@ function showDetail(deal){
   api("deal=" + deal).then(function(res){
     if (!res.ok) { document.getElementById("d-title").textContent = res.error || "нет данных"; return; }
     var r = res.row; CUR = r;
-    document.getElementById("d-title").textContent = (r.client || "Клиент") + (r.company ? " · " + r.company : "");
+    document.getElementById("d-title").textContent = [r.company, r.client].filter(Boolean).join(" · ") || "Клиент";
     var meta = [r.meet_at ? "Встреча " + r.meet_at.replace(/^(\d+)-(\d+)-(\d+)/, "$3.$2.$1") + " МСК" : "Дата встречи не указана",
       [r.niche, r.turn ? "оборот " + r.turn + " млн ₽" : "", r.staff ? r.staff + " сотрудников" : "", r.geo].filter(Boolean).join(" · ")].filter(Boolean);
     document.getElementById("d-meta").innerHTML = meta.map(esc).join("<br>")
@@ -184,6 +383,12 @@ function showDetail(deal){
     document.getElementById("d-amo").href = r.amo_url || ("https://pavelgitelman.amocrm.ru/leads/detail/" + r.deal);
     var q = document.getElementById("d-quiz"); q.hidden = !r.quiz_url; if (r.quiz_url) q.href = r.quiz_url;
     var secs = sections(r.brief), cheat = secs.filter(function(s){ return /ШПАРГАЛКА/i.test(s.title); })[0];
+    var v3 = renderV3(secs);
+    document.getElementById("d-v3").hidden = !v3; document.getElementById("d-toc").hidden = !v3;
+    document.getElementById("d-v3").innerHTML = v3 ? v3.html : "";
+    document.querySelector("#d-toc .in").innerHTML = v3 ? v3.toc : "";
+    document.getElementById("d-sections-card").hidden = !!v3; document.getElementById("d-cases-card").hidden = !!v3;
+    if (v3) cheat = null;
     document.getElementById("d-cheat").hidden = !cheat;
     if (cheat) document.getElementById("d-cheat-body").innerHTML = md(cheat.body.join("\n"));
     var rest = secs.filter(function(s){ return s !== cheat; });
