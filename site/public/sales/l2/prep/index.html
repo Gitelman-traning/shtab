@@ -98,7 +98,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 .v-chk{align-self:flex-start;font-size:11px;padding:2px 8px;border-radius:7px;background:var(--soft);color:var(--faint);border:1px solid var(--line-2)}
 .v-chk.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
 .calc-rate{font-size:12.5px;color:var(--dim);margin:0 0 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap} .calc-rate input{width:80px}
-.calc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px} @media (max-width:900px){.calc-grid{grid-template-columns:1fr}}
+
 .calc-b{background:var(--soft);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
 .calc-h b{display:block;font-size:14px} .calc-h span{font-size:12px;color:var(--faint)}
 .calc-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
@@ -106,6 +106,10 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 .calc-r{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
 .calc-total{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:14px;padding:16px 18px;border-radius:14px;background:var(--bad-bg)}
 .calc-total span{font-size:13px;color:var(--bad);font-weight:600} .calc-total b{font-size:40px;line-height:1;color:var(--bad);font-variant-numeric:tabular-nums}
+.calc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px} @media (max-width:1200px){.calc-grid{grid-template-columns:repeat(2,1fr)}} @media (max-width:760px){.calc-grid{grid-template-columns:1fr}}
+.calc-h{display:flex;flex-direction:column;gap:3px} .calc-on{font-size:11px;color:var(--faint);display:flex;gap:5px;align-items:center;cursor:pointer}
+.calc-ask{font-size:12px;color:var(--dim);font-style:italic}
+.calc-r.off{color:var(--faint)} .calc-fx{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums} .calc-note{font-size:11px;color:var(--faint)}
 </style>
 </head>
 <body>
@@ -220,7 +224,8 @@ function v3facts(L){
   L.forEach(function(t){ var it = v3item(t); if (it == null) return;
     var lv = v3label(it);
     if (/гипотеза про/i.test(lv[0])) return;   // убрано по решению 07.10.2026
-    if (/главный вопрос/i.test(lv[0])) { thesis.push('<div><p class="v-lbl">' + esc(lv[0]) + '</p>' + inline(lv[1]) + '</div>'); return; }
+    if (/главный вопрос/i.test(lv[0])) return;   // убрано по решению 07.10.2026
+    if (false) { thesis.push('<div><p class="v-lbl">' + esc(lv[0]) + '</p>' + inline(lv[1]) + '</div>'); return; }
     var mark = "", mm = it.match(/\s*\[(✓|\?)\]\s*$/); if (mm) { mark = mm[1]; it = it.slice(0, mm.index); }
     var badge = mark === "✓" ? '<span class="v-chk ok" title="цифры и цитаты найдены на странице источника">✓ проверено</span>' : mark === "?" ? '<span class="v-chk" title="проверить по источнику не удалось">не проверено</span>' : "";
     var k = it.lastIndexOf(" → ");
@@ -260,6 +265,40 @@ function v3hyp(L){
   }).join("");
   return '<div class="card" id="v-hyp"><h2>Гипотезы и вопросы <small>отмечайте вопросы по ходу встречи</small></h2><div class="v-hyps">' + html + '</div>' + (more.length ? '<div class="v-more">' + more.join("") + '</div>' : "") + '</div>';
 }
+// ---------- калькулятор потерь: шесть формул (решение 07.10.2026), всё в тысячах долларов в год ----------
+// Коэффициенты по умолчанию — из проверенных исследований (подпись у поля), диагност правит их ответами клиента.
+var CALC_BLOCKS = [
+  { id: "owner", title: "Время собственника", ask: "Сколько часов в неделю вы делаете работу, за которую могли бы платить руководителю?",
+    fields: [["hours", "Часов в неделю на чужую работу", "ч", 1], ["profit", "Чистая прибыль в год", "тыс $", 10]],
+    note: "час собственника = прибыль ÷ 2 000 рабочих часов в год",
+    calc: function(v){ var rate = v.profit * 1000 / 2000; return [v.hours * rate * 50 / 1000, n(v.hours) + " ч × $" + Math.round(rate) + "/ч × 50 недель"]; } },
+  { id: "hire", title: "Ошибка найма руководителя", ask: "Во сколько обошёлся последний неудачный руководитель? Сколько месяцев ушло, пока поняли и заменили?",
+    fields: [["sal", "Оклад руководителя в месяц", "тыс $", 0.5], ["mult", "Окладов на замену", "", 1], ["dept", "Выручка его направления в год", "тыс $", 10], ["pct", "Недобор направления", "%", 0.5], ["months", "Месяцев до исправления", "мес", 1]],
+    note: "замена стоит от ½ до 2 годовых окладов (Gallup, 2019) — берём нижнюю границу: 6 окладов",
+    calc: function(v){ var a = v.sal * v.mult, b = v.dept * v.pct / 100 * v.months / 12; return [a + b, fmtK(v.sal) + " × " + n(v.mult) + " окладов + " + fmtK(v.dept) + " × " + n(v.pct) + "% × " + n(v.months) + "/12"]; } },
+  { id: "half", title: "Работа вполсилы", ask: "Сколько времени ваши люди тратят на согласования, переделки и ожидание ваших решений?",
+    fields: [["fot", "Фонд оплаты труда в год", "тыс $", 10], ["pct", "Теряется на согласования и ожидание", "%", 1]],
+    note: "средняя компания теряет 21% производительной силы на лишние согласования и встречи (Bain, 2017)",
+    calc: function(v){ return [v.fot * v.pct / 100, fmtK(v.fot) + " × " + n(v.pct) + "%"]; } },
+  { id: "weak", title: "Слабый руководитель", ask: "На сколько процентов это направление могло бы зарабатывать больше с сильным руководителем?",
+    fields: [["dept", "Выручка направления в год", "тыс $", 10], ["pct", "Могла быть больше на", "%", 0.5]],
+    note: "когда лучшего продавца делают руководителем, продажи его команды падают на 7,5% (NBER, Benson, Li, Shue)",
+    calc: function(v){ return [v.dept * v.pct / 100, fmtK(v.dept) + " × " + n(v.pct) + "%"]; } },
+  { id: "sales", title: "Продажи на собственнике", ask: "Какая доля выручки приходит через вас лично? Что будет с ней, если вас месяц не будет?",
+    fields: [["rev", "Выручка в год", "тыс $", 10], ["share", "Доля через собственника", "%", 1], ["months", "Месяцев его отсутствия", "мес", 1]],
+    note: "выручка, которая держится на одном человеке, останавливается вместе с ним",
+    calc: function(v){ return [v.rev * v.share / 100 * v.months / 12, fmtK(v.rev) + " × " + n(v.share) + "% × " + n(v.months) + "/12"]; } },
+  { id: "growth", title: "Упущенный рост", soft: true, ask: "Если бы росли не на X, а вдвое быстрее — сколько это было бы в выручке за год?",
+    fields: [["rev", "Выручка в год", "тыс $", 10], ["now", "Рост сейчас", "%", 1], ["could", "Рост возможный", "%", 1]],
+    note: "мягкая оценка: «возможный» — по умолчанию вдвое быстрее нынешнего",
+    calc: function(v){ return [v.rev * Math.max(0, v.could - v.now) / 100, fmtK(v.rev) + " × (" + n(v.could) + "% − " + n(v.now) + "%)"]; } }
+];
+function n(x){ return String(Math.round(x * 10) / 10).replace(".", ","); }
+function fmtK(k){ // k — тысячи долларов
+  if (!isFinite(k) || k <= 0) return "$0";
+  if (k >= 1000) return "$" + (k / 1000).toFixed(k >= 100000 ? 0 : 1).replace(".", ",") + " млн";
+  return "$" + Math.round(k) + " тыс";
+}
 function v3loss(L, calc){
   var finalQ = "", ask = [], rest = [];
   L.forEach(function(t){
@@ -269,68 +308,54 @@ function v3loss(L, calc){
     else rest.push(t);
   });
   calc = calc || {};
-  var role = calc.key_role || "ключевого специалиста", dept = calc.dept_name || "главное подразделение";
-  var html = '<div class="card" id="v-loss"><h2>Сколько теряет <small>калькулятор на встрече: вводите ответы клиента, цифры — в долларах за год</small></h2>'
+  var html = '<div class="card" id="v-loss"><h2>Сколько теряет <small>калькулятор на встрече: вводите ответы клиента; суммы в тысячах долларов за год</small></h2>'
     + '<div class="calc-rate">Курс <input type="number" id="c-rate" step="0.1" min="1"> ₽ за $ <span class="hint" id="c-rate-src"></span></div>'
-    + '<div class="calc-grid">'
-    + calcBlock("profit", "Падение прибыли", "факт из отчётности" + (calc.profit_years ? " · " + esc(calc.profit_years) : ""), [
-        ["c-p1", "Прибыль раньше, $", "money"], ["c-p2", "Прибыль сейчас, $", "money"]])
-    + calcBlock("half", "Команда работает вполсилы", "оценка команды от 1 до 10, никого не разделяя", [
-        ["c-n", "Сотрудников", "int"], ["c-sal", "Средняя зарплата в месяц, $", "money"], ["c-score", "Оценка команды, 1–10", "score"]])
-    + calcBlock("star", "Уход: " + esc(role), "сколько ушло за год и сколько искали замену", [
-        ["c-per", "Выручка на одного в год, $", "money"], ["c-left", "Ушло за год", "int"], ["c-months", "Месяцев на замену", "int"]])
-    + calcBlock("dept", "Недобор: " + esc(dept), "на сколько процентов могло бы зарабатывать больше", [
-        ["c-dept", "Выручка за год, $", "money"], ["c-pct", "Недобор, %", "int"]])
-    + '</div>'
+    + '<div class="calc-grid">' + CALC_BLOCKS.map(function(b){
+        return '<div class="calc-b" data-b="' + b.id + '"><div class="calc-h"><label class="calc-on"><input type="checkbox" data-on="' + b.id + '"' + (b.soft ? '' : ' checked') + '> в итог</label><b>' + b.title + (b.soft ? ' <span class="v-chip">мягкая</span>' : '') + '</b><span class="calc-ask">«' + esc(b.ask) + '»</span></div>'
+          + '<div class="calc-f">' + b.fields.map(function(f){ return '<label><span>' + esc(f[1]) + (f[2] ? ', ' + f[2] : '') + '</span><input type="number" min="0" step="' + f[3] + '" id="c-' + b.id + '-' + f[0] + '"></label>'; }).join("") + '</div>'
+          + '<div class="calc-r" id="c-r-' + b.id + '">—</div><div class="calc-fx" id="c-fx-' + b.id + '"></div><div class="calc-note">' + esc(b.note) + '</div></div>';
+      }).join("") + '</div>'
     + '<div class="calc-total"><span>Теряет в год, порядок</span><b id="c-total">—</b></div>'
-    + (calc.note ? '<p class="hint" style="margin-top:6px">Заполнено заранее: ' + esc(calc.note) + '. Всё можно поправить на встрече.</p>' : "")
-    + (ask.length ? '<div class="v-more">' + ask.map(function(a){ return '<div><b>Спросить для калькулятора</b>' + inline(a) + '</div>'; }).join("") + '</div>' : "")
+    + (calc.note ? '<p class="hint" style="margin-top:6px">Заполнено заранее: ' + esc(calc.note) + '. Пустые поля — спросить у клиента.</p>' : "")
+    + (ask.length ? '<div class="v-more">' + ask.map(function(a){ return '<div><b>Спросить</b>' + inline(a) + '</div>'; }).join("") + '</div>' : "")
     + (rest.length && !ask.length && !finalQ ? '<div class="md" style="padding:0">' + md(rest.join("\n")) + '</div>' : "")
     + (finalQ ? '<div class="v-final"><small>Итоговый вопрос</small>' + inline(finalQ) + '</div>' : "")
     + '</div>';
   return html;
 }
-function calcBlock(id, title, sub, fields){
-  return '<div class="calc-b" data-b="' + id + '"><div class="calc-h"><b>' + title + '</b><span>' + sub + '</span></div><div class="calc-f">'
-    + fields.map(function(f){ return '<label><span>' + esc(f[1]) + '</span><input type="number" id="' + f[0] + '" data-kind="' + f[2] + '" min="0"' + (f[2] === "score" ? ' max="10" step="1"' : f[2] === "money" ? ' step="1000"' : ' step="1"') + '></label>'; }).join("")
-    + '</div><div class="calc-r" id="c-r-' + id + '">—</div></div>';
-}
-function fmtUSD(x){
-  if (!isFinite(x) || x <= 0) return "$0";
-  if (x >= 1e6) return "$" + (x / 1e6).toFixed(x >= 1e8 ? 0 : 1).replace(".", ",") + " млн";
-  if (x >= 1e3) return "$" + Math.round(x / 1e3) + " тыс";
-  return "$" + Math.round(x);
-}
-// заполнить поля из блока calc подготовки (₽ → $ по курсу) и пересчитывать на каждый ввод
 function calcInit(calc){
   calc = calc || {};
   var $ = function(id){ return document.getElementById(id); };
   if (!$("c-rate")) return;
+  function set(id, val){ var el = $(id); if (el && val !== "" && val != null && isFinite(val)) el.value = Math.round(val * 10) / 10; }
   function prefill(){
-    var r = Number($("c-rate").value) || 95, mln = function(v){ return v == null || v === "" ? "" : Math.round(Number(v) * 1e6 / r); };
-    $("c-p1").value = mln(calc.profit_prev); $("c-p2").value = mln(calc.profit_cur);
-    $("c-n").value = calc.staff || ""; $("c-sal").value = calc.avg_salary_month ? Math.round(Number(calc.avg_salary_month) * 1000 / r) : "";
-    if (!$("c-score").value) $("c-score").value = 7;
-    $("c-per").value = calc.revenue && calc.key_count ? Math.round(Number(calc.revenue) * 1e6 / Number(calc.key_count) / r) : "";
-    if (!$("c-left").value) $("c-left").value = 1; if (!$("c-months").value) $("c-months").value = 6;
-    $("c-dept").value = mln(calc.dept_revenue); if (!$("c-pct").value) $("c-pct").value = 10;
+    var r = Number($("c-rate").value) || 95, k = function(mlnRub){ return mlnRub == null || mlnRub === "" ? null : Number(mlnRub) * 1000 / r; };
+    var rev = k(calc.revenue), prof = k(calc.profit_cur), dept = k(calc.dept_revenue);
+    var fot = calc.staff && calc.avg_salary_month ? Number(calc.staff) * Number(calc.avg_salary_month) * 12 / r : null;
+    var now = calc.revenue && calc.revenue_prev ? Math.round((Number(calc.revenue) / Number(calc.revenue_prev) - 1) * 100) : null;
+    set("c-owner-profit", prof); set("c-hire-dept", dept); set("c-weak-dept", dept); set("c-half-fot", fot);
+    set("c-sales-rev", rev); set("c-growth-rev", rev); set("c-growth-now", now); if (now != null) set("c-growth-could", now * 2);
+    if (calc.avg_salary_month) set("c-hire-sal", Number(calc.avg_salary_month) * 2 / r);   // руководитель ≈ 2 средние зарплаты, поправить
+    var def = { "c-owner-hours": 20, "c-hire-mult": 6, "c-hire-pct": 7.5, "c-hire-months": 6, "c-half-pct": 21, "c-weak-pct": 7.5, "c-sales-months": 1 };
+    Object.keys(def).forEach(function(id){ if (!$(id).value) $(id).value = def[id]; });
     recalc();
   }
   function recalc(){
-    var v = function(id){ return Math.max(0, Number($(id).value) || 0); };
-    var res = {
-      profit: Math.max(0, v("c-p1") - v("c-p2")),
-      half: v("c-n") * v("c-sal") * 12 * Math.max(0, 10 - Math.min(10, v("c-score"))) / 10,
-      star: v("c-per") * v("c-left") * v("c-months") / 12,
-      dept: v("c-dept") * v("c-pct") / 100
-    }, total = 0;
-    Object.keys(res).forEach(function(k){ $("c-r-" + k).textContent = fmtUSD(res[k]); total += res[k]; });
-    $("c-total").textContent = "≈ " + fmtUSD(total);
+    var total = 0;
+    CALC_BLOCKS.forEach(function(b){
+      var v = {}, filled = true;
+      b.fields.forEach(function(f){ var el = $("c-" + b.id + "-" + f[0]); v[f[0]] = Math.max(0, Number(el.value) || 0); if (el.value === "") filled = false; });
+      var res = b.calc(v), on = document.querySelector('[data-on="' + b.id + '"]').checked;
+      $("c-r-" + b.id).textContent = filled ? fmtK(res[0]) : "спросить";
+      $("c-r-" + b.id).classList.toggle("off", !filled || !on);
+      $("c-fx-" + b.id).textContent = filled ? res[1] + " = " + fmtK(res[0]) : "заполните пустые поля";
+      if (filled && on) total += res[0];
+    });
+    $("c-total").textContent = "≈ " + fmtK(total);
   }
   $("c-rate").value = 95; $("c-rate-src").textContent = "по умолчанию";
-  [].forEach.call(document.querySelectorAll("#v-loss input[type=number]"), function(i){ i.addEventListener("input", i.id === "c-rate" ? prefill : recalc); });
+  [].forEach.call(document.querySelectorAll("#v-loss input"), function(i){ i.addEventListener(i.type === "checkbox" ? "change" : "input", i.id === "c-rate" ? prefill : recalc); });
   prefill();
-  // курс ЦБ на сегодня, если доступен
   fetch("https://www.cbr-xml-daily.ru/daily_json.js").then(function(r){ return r.json(); }).then(function(j){
     var usd = j && j.Valute && j.Valute.USD && j.Valute.USD.Value;
     if (usd) { $("c-rate").value = usd.toFixed(1); $("c-rate-src").textContent = "курс ЦБ на " + String(j.Date || "").slice(0, 10).split("-").reverse().join("."); prefill(); }
