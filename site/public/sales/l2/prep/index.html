@@ -234,7 +234,8 @@ function v3hyp(L){
   var html = hyps.map(function(h){
     var trap = /ловушка/i.test(h.title);
     var steps = h.steps.map(function(st, i){
-      var lv = v3label(st);
+      var lv = v3label(st), em = st.match(/^(Если[^:]{0,60}):\s*(.*)$/i);
+      if (em) lv = [em[1], em[2]];
       if (/^деньги|^во что/i.test(lv[0])) return '<div class="v-step money"><span class="k">₽</span><div>' + inline(lv[1]) + '</div></div>';
       if (/^если/i.test(lv[0])) return '<div class="v-step"><span class="k">↳</span><div><small>' + esc(lv[0]) + '</small>' + inline(lv[1]) + '</div></div>';
       var text = /^вопрос$/i.test(lv[0]) ? lv[1] : st;
