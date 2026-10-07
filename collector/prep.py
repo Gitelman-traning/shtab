@@ -308,14 +308,14 @@ def research_company(ctx):
 
 # ---------- шаг 2: подбор участников ----------
 
-PICK_SYS = """Ты подбираешь из базы участников тренинга по управлению пять человек, чей бизнес больше всего похож на бизнес клиента.
+PICK_SYS = """Ты подбираешь из базы участников тренинга по управлению десять человек, чей бизнес больше всего похож на бизнес клиента.
 Похожесть — не совпадение слова в нише. Сравнивай: бизнес-модель (производство / услуги / розница / опт / онлайн), B2B или B2C,
 тип продукта, масштаб (оборот и штат), управленческую сложность (несколько точек, филиалы, сезонность, производство + продажи),
 страну. Пример: для цветочной сети подходят не только цветочные компании, а рестораны, fashion-ритейл, сервисные сети с похожим
 масштабом и той же проблемой управления.
-Выбирай только из переданного списка, по id. Ответь ровно пятью строками без заголовков и пояснений, каждая строка:
+Выбирай только из переданного списка, по id. Ответь ровно десятью строками, от самого похожего, без заголовков и пояснений:
 <id> | <1–2 предложения, чем похож>
-Если похожих мало — всё равно выбери 5 ближайших и честно напиши, что сходство частичное."""
+Если похожих мало — всё равно выбери 10 ближайших и честно напиши, что сходство частичное."""
 
 
 def cases_lines(cases):
@@ -343,7 +343,7 @@ def cases_lines(cases):
 def pick_cases(ctx, facts, cases):
     user = "%s\n\nДосье по открытым источникам:\n%s\n\nБаза участников (id | компания | ниша | оборот | штат | география | сайт | когда):\n%s" % (
         card_text(ctx), facts[:6000], cases_lines(cases))
-    text, _, usage = claude(PICK_SYS, user, max_tokens=1500)
+    text, _, usage = claude(PICK_SYS, user, max_tokens=2000, model=MODEL_GROWTH)   # база ~1 800 строк — дешёвой моделью
     by_id = {int(c["deal"]): c for c in cases}
     picked = []
     for line in text.splitlines():
@@ -355,7 +355,7 @@ def pick_cases(ctx, facts, cases):
             picked.append(dict(c, why=m.group(2).strip()[:400]))
     if not picked:
         log("  подбор участников: не нашёл id в ответе: %s" % text[:200].replace("\n", " "))
-    return picked[:5], usage
+    return picked[:10], usage
 
 
 # ---------- шаг 3: рост выпускников ----------
@@ -393,16 +393,51 @@ def alumni_growth(case):
 
 # ---------- шаг 4: сборка подготовки ----------
 
-def build_brief(ctx, facts, picked, prompt):
+HEROES_PATH = os.environ.get("PREP_HEROES", os.path.join(os.path.dirname(__file__), "prep_heroes.md"))
+
+
+def build_brief(ctx, facts, picked, prompt, owner=""):
     cases_txt = []
     for i, c in enumerate(picked, 1):
-        cases_txt.append("### Участник %d: %s\n%s\nЧем похож: %s\nДинамика по открытым источникам:\n%s" % (
-            i, cases_lines([c]), "", c.get("why", ""), c.get("growth") or "не проверялось"))
+        cases_txt.append("### Выпускник %d: %s\nЧем похож: %s\nДинамика по открытым источникам:\n%s" % (
+            i, cases_lines([c]), c.get("why", ""), c.get("growth") or "не проверялось"))
+    heroes = open(HEROES_PATH, encoding="utf-8").read() if os.path.exists(HEROES_PATH) else ""
     style = STYLES.get(ctx.get("manager") or "")
-    style_txt = ("\n\n# СТИЛЬ ВОПРОСОВ ДИАГНОСТА (%s) — из его реальных встреч\nВопросы в разделах 6, 10, 12 формулируй в этой манере, не копируя дословно:\n%s" % (ctx["manager"], style)) if style else ""
-    user = "%s\n\n# ДОСЬЕ ПО ОТКРЫТЫМ ИСТОЧНИКАМ\n%s\n\n# УЧАСТНИКИ ИЗ БАЗЫ (подобраны по сходству)\n%s%s" % (
-        card_text(ctx), facts, "\n\n".join(cases_txt) or "Подходящих участников в базе не нашлось.", style_txt)
-    return claude(prompt, user, max_tokens=10000)
+    style_txt = ("\n\n# СТИЛЬ ВОПРОСОВ ДИАГНОСТА (%s) — из его реальных встреч\nВопросы в разделах 4–6 формулируй в этой манере, не копируя дословно:\n%s" % (ctx["manager"], style)) if style else ""
+    user = "%s\n\n# ДОСЬЕ ПО ОТКРЫТЫМ ИСТОЧНИКАМ\n%s\n\n# О СОБСТВЕННИКЕ: ИНТЕРВЬЮ, ПОБЕДЫ, ФАКТЫ\n%s\n\n# ВЫПУСКНИКИ С ПОДТВЕРЖДЁННЫМ РОСТОМ (подобраны по сходству)\n%s\n\n# ГОТОВЫЕ ИСТОРИИ ВЫПУСКНИКОВ (журнал; результат со слов выпускника)\n%s%s" % (
+        card_text(ctx), facts, owner or "не искали", "\n\n".join(cases_txt) or "Подтверждённых нет.", heroes or "нет", style_txt)
+    return claude(prompt, user, max_tokens=8000)
+
+
+# ---------- о собственнике: интервью, победы, уникальные факты (дешёвая модель) ----------
+
+OWNER_SYS = """Ты ищешь в открытых источниках материал о собственнике компании и её победах — чтобы менеджер на встрече показал,
+что изучил компанию глубоко. Ищи: интервью, подкасты, выступления, статьи и колонки собственника; награды, рейтинги, победы
+компании; необычные факты из истории компании и биографии собственника.
+Это автоматический прогон, вопросов не задавай. Ответ — markdown, до 2 500 знаков, без вступлений:
+## Интервью и выступления
+- <где, когда> — 2–3 главных тезиса; 1–2 дословные цитаты в кавычках (источник: адрес)
+## Победы и награды
+- <что, когда> (источник: адрес)
+## Уникальные факты
+- <факт> (источник: адрес)
+Чего не нашёл — так и напиши в разделе. Ничего не выдумывай, цитаты только дословные."""
+
+
+def owner_notes(ctx, facts):
+    user = "%s\n\nЧто уже известно из досье (имена собственника и компании берите отсюда):\n%s" % (card_text(ctx), facts[:3500])
+    return claude(OWNER_SYS, user, search_uses=4, max_tokens=2500, model=MODEL_GROWTH)
+
+
+def growth_confirmed(text):
+    """Рост подтверждён И он есть: в строке «Изменение:» рост (×N, +N%, «рост») и нет «не подтверждено» / снижения."""
+    for line in (text or "").splitlines():
+        s = line.strip().strip("*").strip().lower()
+        if s.startswith("изменение"):
+            if "не подтвержд" in s or re.search(r"↓|сниж|падени|сократ|−\s*\d", s):
+                return False
+            return bool(re.search(r"рост|×|\+\s*\d|увелич", s))
+    return False
 
 
 # ---------- стиль вопросов диагноста из расшифровок ОКК ----------
@@ -669,29 +704,35 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
         picked = json.load(open(picked_path, encoding="utf-8"))
         log("  участники с проверкой роста взяты из файла %s (%d)" % (picked_path, len(picked)))
     else:
-        picked, u = pick_cases(ctx, facts, cases)
-        add_usage(usage, u)
-        # рост выпускников — из базы «было → стало»; кого в базе ещё нет, проверяем сейчас (дешёвая модель) и кладём в базу:
-        # так база наполняется теми участниками, которые реально нужны на встречах
-        checked, fresh_rows = 0, []
+        candidates, u = pick_cases(ctx, facts, cases)
+        add_usage(usage, u, cheap=True)
+        # в подготовку идут только выпускники с ПОДТВЕРЖДЁННЫМ ростом (решение 07.10.2026): идём по кандидатам от самого похожего,
+        # рост берём из базы «было → стало», кого там нет — проверяем сейчас (дешёвая модель, ≤ PREP_GROWTH_CHECKS штук) и кладём в базу
+        picked, fresh_rows, checks = [], [], 0
+        max_checks = int(os.environ.get("PREP_GROWTH_CHECKS", "5"))
         today = dt.datetime.now(MSK).strftime("%Y-%m-%d")
-        for c in picked:
-            if c.get("result"):
+        for c in candidates:
+            if len(picked) >= 3:
+                break
+            if not c.get("result"):
+                if checks >= max_checks:
+                    continue
+                checks += 1
+                try:
+                    g, _, u = alumni_growth(c)
+                    add_usage(usage, u, cheap=True)
+                    c["result"], c["checked_at"] = g, today
+                    key = re.sub(r"\W+", "", (c.get("company") or c.get("site") or "").lower())
+                    for x in cases:
+                        if re.sub(r"\W+", "", (x.get("company") or x.get("site") or "").lower()) == key and not x.get("result"):
+                            fresh_rows.append({"deal": x["deal"], "result": g[:3000], "checked_at": today})
+                except Exception as e:
+                    log("  рост участника %d: %s" % (c["deal"], str(e)[:100]))
+                    continue
+            if growth_confirmed(c.get("result")):
                 c["growth"] = c["result"] + ("\n(проверено %s)" % c["checked_at"][:10] if c.get("checked_at") else "")
-                checked += 1
-                continue
-            try:
-                g, _, u = alumni_growth(c)
-                add_usage(usage, u, cheap=True)
-                c["growth"], c["result"], c["checked_at"] = g, g, today
-                key = re.sub(r"\W+", "", (c.get("company") or c.get("site") or "").lower())
-                for x in cases:
-                    if re.sub(r"\W+", "", (x.get("company") or x.get("site") or "").lower()) == key and not x.get("result"):
-                        fresh_rows.append({"deal": x["deal"], "result": g[:3000], "checked_at": today})
-            except Exception as e:
-                c["growth"] = "не проверено (ошибка поиска)"
-                log("  рост участника %d: %s" % (c["deal"], str(e)[:100]))
-        log("  участников подобрано: %d, из базы %d, проверено сейчас %d" % (len(picked), checked, len(picked) - checked))
+                picked.append(c)
+        log("  кандидатов %d, проверено сейчас %d, с подтверждённым ростом взято %d" % (len(candidates), checks, len(picked)))
         if fresh_rows and not dry and URL and STOKEN:
             try:
                 shtab("POST", "/api/ingest", {"collector": "prep", "prep_growth": fresh_rows})
@@ -700,20 +741,36 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
         if out_path:
             with open(out_path + ".picked.json", "w", encoding="utf-8") as f:
                 json.dump(picked, f, ensure_ascii=False, indent=1)
-    brief, _, u = build_brief(ctx, facts, picked, prompt)
+    owner_cache = (out_path + ".owner.md") if out_path else None
+    if owner_cache and os.path.exists(owner_cache):
+        owner = open(owner_cache, encoding="utf-8").read()
+        log("  о собственнике: взято из файла %s" % owner_cache)
+    else:
+        try:
+            owner, owner_src, u = owner_notes(ctx, facts)
+            add_usage(usage, u, cheap=True)
+            sources = sources + [s for s in owner_src if s["url"] not in [x["url"] for x in sources]]
+            log("  о собственнике: %d символов, поисков %d" % (len(owner), u["search"]))
+            if owner_cache:
+                open(owner_cache, "w", encoding="utf-8").write(owner)
+        except Exception as e:
+            owner = ""
+            log("  о собственнике: не получилось (%s)" % str(e)[:100])
+    facts_full = facts + ("\n\n## О собственнике: интервью, победы, факты\n" + owner if owner else "")
+    brief, _, u = build_brief(ctx, facts, picked, prompt, owner)
     add_usage(usage, u)
     log("  подготовка: %d символов, всего токенов %d/%d, поисков %d, %d сек, ≈ %.0f ₽" % (
         len(brief), usage["in"], usage["out"], usage["search"], time.time() - t0, usage.get("rub", 0)))
     row = {"deal": deal, "contact": ctx["contact"], "meet_at": ctx["meet_at"], "manager": ctx["manager"], "client": ctx["card"].get("Имя", ""),
            "company": ctx["company"], "niche": ctx["niche"], "turn": ctx["turn"], "staff": ctx["staff"],
            "geo": ", ".join(x for x in (ctx["city"], ctx["country"]) if x), "quiz_url": ctx["quiz_url"],
-           "status": "ready", "facts": facts, "sources": sources, "cases": picked, "brief": brief,
+           "status": "ready", "facts": facts_full, "sources": sources, "cases": picked, "brief": brief,
            "model": MODEL, "tokens_in": usage["in"], "tokens_out": usage["out"], "searches": usage["search"],
            "amo_url": AMO_UI % deal, "error": ""}
     if out_path:
         with open(out_path, "w", encoding="utf-8") as f:
             f.write("# Подготовка к встрече · сделка %d · %s · диагност %s\n\n%s\n\n---\n\n# Досье\n\n%s\n\n---\n\n# Участники\n\n%s\n" % (
-                deal, ctx["meet_at"], ctx["manager"], brief, facts,
+                deal, ctx["meet_at"], ctx["manager"], brief, facts_full,
                 "\n\n".join("## %s\n%s\n%s" % (cases_lines([c]), c.get("why", ""), c.get("growth", "")) for c in picked)))
         log("  записано в %s" % out_path)
     if not dry:

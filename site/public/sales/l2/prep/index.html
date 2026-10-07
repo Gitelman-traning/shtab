@@ -183,10 +183,10 @@ function showDetail(deal){
       + (r.updated_at ? "<br>обновлено " + esc(r.updated_at.slice(0, 16).replace("T", " ")) + " UTC" : "") + (r.model ? "<br>" + esc(r.model) + " · " + (r.tokens_in + r.tokens_out).toLocaleString("ru") + " токенов · " + r.searches + " поисков" : "");
     document.getElementById("d-amo").href = r.amo_url || ("https://pavelgitelman.amocrm.ru/leads/detail/" + r.deal);
     var q = document.getElementById("d-quiz"); q.hidden = !r.quiz_url; if (r.quiz_url) q.href = r.quiz_url;
-    var secs = sections(r.brief), cheat = secs.filter(function(s){ return s.n === 16; })[0];
+    var secs = sections(r.brief), cheat = secs.filter(function(s){ return /ШПАРГАЛКА/i.test(s.title); })[0];
     document.getElementById("d-cheat").hidden = !cheat;
     if (cheat) document.getElementById("d-cheat-body").innerHTML = md(cheat.body.join("\n"));
-    var rest = secs.filter(function(s){ return s.n !== 16; });
+    var rest = secs.filter(function(s){ return s !== cheat; });
     document.getElementById("d-sections").innerHTML = rest.length ? rest.map(function(s, i){
       return '<details class="sec"' + (i < 1 ? " open" : "") + '><summary><span class="n">' + (s.n || "") + '</span>' + esc(s.title || "Вступление") + '</summary><div class="md">' + md(s.body.join("\n")) + '</div></details>';
     }).join("") : '<p class="empty">' + (r.status === "queued" ? "Подготовка ещё считается — страница обновится сама." : "Текста подготовки нет.") + '</p>';
