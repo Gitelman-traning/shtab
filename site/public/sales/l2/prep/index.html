@@ -208,7 +208,8 @@ function v3facts(L){
   var cards = [], thesis = [];
   L.forEach(function(t){ var it = v3item(t); if (it == null) return;
     var lv = v3label(it);
-    if (/гипотеза про|главный вопрос/i.test(lv[0])) { thesis.push('<div><p class="v-lbl">' + esc(lv[0]) + '</p>' + inline(lv[1]) + '</div>'); return; }
+    if (/гипотеза про/i.test(lv[0])) return;   // убрано по решению 07.10.2026
+    if (/главный вопрос/i.test(lv[0])) { thesis.push('<div><p class="v-lbl">' + esc(lv[0]) + '</p>' + inline(lv[1]) + '</div>'); return; }
     var k = it.lastIndexOf(" → ");
     cards.push('<div class="v-fact"><div>' + inline(k > 0 ? it.slice(0, k) : it) + '</div>' + (k > 0 ? '<div class="m">' + inline(it.slice(k + 3)) + '</div>' : "") + '</div>'); });
   return '<div class="card" id="v-facts"><h2>Что интересного <small>показать, что изучили не поверхностно</small></h2><div class="v-facts">' + cards.join("") + '</div>' + (thesis.length ? '<div class="v-thesis">' + thesis.join("") + '</div>' : "") + '</div>';
@@ -305,7 +306,7 @@ function renderV3(secs){
   var top = (by.cheat ? v3cheat(by.cheat) : "") + (by.cmp ? v3cmp(by.cmp) : "");
   var html = (top ? '<div class="v-top">' + top + '</div>' : "") + (by.facts ? v3facts(by.facts) : "") + (by.open ? v3open(by.open) : "")
     + v3hyp(by.hyp) + (by.loss ? v3loss(by.loss) : "") + (by.cases ? v3cases(by.cases) : "");
-  var toc = Object.keys(V3_TOC).filter(function(k){ return by[k]; }).map(function(k){ return '<a href="#v-' + k + '" data-v="v-' + k + '">' + V3_TOC[k] + '</a>'; }).join("") + '<a href="#v-dossier" data-v="v-dossier">Досье</a>';
+  var toc = Object.keys(V3_TOC).filter(function(k){ return by[k]; }).map(function(k){ return '<a href="#v-' + k + '" data-v="v-' + k + '">' + V3_TOC[k] + '</a>'; }).join("") ;
   return { html: html, toc: toc };
 }
 document.addEventListener("click", function(e){
@@ -388,7 +389,7 @@ function showDetail(deal){
     document.getElementById("d-v3").hidden = !v3; document.getElementById("d-toc").hidden = !v3;
     document.getElementById("d-v3").innerHTML = v3 ? v3.html : "";
     document.querySelector("#d-toc .in").innerHTML = v3 ? v3.toc : "";
-    document.getElementById("d-sections-card").hidden = !!v3; document.getElementById("d-cases-card").hidden = !!v3;
+    document.getElementById("d-sections-card").hidden = !!v3; document.getElementById("d-cases-card").hidden = !!v3; document.getElementById("v-dossier").hidden = !!v3;
     if (v3) cheat = null;
     document.getElementById("d-cheat").hidden = !cheat;
     if (cheat) document.getElementById("d-cheat-body").innerHTML = md(cheat.body.join("\n"));
