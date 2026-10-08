@@ -203,13 +203,14 @@ var SECTIONS=[];   // [{id,name}] — из /api/sections, для заявок
 /* дерево разделов для прав: отдел → подразделы (наследуют уровень отдела, если не задано своё) */
 var RTREE=[
   {id:"hub",name:"Общий экран"},
+  {id:"tasks",name:"Задачи"},
   {id:"sales",name:"Отдел продаж",children:[{id:"sales.l1",name:"Первая линия"},{id:"sales.l2",name:"Вторая линия",children:[{id:"sales.l2.okk",name:"Встречи · Менеджеры · Сверка (ОКК)"}]}]},
   {id:"marketing",name:"Маркетинг",children:[{id:"marketing.instagram",name:"Instagram SMM"},{id:"marketing.telegram",name:"Телеграм-канал"},{id:"marketing.influence",name:"Инфлюенс"},{id:"marketing.youtube",name:"YouTube"},{id:"marketing.fb",name:"Реклама FB"},{id:"marketing.sitechat",name:"Чат на сайте"},{id:"marketing.site",name:"Сайт"}]},
-  {id:"hr",name:"HR",children:[{id:"hr.structure",name:"Структура компании"},{id:"hr.team",name:"Для HR (закрыто по умолчанию)"}]},
+  {id:"hr",name:"HR",children:[{id:"hr.structure",name:"Структура компании"},{id:"hr.events",name:"Праздники"},{id:"hr.leave",name:"Отпуска"},{id:"hr.team",name:"Для HR (закрыто по умолчанию)"}]},
   {id:"guide",name:"Гайд и вопросы"},
   {id:"status",name:"Витрина"}
 ];
-var PARENT={"sales.l1":"sales","sales.l2":"sales","sales.l2.okk":"sales.l2","marketing.instagram":"marketing","marketing.telegram":"marketing","marketing.influence":"marketing","marketing.youtube":"marketing","marketing.fb":"marketing","marketing.sitechat":"marketing","marketing.site":"marketing","hr.structure":"hr","hr.team":"hr"};
+var PARENT={"sales.l1":"sales","sales.l2":"sales","sales.l2.okk":"sales.l2","marketing.instagram":"marketing","marketing.telegram":"marketing","marketing.influence":"marketing","marketing.youtube":"marketing","marketing.fb":"marketing","marketing.sitechat":"marketing","marketing.site":"marketing","hr.structure":"hr","hr.events":"hr","hr.leave":"hr","hr.team":"hr"};
 var ADMIN_ONLY=["users","tags","budget","dashboard"];   // настройки — только админ, в дереве прав не показываем
 /* разделы, которые сервер уже знает, а дерево ещё нет, — добавляем в конец, чтобы новый раздел сразу был виден в правах */
 function extendTree(ids){
@@ -220,14 +221,14 @@ function extendTree(ids){
     var node={id:id,name:id}; if(host){ (host.children=host.children||[]).push(node); PARENT[id]=p; } else RTREE.push(node); });
 }
 var PRESETS=[
-  ["Смотрит всё",{"hub":1,"sales":1,"marketing":1,"hr":1,"guide":1,"status":1}],
-  ["Руководитель Первой линии",{"hub":1,"sales":1,"sales.l1":2,"marketing":1,"hr":1,"guide":1,"status":1}],
-  ["Руководитель Второй линии",{"hub":1,"sales":1,"sales.l2":2,"marketing":1,"hr":1,"guide":1,"status":1}],
-  ["Маркетинг",{"hub":1,"sales":1,"marketing":2,"hr":1,"guide":1,"status":1}],
-  ["Инфлюенс",{"hub":1,"sales":1,"marketing":1,"marketing.influence":2,"hr":1,"guide":1,"status":1}],
-  ["Сотрудник HR",{"hub":1,"sales":1,"marketing":1,"hr":2,"guide":1,"status":1}],
-  ["Только своя линия (1-я)",{"hub":1,"sales":0,"sales.l1":2,"marketing":0,"hr":0,"guide":1,"status":0}],
-  ["Всё закрыть",{"hub":0,"sales":0,"marketing":0,"hr":0,"guide":0,"status":0}]
+  ["Смотрит всё",{"hub":1,"tasks":1,"sales":1,"marketing":1,"hr":1,"guide":1,"status":1}],
+  ["Руководитель Первой линии",{"hub":1,"tasks":1,"sales":1,"sales.l1":2,"marketing":1,"hr":1,"guide":1,"status":1}],
+  ["Руководитель Второй линии",{"hub":1,"tasks":1,"sales":1,"sales.l2":2,"marketing":1,"hr":1,"guide":1,"status":1}],
+  ["Маркетинг",{"hub":1,"tasks":1,"sales":1,"marketing":2,"hr":1,"guide":1,"status":1}],
+  ["Инфлюенс",{"hub":1,"tasks":1,"sales":1,"marketing":1,"marketing.influence":2,"hr":1,"guide":1,"status":1}],
+  ["Сотрудник HR",{"hub":1,"tasks":1,"sales":1,"marketing":1,"hr":2,"guide":1,"status":1}],
+  ["Только своя линия (1-я)",{"hub":1,"tasks":1,"sales":0,"sales.l1":2,"marketing":0,"hr":0,"guide":1,"status":0}],
+  ["Всё закрыть",{"hub":0,"tasks":0,"sales":0,"marketing":0,"hr":0,"guide":0,"status":0}]
 ];
 var LV=["закрыт","просмотр","правка"];
 /* редактор прав: состояние живёт в el.__val */
