@@ -98,6 +98,13 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 .v-chk{align-self:flex-start;font-size:11px;padding:2px 8px;border-radius:7px;background:var(--soft);color:var(--faint);border:1px solid var(--line-2)}
 .v-chk.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
 .calc-rate{font-size:12.5px;color:var(--dim);margin:0 0 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap} .calc-rate input{width:80px}
+.v-hyps.two{grid-template-columns:repeat(2,1fr)} @media (max-width:1000px){.v-hyps.two{grid-template-columns:1fr}}
+.v-rules{font-size:13px;line-height:1.55;padding:10px 14px;border-radius:12px;background:var(--gold-soft);margin:0 0 14px} .v-rules b{color:var(--gold)} .v-rules .hint{display:block;margin-top:4px}
+.v-step label small{display:block;font-size:11px;color:var(--faint);margin-bottom:1px}
+.v-uni{margin-top:14px;font-size:13px} .v-uni summary{cursor:pointer;color:var(--dim);font-size:12.5px} .v-uni ol{margin:8px 0 0;padding-left:22px} .v-uni li{margin:4px 0} .v-uni li small{color:var(--faint);margin-right:6px}
+.calc-b.main{border:1px solid var(--gold-a)} .calc-more{margin-top:12px} .calc-more summary{cursor:pointer;font-size:12.5px;color:var(--dim);margin-bottom:10px}
+.calc-total>div{display:flex;flex-direction:column;gap:4px} .calc-idle{align-items:flex-end;text-align:right} .calc-idle input{width:56px;margin:0 4px} .calc-idle b{font-size:24px!important}
+.v-final .c-sum{color:var(--bad)} .v-after{margin-top:8px;font-size:12.5px;font-weight:400;color:var(--dim)}
 
 .calc-b{background:var(--soft);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
 .calc-h b{display:block;font-size:14px} .calc-h span{font-size:12px;color:var(--faint)}
@@ -199,8 +206,8 @@ function sections(brief){
 }
 
 // ---------- подготовка v3: раскладка по блокам (по названиям разделов промпта) ----------
-var V3_KIND = [["cheat", /ШПАРГАЛКА/i], ["cmp", /СВЕРКА/i], ["facts", /ИНТЕРЕСН/i], ["open", /ЗАХОД/i], ["hyp", /ГИПОТЕЗ/i], ["loss", /ТЕРЯ/i], ["cases", /КЕЙС/i]];
-var V3_TOC = { cheat: "Шпаргалка", cmp: "Сверка цифр", facts: "Интересное", open: "Заход", hyp: "Гипотезы", loss: "Потери", cases: "Кейсы" };
+var V3_KIND = [["cheat", /ШПАРГАЛКА/i], ["cmp", /СВЕРКА/i], ["facts", /ИНТЕРЕСН/i], ["open", /ЗАХОД/i], ["branch", /ВЕТК/i], ["hyp", /ГИПОТЕЗ/i], ["loss", /ТЕРЯ/i], ["cases", /КЕЙС/i]];
+var V3_TOC = { cheat: "Шпаргалка", cmp: "Сверка цифр", facts: "Интересное", open: "Заход", branch: "Ветки", hyp: "Гипотезы", loss: "Потери", cases: "Кейсы" };
 function v3kind(title){ for (var i = 0; i < V3_KIND.length; i++) if (V3_KIND[i][1].test(title)) return V3_KIND[i][0]; return ""; }
 function v3lines(body){ return body.map(function(l){ return l.trim(); }).filter(Boolean); }
 function v3item(t){ var m = t.match(/^[-*•]\s+(.*)$/); return m ? m[1] : null; }
@@ -265,100 +272,151 @@ function v3hyp(L){
   }).join("");
   return '<div class="card" id="v-hyp"><h2>Гипотезы и вопросы <small>отмечайте вопросы по ходу встречи</small></h2><div class="v-hyps">' + html + '</div>' + (more.length ? '<div class="v-more">' + more.join("") + '</div>' : "") + '</div>';
 }
-// ---------- калькулятор потерь: шесть формул (решение 07.10.2026), всё в тысячах долларов в год ----------
-// Коэффициенты по умолчанию — из проверенных исследований (подпись у поля), диагност правит их ответами клиента.
+// ---------- ядро денежной диагностики (методика Жени, принята 08.10.2026): постоянная часть страницы, модель её не пишет ----------
+var BRANCHES = { 1: "Собственник — бутылочное горлышко", 2: "Руководитель есть, но результата нет", 3: "Долго ищут руководителя",
+  4: "Лучший специалист стал руководителем", 5: "Команда могла бы делать больше", 6: "Уходят ключевые люди", 7: "Непонятно, сколько приносит каждый" };
+var CORE_PHRASES = ["Не ищи ещё одну боль. Докопайся до денег в той боли, которую уже нашли.",
+  "Не задавай следующий вопрос, пока клиент не ответил на предыдущий.",
+  "Не называй клиенту сумму потерь сам. Пусть он посчитает её вместе с тобой."];
+var CORE_CHAIN = [["Вопрос", "Где сейчас команда сильнее всего ограничивает рост бизнеса?"], ["Факт", "Вспомните последний конкретный случай. Что произошло?"],
+  ["Последствие", "К чему это привело для бизнеса?"], ["Зеркало", "Правильно понимаю, что из-за этого происходит ___?"],
+  ["Деньги", "Сколько денег бизнес недополучает из-за этого?"], ["Год", "А если посчитать за год?"],
+  ["Бездействие", "А если вообще ничего не менять?"], ["Итог", "Получается, примерно ___ в год?"]];
+var MONEY_STEP = /^(деньги|добивающий|год|цена бездействия|бездействие|итог)/i;
+
+function v4branches(L, calc){
+  var br = [], others = [], cur = null, inOthers = false;
+  L.forEach(function(t){
+    var m = t.match(/^\*\*\s*Ветка\s*(\d+)\s*[.—–-]*\s*(.+?)\*\*\s*(.*)$/i);
+    if (m) { cur = { n: Number(m[1]), title: m[2].replace(/[.\s]+$/, ""), basis: m[3], steps: [] }; br.push(cur); inOthers = false; return; }
+    if (/^\**другие ветки/i.test(t)) { inOthers = true; return; }
+    var it = v3item(t);
+    if (inOthers) { if (it != null) { var om = it.match(/^(\d+)[.)]?\s*([^:«]+?):\s*(.*)$/); others.push(om ? { n: om[1], title: om[2], q: om[3] } : { n: "", title: "", q: it }); } return; }
+    if (!cur) return;
+    if (it == null) { cur.basis += (cur.basis ? " " : "") + t; return; }
+    cur.steps.push(it);
+  });
+  var html = br.map(function(b, bi){
+    var tag = bi === 0 ? '<span class="v-chip gold">главная</span>' : '<span class="v-chip">запасная</span>';
+    var steps = b.steps.map(function(st, i){
+      var lv = v3label(st), em = st.match(/^(Если[^:]{0,60}):\s*(.*)$/i);
+      if (em) lv = [em[1], em[2]];
+      if (/^если/i.test(lv[0])) return '<div class="v-step"><span class="k">↳</span><div><small>' + esc(lv[0]) + '</small>' + inline(lv[1]) + '</div></div>';
+      var money = MONEY_STEP.test(lv[0]);
+      return '<div class="v-step' + (i === 0 ? ' q' : money ? ' money' : '') + '"><span class="k">' + (money ? '$' : i + 1) + '</span><label><input type="checkbox"><span><small>' + esc(lv[0] || "") + '</small>' + inline(lv[1]) + '</span></label></div>';
+    }).join("");
+    return '<div class="v-hyp"><h3><span class="n">' + b.n + '</span>' + inline(b.title) + ' ' + tag + '</h3>' + (b.basis ? '<div class="basis">' + inline(b.basis) + '</div>' : '') + steps + '</div>';
+  }).join("");
+  var rules = '<div class="v-rules"><b>Одна боль — до денег.</b> ' + CORE_PHRASES.map(esc).join(" ") + ' <span class="hint">Формула встречи: 1–2 глубокие проблемы → факт → последствия → деньги → цена бездействия → решение.</span></div>';
+  var uni = '<details class="v-uni"><summary>Ветка не угадалась — универсальная цепочка</summary><ol>' + CORE_CHAIN.map(function(s){ return '<li><small>' + s[0] + '</small>«' + esc(s[1]) + '»</li>'; }).join("") + '</ol></details>';
+  return '<div class="card" id="v-branch"><h2>Ветки диагностики <small>одна проблема — до денег; отмечайте вопросы по ходу встречи</small></h2>' + rules
+    + '<div class="v-hyps two">' + html + '</div>'
+    + (others.length ? '<p class="v-lbl" style="margin-top:16px">Другие ветки — если клиент сам туда уйдёт</p><div class="v-more">' + others.map(function(o){ return '<div><b>' + esc((o.n ? o.n + ". " : "") + o.title) + '</b>' + inline(o.q) + '</div>'; }).join("") + '</div>' : "")
+    + uni + '</div>';
+}
+
+// ---------- калькулятор: цифры называет клиент (методика Жени), всё в тысячах долларов в месяц → год и цена бездействия ----------
 var CALC_BLOCKS = [
-  { id: "owner", title: "Время собственника", ask: "Сколько часов в неделю вы делаете работу, за которую могли бы платить руководителю?",
-    fields: [["hours", "Часов в неделю на чужую работу", "ч", 1], ["profit", "Чистая прибыль в год", "тыс $", 10]],
-    note: "час собственника = прибыль ÷ 2 000 рабочих часов в год",
-    calc: function(v){ var rate = v.profit * 1000 / 2000; return [v.hours * rate * 50 / 1000, n(v.hours) + " ч × $" + Math.round(rate) + "/ч × 50 недель"]; } },
-  { id: "hire", title: "Ошибка найма руководителя", ask: "Во сколько обошёлся последний неудачный руководитель? Сколько месяцев ушло, пока поняли и заменили?",
-    fields: [["sal", "Оклад руководителя в месяц", "тыс $", 0.5], ["mult", "Окладов на замену", "", 1], ["dept", "Выручка его направления в год", "тыс $", 10], ["pct", "Недобор направления", "%", 0.5], ["months", "Месяцев до исправления", "мес", 1]],
-    note: "замена стоит от ½ до 2 годовых окладов (Gallup, 2019) — берём нижнюю границу: 6 окладов",
-    calc: function(v){ var a = v.sal * v.mult, b = v.dept * v.pct / 100 * v.months / 12; return [a + b, fmtK(v.sal) + " × " + n(v.mult) + " окладов + " + fmtK(v.dept) + " × " + n(v.pct) + "% × " + n(v.months) + "/12"]; } },
-  { id: "half", title: "Работа вполсилы", ask: "Сколько времени ваши люди тратят на согласования, переделки и ожидание ваших решений?",
-    fields: [["fot", "Фонд оплаты труда в год", "тыс $", 10], ["pct", "Теряется на согласования и ожидание", "%", 1]],
-    note: "средняя компания теряет 21% производительной силы на лишние согласования и встречи (Bain, 2017)",
-    calc: function(v){ return [v.fot * v.pct / 100, fmtK(v.fot) + " × " + n(v.pct) + "%"]; } },
-  { id: "weak", title: "Слабый руководитель", ask: "На сколько процентов это направление могло бы зарабатывать больше с сильным руководителем?",
-    fields: [["dept", "Выручка направления в год", "тыс $", 10], ["pct", "Могла быть больше на", "%", 0.5]],
-    note: "когда лучшего продавца делают руководителем, продажи его команды падают на 7,5% (NBER, Benson, Li, Shue)",
-    calc: function(v){ return [v.dept * v.pct / 100, fmtK(v.dept) + " × " + n(v.pct) + "%"]; } },
-  { id: "sales", title: "Продажи на собственнике", ask: "Какая доля выручки приходит через вас лично? Что будет с ней, если вас месяц не будет?",
-    fields: [["rev", "Выручка в год", "тыс $", 10], ["share", "Доля через собственника", "%", 1], ["months", "Месяцев его отсутствия", "мес", 1]],
-    note: "выручка, которая держится на одном человеке, останавливается вместе с ним",
-    calc: function(v){ return [v.rev * v.share / 100 * v.months / 12, fmtK(v.rev) + " × " + n(v.share) + "% × " + n(v.months) + "/12"]; } },
-  { id: "growth", title: "Упущенный рост", soft: true, ask: "Если бы росли не на X, а вдвое быстрее — сколько это было бы в выручке за год?",
-    fields: [["rev", "Выручка в год", "тыс $", 10], ["now", "Рост сейчас", "%", 1], ["could", "Рост возможный", "%", 1]],
-    note: "мягкая оценка: «возможный» — по умолчанию вдвое быстрее нынешнего",
-    calc: function(v){ return [v.rev * Math.max(0, v.could - v.now) / 100, fmtK(v.rev) + " × (" + n(v.could) + "% − " + n(v.now) + "%)"]; } }
+  { b: 1, ask: "Сколько компания недополучила из-за того, что решение затянулось? Если таких решений 5–10 в месяц?",
+    fields: [["loss", "Потеря на одном решении", "тыс $"], ["count", "Таких решений в месяц", "шт"]],
+    ref: "Женя: «если таких решений 5–10 в месяц, какой порядок за год?»",
+    calc: function(v){ return { m: v.loss * v.count, fx: fmtK(v.loss) + " × " + n(v.count) + " в месяц" }; } },
+  { b: 2, ask: "Какой результат он должен давать в месяц? А сколько даёт фактически?",
+    fields: [["plan", "План в месяц", "тыс $"], ["fact", "Факт в месяц", "тыс $"]],
+    ref: "для ориентира: талантливые руководители дают на 48% больше прибыли (Gallup, 2015)",
+    calc: function(v){ return { m: Math.max(0, v.plan - v.fact), fx: fmtK(v.plan) + " − " + fmtK(v.fact) + " в месяц" }; } },
+  { b: 3, ask: "Сколько вы недополучаете за каждый месяц, пока позиция не закрыта? Сколько уже ищете?",
+    fields: [["loss", "Недополучаете в месяц", "тыс $"], ["months", "Уже ищете", "мес"]],
+    ref: "для ориентира: с выбором руководителя ошибаются в 82% случаев (Gallup, 2015)",
+    calc: function(v){ return { m: v.loss, fx: fmtK(v.loss) + " в месяц · за " + n(v.months) + " мес поиска уже " + fmtK(v.loss * v.months) }; } },
+  { b: 4, ask: "Какой результат у его подразделения в месяц? На сколько процентов люди могли бы давать больше?",
+    fields: [["base", "Результат подразделения в месяц", "тыс $"], ["pct", "Могли бы давать больше", "%"]],
+    ref: "для ориентира: когда лучшего продавца делают руководителем, продажи его команды падают на 7,5% (NBER); Женя спрашивает про 10–20%",
+    calc: function(v){ return { m: v.base * v.pct / 100, fx: fmtK(v.base) + " × " + n(v.pct) + "% в месяц" }; } },
+  { b: 5, ask: "Какой результат команда даёт сейчас в месяц? А какой могла бы?",
+    fields: [["now", "Сейчас в месяц", "тыс $"], ["could", "Могла бы в месяц", "тыс $"]],
+    ref: "для ориентира: средняя компания теряет 21% производительной силы на лишние согласования и встречи (Bain, 2017)",
+    calc: function(v){ return { m: Math.max(0, v.could - v.now), fx: fmtK(v.could) + " − " + fmtK(v.now) + " в месяц" }; } },
+  { b: 6, ask: "Сколько выручки в месяц держалось на этом человеке? Сколько месяцев ушло на замену?",
+    fields: [["rev", "Выручка на человеке в месяц", "тыс $"], ["months", "Месяцев на замену", "мес"]],
+    ref: "для ориентира: замена сотрудника стоит от ½ до 2 годовых окладов (Gallup, 2019)",
+    calc: function(v){ return { once: v.rev * v.months, fx: fmtK(v.rev) + " × " + n(v.months) + " мес, разово" }; } },
+  { b: 7, ask: "Какую одну метрику в команде можно изменить, чтобы это повлияло на прибыль? Сколько это в месяц?",
+    fields: [["eff", "Эффект метрики в месяц", "тыс $"]],
+    ref: "Женя: одна метрика, которая реально влияет на прибыль",
+    calc: function(v){ return { m: v.eff, fx: fmtK(v.eff) + " в месяц" }; } }
 ];
 function n(x){ return String(Math.round(x * 10) / 10).replace(".", ","); }
 function fmtK(k){ // k — тысячи долларов
   if (!isFinite(k) || k <= 0) return "$0";
   if (k >= 1000) return "$" + (k / 1000).toFixed(k >= 100000 ? 0 : 1).replace(".", ",") + " млн";
-  return "$" + Math.round(k) + " тыс";
+  return "$" + n(k < 10 ? k : Math.round(k)) + " тыс";
 }
 function v3loss(L, calc){
-  var finalQ = "", ask = [], rest = [];
+  var finalQ = "", ask = [], trans = "";
   L.forEach(function(t){
     var it = v3item(t), lv = v3label(it == null ? t : it);
     if (/итоговый вопрос/i.test(lv[0])) finalQ = lv[1];
+    else if (/^переход/i.test(lv[0])) trans = lv[1];
     else if (/^спросить/i.test(lv[0])) ask.push(lv[1]);
-    else rest.push(t);
   });
   calc = calc || {};
-  var html = '<div class="card" id="v-loss"><h2>Сколько теряет <small>калькулятор на встрече: вводите ответы клиента; суммы в тысячах долларов за год</small></h2>'
-    + '<div class="calc-rate">Курс <input type="number" id="c-rate" step="0.1" min="1"> ₽ за $ <span class="hint" id="c-rate-src"></span></div>'
-    + '<div class="calc-grid">' + CALC_BLOCKS.map(function(b){
-        return '<div class="calc-b" data-b="' + b.id + '"><div class="calc-h"><label class="calc-on"><input type="checkbox" data-on="' + b.id + '"' + (b.soft ? '' : ' checked') + '> в итог</label><b>' + b.title + (b.soft ? ' <span class="v-chip">мягкая</span>' : '') + '</b><span class="calc-ask">«' + esc(b.ask) + '»</span></div>'
-          + '<div class="calc-f">' + b.fields.map(function(f){ return '<label><span>' + esc(f[1]) + (f[2] ? ', ' + f[2] : '') + '</span><input type="number" min="0" step="' + f[3] + '" id="c-' + b.id + '-' + f[0] + '"></label>'; }).join("") + '</div>'
-          + '<div class="calc-r" id="c-r-' + b.id + '">—</div><div class="calc-fx" id="c-fx-' + b.id + '"></div><div class="calc-note">' + esc(b.note) + '</div></div>';
-      }).join("") + '</div>'
-    + '<div class="calc-total"><span>Теряет в год, порядок</span><b id="c-total">—</b></div>'
-    + (calc.note ? '<p class="hint" style="margin-top:6px">Заполнено заранее: ' + esc(calc.note) + '. Пустые поля — спросить у клиента.</p>' : "")
+  var main = (calc.branches || []).map(Number).filter(function(x){ return BRANCHES[x]; });
+  var order = main.concat(CALC_BLOCKS.map(function(c){ return c.b; }).filter(function(b){ return main.indexOf(b) < 0; }));
+  var block = function(b){
+    var c = CALC_BLOCKS.filter(function(x){ return x.b === b; })[0], isMain = main.indexOf(b) >= 0;
+    return '<div class="calc-b' + (isMain ? ' main' : '') + '" data-b="' + b + '"><div class="calc-h"><b>' + b + '. ' + esc(BRANCHES[b]) + (isMain ? ' <span class="v-chip gold">' + (main[0] === b ? 'главная' : 'запасная') + '</span>' : '') + '</b><span class="calc-ask">«' + esc(c.ask) + '»</span></div>'
+      + '<div class="calc-f">' + c.fields.map(function(f){ return '<label><span>' + esc(f[1]) + ', ' + f[2] + '</span><input type="number" min="0" step="any" inputmode="decimal" id="c-' + b + '-' + f[0] + '"></label>'; }).join("") + '</div>'
+      + '<div class="calc-r off" id="c-r-' + b + '">спросить</div><div class="calc-fx" id="c-fx-' + b + '"></div><div class="calc-note">' + esc(c.ref) + '</div></div>';
+  };
+  var first = main.length ? order.slice(0, main.length) : order, rest = main.length ? order.slice(main.length) : [];
+  if (!trans) trans = "«Правильно я понял: сейчас у вас ___, из-за этого бизнес недополучает примерно ___ в год?»";
+  var transHtml = inline(trans).replace(/_{3,}(\s*в год)/, '<b class="c-sum">___</b>$1');
+  return '<div class="card" id="v-loss"><h2>Сколько теряет <small>цифры называет клиент; вводите в тысячах долларов в месяц — калькулятор переведёт в год</small></h2>'
+    + '<div class="calc-rate">Курс <input type="number" id="c-rate" step="0.1" min="1"> ₽ за $ <span class="hint" id="c-rate-src"></span><span class="hint" id="c-ref"></span></div>'
+    + '<div class="calc-grid">' + first.map(block).join("") + '</div>'
+    + (rest.length ? '<details class="calc-more"><summary>Другие ветки (' + rest.length + ')</summary><div class="calc-grid">' + rest.map(block).join("") + '</div></details>' : "")
+    + '<div class="calc-total"><div><span>Недополучает в год</span><b id="c-total">—</b></div><div class="calc-idle"><span>Если ничего не менять <input type="number" id="c-idle" min="1" step="1" value="6"> мес</span><b id="c-idle-sum">—</b></div></div>'
     + (ask.length ? '<div class="v-more">' + ask.map(function(a){ return '<div><b>Спросить</b>' + inline(a) + '</div>'; }).join("") + '</div>' : "")
-    + (rest.length && !ask.length && !finalQ ? '<div class="md" style="padding:0">' + md(rest.join("\n")) + '</div>' : "")
+    + '<div class="v-final"><small>Переход к продаже</small>' + transHtml
+    + '<div class="v-after">После подтверждения: «Тогда давайте посмотрим, можем ли мы за счёт нашей работы вернуть хотя бы часть этих денег в бизнес». Только после этого — презентация «Команды» через проблему клиента; сопоставить с ценой решения.</div></div>'
     + (finalQ ? '<div class="v-final"><small>Итоговый вопрос</small>' + inline(finalQ) + '</div>' : "")
     + '</div>';
-  return html;
 }
 function calcInit(calc){
   calc = calc || {};
   var $ = function(id){ return document.getElementById(id); };
   if (!$("c-rate")) return;
-  function set(id, val){ var el = $(id); if (el && val !== "" && val != null && isFinite(val)) el.value = Math.round(val * 10) / 10; }
-  function prefill(){
-    var r = Number($("c-rate").value) || 95, k = function(mlnRub){ return mlnRub == null || mlnRub === "" ? null : Number(mlnRub) * 1000 / r; };
-    var rev = k(calc.revenue), prof = k(calc.profit_cur), dept = k(calc.dept_revenue);
-    var fot = calc.staff && calc.avg_salary_month ? Number(calc.staff) * Number(calc.avg_salary_month) * 12 / r : null;
-    var now = calc.revenue && calc.revenue_prev ? Math.round((Number(calc.revenue) / Number(calc.revenue_prev) - 1) * 100) : null;
-    set("c-owner-profit", prof); set("c-hire-dept", dept); set("c-weak-dept", dept); set("c-half-fot", fot);
-    set("c-sales-rev", rev); set("c-growth-rev", rev); set("c-growth-now", now); if (now != null) set("c-growth-could", now * 2);
-    if (calc.avg_salary_month) set("c-hire-sal", Number(calc.avg_salary_month) * 2 / r);   // руководитель ≈ 2 средние зарплаты, поправить
-    var def = { "c-owner-hours": 20, "c-hire-mult": 6, "c-hire-pct": 7.5, "c-hire-months": 6, "c-half-pct": 21, "c-weak-pct": 7.5, "c-sales-months": 1 };
-    Object.keys(def).forEach(function(id){ if (!$(id).value) $(id).value = def[id]; });
+  function ref(){   // справка из реестра/интервью — для сверки с тем, что называет клиент; в сумму не идёт
+    var r = Number($("c-rate").value) || 95, k = function(m){ return m == null || m === "" || !isFinite(m) ? null : Number(m) * 1000 / r; };
+    var rev = k(calc.revenue), prof = k(calc.profit_cur), out = [];
+    if (rev) out.push("выручка ≈ " + fmtK(rev / 12) + " в месяц");
+    if (prof != null && calc.profit_cur !== null) out.push("чистая прибыль " + (calc.profit_years ? calc.profit_years + " " : "") + "≈ " + fmtK(prof) + " в год");
+    $("c-ref").textContent = out.length ? " · Для сверки, по открытым данным: " + out.join(", ") : "";
     recalc();
   }
   function recalc(){
-    var total = 0;
-    CALC_BLOCKS.forEach(function(b){
+    var month = 0, once = 0;
+    CALC_BLOCKS.forEach(function(c){
       var v = {}, filled = true;
-      b.fields.forEach(function(f){ var el = $("c-" + b.id + "-" + f[0]); v[f[0]] = Math.max(0, Number(el.value) || 0); if (el.value === "") filled = false; });
-      var res = b.calc(v), on = document.querySelector('[data-on="' + b.id + '"]').checked;
-      $("c-r-" + b.id).textContent = filled ? fmtK(res[0]) : "спросить";
-      $("c-r-" + b.id).classList.toggle("off", !filled || !on);
-      $("c-fx-" + b.id).textContent = filled ? res[1] + " = " + fmtK(res[0]) : "заполните пустые поля";
-      if (filled && on) total += res[0];
+      c.fields.forEach(function(f){ var el = $("c-" + c.b + "-" + f[0]); v[f[0]] = Math.max(0, Number(el.value) || 0); if (el.value === "") filled = false; });
+      var res = c.calc(v), y = (res.m || 0) * 12 + (res.once || 0);
+      $("c-r-" + c.b).textContent = filled ? fmtK(y) + (res.once ? "" : " в год") : "спросить";
+      $("c-r-" + c.b).classList.toggle("off", !filled);
+      $("c-fx-" + c.b).textContent = filled ? res.fx + (res.once ? "" : " × 12") + " = " + fmtK(y) : "";
+      if (filled) { month += res.m || 0; once += res.once || 0; }
     });
-    $("c-total").textContent = "≈ " + fmtK(total);
+    var year = month * 12 + once, idle = Math.max(1, Number($("c-idle").value) || 6);
+    $("c-total").textContent = year > 0 ? "≈ " + fmtK(year) : "—";
+    $("c-idle-sum").textContent = year > 0 ? "≈ " + fmtK(month * idle + once) : "—";
+    [].forEach.call(document.querySelectorAll("#v-loss .c-sum"), function(s){ s.textContent = year > 0 ? fmtK(year) : "___"; });
   }
   $("c-rate").value = 95; $("c-rate-src").textContent = "по умолчанию";
-  [].forEach.call(document.querySelectorAll("#v-loss input"), function(i){ i.addEventListener(i.type === "checkbox" ? "change" : "input", i.id === "c-rate" ? prefill : recalc); });
-  prefill();
+  [].forEach.call(document.querySelectorAll("#v-loss input"), function(i){ i.addEventListener("input", i.id === "c-rate" ? ref : recalc); });
+  ref();
   fetch("https://www.cbr-xml-daily.ru/daily_json.js").then(function(r){ return r.json(); }).then(function(j){
     var usd = j && j.Valute && j.Valute.USD && j.Valute.USD.Value;
-    if (usd) { $("c-rate").value = usd.toFixed(1); $("c-rate-src").textContent = "курс ЦБ на " + String(j.Date || "").slice(0, 10).split("-").reverse().join("."); prefill(); }
+    if (usd) { $("c-rate").value = usd.toFixed(1); $("c-rate-src").textContent = "курс ЦБ на " + String(j.Date || "").slice(0, 10).split("-").reverse().join("."); ref(); }
   }).catch(function(){});
 }
 function v3cases(L){
@@ -392,10 +450,10 @@ function v3cases(L){
 function renderV3(secs, calc){
   var by = {}, kinds = 0;
   secs.forEach(function(s){ var k = v3kind(s.title); if (k && !by[k]) { by[k] = v3lines(s.body); kinds++; } });
-  if (!(by.hyp && (by.cmp || by.open) && kinds >= 4)) return null;
+  if (!((by.hyp || by.branch) && (by.cmp || by.open) && kinds >= 4)) return null;
   var top = (by.cheat ? v3cheat(by.cheat) : "") + (by.cmp ? v3cmp(by.cmp) : "");
   var html = (top ? '<div class="v-top">' + top + '</div>' : "") + (by.facts ? v3facts(by.facts) : "") + (by.open ? v3open(by.open) : "")
-    + v3hyp(by.hyp) + (by.loss ? v3loss(by.loss, calc) : "") + (by.cases ? v3cases(by.cases) : "");
+    + (by.branch ? v4branches(by.branch, calc) : v3hyp(by.hyp)) + (by.loss ? v3loss(by.loss, calc) : "") + (by.cases ? v3cases(by.cases) : "");
   var toc = Object.keys(V3_TOC).filter(function(k){ return by[k]; }).map(function(k){ return '<a href="#v-' + k + '" data-v="v-' + k + '">' + V3_TOC[k] + '</a>'; }).join("") ;
   return { html: html, toc: toc };
 }
