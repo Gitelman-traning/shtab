@@ -5,6 +5,7 @@
 
   python collector/prep.py cases [--out cases.json]          — база участников: купившие из amo → витрина (prep_cases)
   python collector/prep.py run [--deal ID] [--dry] [--out brief.md] [--cases cases.json]
+  python collector/prep.py material --deal ID [--out m.md]  — отладка шага 1 без модели: сайт, ИНН, отчётность ФНС
         — сделки на этапе «Встреча подтверждена» (и поставленные в очередь на странице) → четыре шага → витрина (prep)
 
 Четыре шага на каждую сделку (рекомендация GPT, принята 05.10.2026):
@@ -207,7 +208,10 @@ def add_usage(total, u, cheap=False):
     for k in ("in", "out", "search"):
         total[k] = total.get(k, 0) + (u.get(k) or 0)
     # оценка в рублях: Sonnet 600/3030 ₽ за 1M, Haiku 200/1010 ₽ за 1M (ProxyAPI, ориентир)
-    total["rub"] = total.get("rub", 0) + ((u.get("in") or 0) * (200 if cheap else 600) + (u.get("out") or 0) * (1010 if cheap else 3030)) / 1e6
+    if "rub" in u:      # уже посчитано (смесь моделей)
+        total["rub"] = total.get("rub", 0) + u["rub"]
+    else:
+        total["rub"] = total.get("rub", 0) + ((u.get("in") or 0) * (200 if cheap else 600) + (u.get("out") or 0) * (1010 if cheap else 3030)) / 1e6
 
 
 # ---------- контекст сделки ----------
@@ -274,26 +278,220 @@ def card_text(ctx):
     return "\n".join(lines)
 
 
-# ---------- шаг 1: исследование компании ----------
+# ---------- шаг 1: материал о компании ----------
+# Решение 08.10.2026 (цена): веб-поиск модели только НАХОДИТ адреса (дешёвая модель, мало запросов), страницы качаем сами,
+# реестр — открытая отчётность ФНС (ГИР БО) по ИНН с сайта клиента; досье пишет основная модель одним вызовом без поиска.
+# Раньше Sonnet с 10 поисками перечитывал накопленный контекст на каждом запросе: ~200 тыс. входных токенов, ~165 ₽ за шаг.
+
+UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36", "Accept-Language": "ru,en;q=0.8"}
+GIRBO = "https://bo.nalog.gov.ru"
+RE_INN = re.compile(r"ИНН\D{0,25}?(\d{12}|\d{10})(?!\d)")
+RE_SUBPAGE = re.compile(r"about|o-nas|o_nas|onas|company|kompani|contact|kontakt|team|komand|vrach|doctor|speciali|staff|vakans|career|karer|rekviz|requisit|filial|branch|klinik", re.I)
+PAGE_CHARS = int(os.environ.get("PREP_PAGE_CHARS", "5000"))      # сколько текста страницы отдаём модели
+MATERIAL_CHARS = int(os.environ.get("PREP_MATERIAL_CHARS", "45000"))
+_raw_cache = {}
+
+
+def fetch(url):
+    """→ (текст страницы без разметки, html). Пусто, если страница не открылась (многие реестры режут ботов — это нормально)."""
+    if url in _raw_cache:
+        return _raw_cache[url]
+    import html as _html
+    text, raw = "", ""
+    try:
+        r = requests.get(url, timeout=25, headers=UA)
+        if r.status_code == 200 and "html" in r.headers.get("content-type", "html"):
+            raw = r.text
+            t = re.sub(r"(?is)<(script|style|noscript|svg)[^>]*>.*?</\1>", " ", raw)
+            text = re.sub(r"\s+", " ", _html.unescape(re.sub(r"<[^>]+>", " ", t))).strip()
+    except requests.RequestException:
+        pass
+    _raw_cache[url] = (text, raw)
+    return _raw_cache[url]
+
+
+def site_url(ctx):
+    """Сайт из карточки: поля «Сайт», «Сайт / соцсети», иногда домен вписан в «Компания». Соцсети и мессенджеры — не сайт."""
+    card = ctx["card"]
+    for key in ("Сайт", "Сайт / соцсети", "Компания"):
+        for tok in re.split(r"[\s,;]+", card.get(key) or ""):
+            tok = tok.strip().rstrip("/.")
+            if not re.match(r"^(https?://)?([\w-]+\.)+[a-zа-я]{2,}(/\S*)?$", tok, re.I):
+                continue
+            if re.search(r"instagram\.|t\.me|wa\.me|vk\.com|facebook\.|youtube\.|tiktok\.|taplink|linktr", tok, re.I):
+                continue
+            return tok if tok.startswith("http") else "https://" + tok
+    return ""
+
+
+def site_pages(url, extra=3):
+    """Главная + до extra внутренних страниц (о компании, команда/врачи, контакты/реквизиты, вакансии). → [(url, text)]"""
+    text, raw = fetch(url)
+    if not text:
+        return []
+    from urllib.parse import urljoin, urlparse
+    host = urlparse(url).netloc.replace("www.", "")
+    pages, seen, kinds = [(url, text)], {url.rstrip("/")}, set()
+    for href in re.findall(r'href="([^"#?]+)"', raw):
+        u = urljoin(url, href).rstrip("/")
+        m = RE_SUBPAGE.search(urlparse(u).path)
+        if not m or urlparse(u).netloc.replace("www.", "") != host or u in seen or re.search(r"\.(pdf|jpe?g|png|docx?)$", u, re.I):
+            continue
+        kind = m.group(0).lower()[:4]
+        if kind in kinds:
+            continue
+        seen.add(u)
+        kinds.add(kind)
+        t, _ = fetch(u)
+        if t:
+            pages.append((u, t))
+        if len(pages) > extra:
+            break
+    return pages
+
+
+def find_inns(texts):
+    out = []
+    for t in texts:
+        for inn in RE_INN.findall(t or ""):
+            if inn not in out:
+                out.append(inn)
+    return out[:4]
+
+
+def _girbo(path, params=None):
+    r = requests.get(GIRBO + path, params=params, timeout=25, headers=dict(UA, Accept="application/json", Referer=GIRBO + "/"))
+    r.raise_for_status()
+    return r.json()
+
+
+def registry(inn):
+    """Открытая бухотчётность ФНС (ГИР БО) по ИНН: выручка по годам, чистая прибыль за 2–3 последних года. ИП отчётность не сдают.
+    → строка для материала или ''"""
+    if len(inn) != 10:
+        return ""
+    found = (_girbo("/advanced-search/organizations/search", {"query": inn, "page": 0}).get("content") or [])
+    org = next((o for o in found if re.sub(r"<[^>]+>", "", o.get("inn") or "") == inn), None)    # поиск подсвечивает совпадение <strong>
+    if not org:
+        return ""
+    reports = sorted(_girbo("/nbo/organizations/%s/bfo/" % org["id"]), key=lambda x: x.get("period") or "")
+    rev = {x["period"]: x.get("gainSum") for x in reports if x.get("period") and x.get("gainSum") is not None}
+    profit = {}
+    for rep in reports[-2:]:
+        try:
+            d = _girbo("/nbo/bfo/%s/details" % rep["id"])
+            fr = (d[0] if isinstance(d, list) and d else d).get("financialResult") or {}
+            y = int(rep["period"])
+            for key, year in (("current2400", y), ("previous2400", y - 1)):
+                if fr.get(key) is not None:
+                    profit[str(year)] = fr[key]
+            if fr.get("current2110") is not None:
+                rev[rep["period"]] = fr["current2110"]
+        except Exception:
+            pass
+        time.sleep(0.3)
+    mln = lambda v: ("%.1f" % (v / 1000)).replace(".", ",")      # отчётность — в тысячах рублей
+    name = re.sub(r"<[^>]+>", "", org.get("shortName") or "")
+    line = "- %s, ИНН %s, %s, ОКВЭД %s" % (name, inn, (org.get("region") or "").title(), org.get("okved2") or "—")
+    if rev:
+        line += ". Выручка, млн ₽: " + " · ".join("%s — %s" % (y, mln(v)) for y, v in sorted(rev.items())[-5:])
+    if profit:
+        line += ". Чистая прибыль, млн ₽: " + " · ".join("%s — %s" % (y, mln(v)) for y, v in sorted(profit.items()))
+    return line + " [ГИР БО ФНС](%s/organizations-card/%s)" % (GIRBO, org["id"])
+
+
+FIND_SYS = """Ты находишь в интернете страницы о компании собственника перед бизнес-встречей. Пересказывать их не нужно — только адреса.
+Нужны: страница компании в реестре юрлиц (rusprofile, checko, list-org, saby, audit-it или реестр страны клиента) — ради ИНН,
+выручки и штата; интервью, статьи, подкасты, выступления собственника; рейтинги и награды; вакансии (hh.ru и аналоги);
+новости за последние два года; страницы на картах с отзывами. Официальный сайт уже есть — его страницы не ищи.
+Это автоматический прогон, вопросов не задавай. Ответ — только строки вида
+URL | что там, до 12 слов (цифры, если видны в выдаче)
+и для каждого найденного юрлица строка «ИНН: <номер> | <название>». До 10 адресов, самые содержательные первыми."""
+
+
+def find_pages(ctx, site, inns):
+    hint = "\nОфициальный сайт: %s" % site if site else "\nОфициальный сайт неизвестен — найди его первым."
+    if inns:
+        hint += "\nИНН уже известны: %s — реестр по ним искать не нужно." % ", ".join(inns)
+    text, sources, usage = claude(FIND_SYS, card_text(ctx) + hint, search_uses=int(os.environ.get("PREP_FIND_SEARCHES", "5")),
+                                  max_tokens=900, model=MODEL_GROWTH)
+    links, found_inns = [], []
+    for line in text.replace("*", "").splitlines():
+        m = re.match(r"\s*[-\d.)]*\s*ИНН:?\s*(\d{10}|\d{12})", line)
+        if m:
+            found_inns.append(m.group(1))
+            continue
+        m = re.match(r"\s*[-\d.)]*\s*<?(https?://[^\s|>]+)>?\s*\|?\s*(.*)", line)
+        if m and m.group(1) not in [u for u, _ in links]:
+            links.append((m.group(1).rstrip(".,;"), m.group(2).strip()))
+    for s in sources:                                   # адреса из цитат поиска, которых нет в списке
+        if s["url"] not in [u for u, _ in links]:
+            links.append((s["url"], s.get("title") or ""))
+    return links[:12], found_inns, usage
+
+
+def gather_material(ctx, search=True):
+    """→ (материал для досье, источники [{url,title}], usage). search=False — только сайт и реестр (без модели)."""
+    usage, sources, parts = {}, [], []
+    site = site_url(ctx)
+    pages = site_pages(site) if site else []
+    if pages:
+        parts.append("# САЙТ КОМПАНИИ\n" + "\n\n".join("## %s\n%s" % (u, t[:PAGE_CHARS]) for u, t in pages))
+        sources += [{"url": u, "title": "сайт компании"} for u, _ in pages]
+    inns = find_inns([t for _, t in pages] + [card_text(ctx)])
+    links = []
+    if search:
+        links, more, u = find_pages(ctx, site, inns)
+        add_usage(usage, u, cheap=True)
+        inns += [i for i in more if i not in inns]
+    reg = []
+    for inn in inns[:4]:
+        try:
+            line = registry(inn)
+            if line:
+                reg.append(line)
+        except Exception as e:
+            log("  реестр ИНН: не ответил (%s)" % str(e)[:80])
+    if reg:
+        parts.append("# РЕЕСТР: ОТКРЫТАЯ БУХОТЧЁТНОСТЬ ФНС (ГИР БО)\n" + "\n".join(reg))
+        sources += [{"url": m, "title": "ГИР БО ФНС"} for m in re.findall(r"\((https://bo\.nalog[^)]+)\)", "\n".join(reg))]
+    found = []
+    site_host = re.sub(r"^https?://(www\.)?", "", site).split("/")[0] if site else "-"
+    for url, what in links:
+        if site_host in url:
+            continue
+        text, _ = fetch(url)
+        if text and len(text) > 300:
+            found.append("## %s — %s\n%s" % (url, what, text[:PAGE_CHARS]))
+            sources.append({"url": url, "title": what[:120]})
+        else:
+            found.append("## %s — %s\n(страницу скачать не удалось; что там — только со слов поиска)" % (url, what))
+    if found:
+        parts.append("# НАЙДЕННЫЕ СТРАНИЦЫ\n" + "\n\n".join(found))
+    material = "\n\n".join(parts)[:MATERIAL_CHARS]
+    log("  материал: сайт %d стр., ИНН %d, реестр %d, найдено %d адресов (скачано %d), %d символов" % (
+        len(pages), len(inns), len(reg), len(links), sum(1 for f in found if "скачать не удалось" not in f), len(material)))
+    return material, sources, usage
+
 
 RESEARCH_SYS = """Ты аналитик, который готовит досье на компанию собственника перед бизнес-встречей.
-Ищи в открытых источниках: сайт компании, соцсети, отзывы, карты, реестры юрлиц и выручки (Rusprofile, Checko, СБИС, список-орг и аналоги
-в стране клиента), СМИ, вакансии (hh.ru — размер команды и какие роли нанимают), маркетплейсы.
+Тебе передают карточку CRM и материалы: тексты страниц сайта компании, данные открытой бухотчётности ФНС, найденные страницы.
+В интернет ты не ходишь — работаешь только по переданному.
 Правила:
-0. Обязательно ищи в интернете, даже если данных в карточке мало: по названию компании и сайту; по нику в Instagram/Telegram;
-   по имени собственника вместе с нишей, городом или страной; по сайту — что на нём написано (продукты, цены, география, команда).
-   Минимум 3 разных запроса, пока не найдёшь компанию или не убедишься, что её нет в открытых источниках.
-1. Каждый факт — с источником (адрес страницы). Нет источника — это гипотеза, так и помечай.
-2. Не выдумывай: если компанию найти не удалось, скажи это прямо и опиши, что именно искал.
-3. Если найденное расходится с карточкой CRM — покажи оба значения.
-4. Пиши по-русски, структурно, без вступлений."""
+1. Каждый факт — с адресом страницы из материалов в формате [название](адрес). Нет адреса — это гипотеза, так и помечай.
+2. Цифры и цитаты переписывай ровно так, как в источнике. Не выдумывай.
+3. Если материалов мало или компания в них не та — скажи это прямо.
+4. Если найденное расходится с карточкой CRM — покажи оба значения.
+5. Пиши по-русски, структурно, без вступлений."""
 
 RESEARCH_USER = """%s
 
+%s
+
 Собери досье по разделам:
 ## Факты о компании
-Что за бизнес, продукт, кому продают (B2B/B2C), каналы продаж, география, год основания, юрлицо и выручка по открытым реестрам,
-размер команды, открытые вакансии, цены/средний чек, отзывы и репутация, последние новости. У каждого пункта — источник.
+Что за бизнес, продукт, кому продают (B2B/B2C), каналы продаж, география, год основания, юрлица, выручка и прибыль по реестру
+по годам, размер команды, открытые вакансии, цены/средний чек, отзывы и репутация, последние новости. У каждого пункта — источник.
 ## Структура бизнеса и продукты
 ## Рынок и конкуренты (коротко)
 ## Что необычного
@@ -303,7 +501,10 @@ RESEARCH_USER = """%s
 
 
 def research_company(ctx):
-    return claude(RESEARCH_SYS, RESEARCH_USER % card_text(ctx), search_uses=10, max_tokens=5000)
+    material, sources, usage = gather_material(ctx)
+    text, _, u = claude(RESEARCH_SYS, RESEARCH_USER % (card_text(ctx), material or "Материалов не нашлось."), max_tokens=5000)
+    add_usage(usage, u)
+    return text, sources, usage
 
 
 # ---------- шаг 2: подбор участников ----------
@@ -414,19 +615,9 @@ def _norm(t):
 
 
 def page_text(url):
-    if url in _page_cache:
-        return _page_cache[url]
-    import html as _html
-    text = ""
-    try:
-        r = requests.get(url, timeout=25, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
-                                                   "Accept-Language": "ru,en;q=0.8"})
-        if r.status_code == 200 and "html" in r.headers.get("content-type", "html"):
-            t = re.sub(r"(?is)<(script|style|noscript)[^>]*>.*?</\1>", " ", r.text)
-            text = _html.unescape(re.sub(r"<[^>]+>", " ", t))
-    except requests.RequestException:
-        text = ""
-    _page_cache[url] = _norm(text)
+    """Текст страницы для сверки фактов: нижний регистр, без кавычек и лишних пробелов."""
+    if url not in _page_cache:
+        _page_cache[url] = _norm(fetch(url)[0])
     return _page_cache[url]
 
 
@@ -973,7 +1164,7 @@ def cmd_run(deal, dry, out_path, cases_path, facts_path=None, picked_path=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["cases", "sheet", "growth", "style", "run"])
+    ap.add_argument("cmd", choices=["cases", "sheet", "growth", "style", "run", "material"])
     ap.add_argument("--deal", type=int)
     ap.add_argument("--user", type=int, help="style: id пользователя amo (диагност)")
     ap.add_argument("--limit", type=int, default=int(os.environ.get("PREP_GROWTH_LIMIT", "100")), help="growth: сколько участников проверить за прогон")
@@ -993,6 +1184,14 @@ def main():
         if not LLM_KEY:
             sys.exit("нет LLM_API_KEY")
         cmd_growth(a.limit, a.cases, a.out)
+    elif a.cmd == "material":     # отладка шага 1 без модели: сайт + ИНН + реестр ФНС
+        if not a.deal:
+            sys.exit("нужен --deal")
+        text, src, _ = gather_material(lead_context(a.deal), search=False)
+        if a.out:
+            open(a.out, "w", encoding="utf-8").write(text)
+        else:
+            print(text)
     elif a.cmd == "style":
         if not LLM_KEY or not a.user:
             sys.exit("нужны LLM_API_KEY и --user <id amo>")
