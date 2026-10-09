@@ -5,7 +5,7 @@
 // GET ?page=… отдаёт страницу (её показывает iframe на /settings/dashboard/), GET ?meta=1 — когда что обновлялось.
 //
 // Обмен задачами с Telegram-ботом (/api/tgtask), всё по токену сборщика:
-//   PUT  {"tasks": [...]}   — копия tasks.json для бота (список, закрытие по номеру)
+//   PUT  {"tasks": [...], "projects": [...]} — копия tasks.json и проекты с ключевыми словами (бот подбирает проект)
 //   GET  ?inbox=1           — очередь правок, накопленных ботом (новые задачи, закрытия)
 //   POST ?ack=1 {"ids":[…]} — убрать из очереди уже применённые
 import { json, bad, hasIngestToken, currentUser, isAdmin, now } from "./_lib.js";
@@ -19,7 +19,8 @@ async function put({ request, env }) {
   if (!body) return bad("нужен json");
   if (Array.isArray(body.tasks)) {
     await env.OKK_KV.put(KEY("tasks"), JSON.stringify(body.tasks));
-    return json({ ok: true, tasks: body.tasks.length });
+    if (Array.isArray(body.projects)) await env.OKK_KV.put(KEY("projects"), JSON.stringify(body.projects));
+    return json({ ok: true, tasks: body.tasks.length, projects: Array.isArray(body.projects) ? body.projects.length : undefined });
   }
   if (!PAGES.includes(body.page) || typeof body.html !== "string" || !body.html.trim()) return bad("нужны page (" + PAGES.join("|") + ") и html, или tasks");
   await env.OKK_KV.put(KEY(body.page), body.html);
