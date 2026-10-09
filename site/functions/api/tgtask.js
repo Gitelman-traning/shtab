@@ -10,16 +10,17 @@
 //   проект не угадан → сразу кнопки выбора проекта
 //   «список» / /list                   → открытые задачи с номерами и кнопками «✅ N»
 //   «готово 3» / «сделано 3»           → закрыть задачу № из последнего списка; «отложи 3» → отложить
-// Проект угадывается по ключевым словам из projects.json (их присылает sync.mjs в KV dash:projects),
+// Проект угадывается по ключевым словам из projects.json (их присылает sync.mjs в KV dash:tg-projects),
 // а пока их нет — по запасному списку ниже.
-// Данные: KV dash:tasks — копия tasks.json (присылает sync.mjs с компьютера Никиты), dash:inbox — очередь правок
+// Данные: KV dash:tg-tasks — копия tasks.json (присылает sync.mjs с компьютера Никиты), dash:inbox — очередь правок
 // (add / status / project / delete), которую sync.mjs забирает перед каждой сборкой дашборда и применяет к tasks.json.
 //
 // Настройка вебхука: POST /api/tgtask?setup=1 с Bearer INGEST_TOKEN — ставит setWebhook на этот адрес
 // с секретом (KV dash:tg-secret), слушает message и callback_query. GET с тем же токеном — куда смотрит вебхук.
 import { json, bad, hasIngestToken, randomId, tgSend, tgRequestAccess } from "./_lib.js";
 
-const K = { tasks: "dash:tasks", inbox: "dash:inbox", secret: "dash:tg-secret", list: "dash:tg-list", projects: "dash:projects" };
+// dash:tasks / dash:projects заняты страницами дашборда (/api/dashboard?page=…) — данные бота живут под dash:tg-*
+const K = { tasks: "dash:tg-tasks", inbox: "dash:inbox", secret: "dash:tg-secret", list: "dash:tg-list", projects: "dash:tg-projects" };
 // запасной список, пока sync.mjs не прислал projects.json; слова отсюда добавляются и к присланным
 const PROJECTS = {
   shtab: ["штаб", "shtab", "витрин", "doppler", "пинг", "окна", "окно"],
