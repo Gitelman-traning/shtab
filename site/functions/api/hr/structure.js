@@ -2,7 +2,7 @@
 //   GET  /api/hr/structure            — {depts, people, can_edit}; уволенных видят только те, кто может править
 //   POST /api/hr/structure {action:…}  — правка, уровень «правка» на разделе hr.structure:
 //     dept_save {id?, name, parent, head, sort}   · dept_del {id}  (только пустой отдел без подотделов)
-//     person_save {id?, name, position, dept, manager, login, status, hired, birth, leave_year, leave_adj, children:[{name,birth}]}   · person_del {id}
+//     person_save {id?, name, position, dept, manager, login, tg, status, hired, birth, leave_year, leave_adj, children:[{name,birth}]}   · person_del {id}
 //       год рождения и дети — только для сотрудников HR: остальным GET отдаёт день и месяц рождения, детей не отдаёт
 //     import {rows:[{name, position, dept, manager}]} — пачкой; dept — id или название отдела, manager — имя
 import { json, bad, canRead, canEdit, canView, audit, now } from "../_lib.js";
@@ -22,7 +22,9 @@ export async function onRequestGet({ request, env }) {
   const depts = await env.DB.prepare("SELECT id, name, parent, head, sort FROM hr_depts ORDER BY sort, name").all();
   const hr = isHR(user);
   const people = (await env.DB.prepare(
-    "SELECT id, name, position, dept, manager, login, status, sort, birth, hired, leave_year, leave_adj FROM hr_people" + (edit ? "" : " WHERE status = 'active'") + " ORDER BY sort, name"
+    // tg — что внесли в карточку; tg_auto — @username из входа в Штаб через Telegram, если человек связан с логином
+    "SELECT p.id, p.name, p.position, p.dept, p.manager, p.login, p.tg, u.tg_username AS tg_auto, p.status, p.sort, p.birth, p.hired, p.leave_year, p.leave_adj " +
+    "FROM hr_people p LEFT JOIN users u ON u.login = p.login AND p.login != ''" + (edit ? "" : " WHERE p.status = 'active'") + " ORDER BY p.sort, p.name"
   ).all()).results || [];
   if (!hr) for (const p of people) { p.birth = p.birth ? "--" + p.birth.slice(-5) : ""; delete p.leave_adj; delete p.leave_year; }
   const children = hr ? ((await env.DB.prepare("SELECT id, person, name, birth FROM hr_children ORDER BY birth").all()).results || []) : [];
@@ -84,14 +86,17 @@ export async function onRequestPost({ request, env }) {
     if (id && manager === id) return bad("человек не может быть руководителем самому себе");
     const hired = cleanDate(body.hired, false);
     if (hired === null) return bad("дата выхода: ГГГГ-ММ-ДД");
-    const vals = [name, str(body.position, 120), dept, manager, str(body.login, 32), status, int(body.sort) ?? 100, hired, t];
+    // Telegram: принимаем @user, user или ссылку t.me/user
+    const tg = str(body.tg, 80).replace(/^https?:\/\/(www\.)?t(elegram)?\.me\//i, "").replace(/^@/, "").replace(/[/?#].*$/, "");
+    if (tg && !/^[A-Za-z0-9_]{4,32}$/.test(tg)) return bad("Telegram: @username латиницей, от 4 символов");
+    const vals = [name, str(body.position, 120), dept, manager, str(body.login, 32), tg, status, int(body.sort) ?? 100, hired, t];
     let pid = id;
     if (id) {
-      await env.DB.prepare("UPDATE hr_people SET name = ?, position = ?, dept = ?, manager = ?, login = ?, status = ?, sort = ?, hired = ?, updated_at = ? WHERE id = ?")
+      await env.DB.prepare("UPDATE hr_people SET name = ?, position = ?, dept = ?, manager = ?, login = ?, tg = ?, status = ?, sort = ?, hired = ?, updated_at = ? WHERE id = ?")
         .bind(...vals, id).run();
       await audit(env, user.login, "hr.person_edit", String(id), name);
     } else {
-      const r = await env.DB.prepare("INSERT INTO hr_people (name, position, dept, manager, login, status, sort, hired, updated_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
+      const r = await env.DB.prepare("INSERT INTO hr_people (name, position, dept, manager, login, tg, status, sort, hired, updated_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
         .bind(...vals, t).run();
       pid = r.meta && r.meta.last_row_id;
       await audit(env, user.login, "hr.person_add", String(pid || ""), name);
