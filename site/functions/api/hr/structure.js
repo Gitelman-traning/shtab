@@ -82,6 +82,8 @@ export async function onRequestPost({ request, env }) {
     if (dept && !(await deptExists(env, dept))) return bad("нет такого отдела");
     const status = body.status === "left" ? "left" : "active";
     const id = int(body.id);
+    // руководитель человека в структуре не показывается (решение 09.10), но поле живёт для «Задач» → без manager в запросе не трогаем
+    const hasMgr = Object.prototype.hasOwnProperty.call(body, "manager");
     const manager = int(body.manager);
     if (id && manager === id) return bad("человек не может быть руководителем самому себе");
     const hired = cleanDate(body.hired, false);
@@ -92,8 +94,8 @@ export async function onRequestPost({ request, env }) {
     const vals = [name, str(body.position, 120), dept, manager, str(body.login, 32), tg, status, int(body.sort) ?? 100, hired, t];
     let pid = id;
     if (id) {
-      await env.DB.prepare("UPDATE hr_people SET name = ?, position = ?, dept = ?, manager = ?, login = ?, tg = ?, status = ?, sort = ?, hired = ?, updated_at = ? WHERE id = ?")
-        .bind(...vals, id).run();
+      await env.DB.prepare("UPDATE hr_people SET name = ?, position = ?, dept = ?, manager = CASE WHEN ? THEN ? ELSE manager END, login = ?, tg = ?, status = ?, sort = ?, hired = ?, updated_at = ? WHERE id = ?")
+        .bind(vals[0], vals[1], vals[2], hasMgr ? 1 : 0, vals[3], ...vals.slice(4), id).run();
       await audit(env, user.login, "hr.person_edit", String(id), name);
     } else {
       const r = await env.DB.prepare("INSERT INTO hr_people (name, position, dept, manager, login, tg, status, sort, hired, updated_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")

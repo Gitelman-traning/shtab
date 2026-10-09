@@ -69,7 +69,7 @@ dialog .in{max-height:calc(100vh - 40px);overflow:auto}
 <aside class="side" id="side"></aside>
 <div class="pane">
 <header>
-  <div><div class="crumbs">HR · <b>Структура компании</b></div><h1>Структура компании</h1><p class="sub">Отделы, руководители и кто кому подчиняется. Нажмите на человека, чтобы открыть карточку</p></div>
+  <div><div class="crumbs">HR · <b>Структура компании</b></div><h1>Структура компании</h1><p class="sub">Кто в каком отделе. Нажмите на человека, чтобы открыть карточку</p></div>
   <div class="spacer"></div>
   <div class="themer" role="group" aria-label="Тема оформления">
     <button type="button" data-set="auto" aria-pressed="true">Авто</button>
@@ -217,14 +217,10 @@ dialog .in{max-height:calc(100vh - 40px);overflow:auto}
   function kidsOf(id) { return (D.children || []).filter(function (c) { return c.person === id; }); }
   function showPerson(id) {
     var p = person(id); if (!p) return;
-    var mgr = p.manager ? person(p.manager) : null;
-    var team = D.people.filter(function (x) { return x.manager === p.id && visible(x); });
     var leads = D.depts.filter(function (d) { return d.head === p.id; });
     var h = '<div class="ttl"><span class="av">' + esc(initials(p.name)) + '</span><div><h3>' + esc(p.name) + '</h3><div class="sub" style="font-size:12.5px;color:var(--dim)">' + esc(p.position || "должность не указана") + '</div></div></div><dl>'
       + '<dt>Отдел</dt><dd>' + esc(p.dept ? deptPath(p.dept) : "—") + '</dd>'
       + (leads.length ? '<dt>Руководит</dt><dd>' + leads.map(function (d) { return esc(d.name); }).join(", ") + '</dd>' : "")
-      + '<dt>Руководитель</dt><dd>' + (mgr ? '<button type="button" class="lnk" data-go="' + mgr.id + '">' + esc(mgr.name) + '</button>' : "—") + '</dd>'
-      + (team.length ? '<dt>Подчинённые</dt><dd>' + team.map(function (x) { return '<button type="button" class="lnk" data-go="' + x.id + '">' + esc(x.name) + '</button>'; }).join(", ") + '</dd>' : "")
       + (tgOf(p) ? '<dt>Telegram</dt><dd><a href="https://t.me/' + encodeURIComponent(tgOf(p)) + '" target="_blank" rel="noopener">@' + esc(tgOf(p)) + '</a></dd>' : "")
       + (p.birth ? '<dt>День рождения</dt><dd>' + esc(dmText(p.birth)) + '</dd>' : "")
       + (p.hired ? '<dt>В компании</dt><dd>с ' + esc(fullDate(p.hired)) + (tenure(p.hired) ? ", " + esc(tenure(p.hired)) : "") + '</dd>' : "")
@@ -248,7 +244,6 @@ dialog .in{max-height:calc(100vh - 40px);overflow:auto}
       + '<label class="f">Имя и фамилия<input id="f-name" maxlength="80" value="' + esc(p.name) + '"></label>'
       + '<label class="f">Должность<input id="f-pos" maxlength="120" value="' + esc(p.position) + '"></label>'
       + '<label class="f">Отдел<select id="f-dept">' + deptOpts(p.dept) + '</select></label>'
-      + '<label class="f">Непосредственный руководитель<select id="f-mgr">' + peopleOpts(p.manager, id) + '</select></label>'
       + '<label class="f">Telegram<input id="f-tg" maxlength="80" placeholder="@username" value="' + esc(p.tg ? "@" + p.tg : "") + '"></label>'
       + '<label class="f">Логин в Штабе (если есть)<input id="f-login" maxlength="32" value="' + esc(p.login) + '"></label>'
       + '<label class="f">Дата выхода в компанию<input id="f-hired" type="date" value="' + esc(p.hired || "") + '"></label>'
@@ -305,7 +300,7 @@ dialog .in{max-height:calc(100vh - 40px);overflow:auto}
     if (t.hasAttribute("data-edit")) return editPerson(+t.getAttribute("data-edit"));
     if (t.hasAttribute("data-psave")) {
       var v = function (id) { return dIn.querySelector(id).value; };
-      var body = { action: "person_save", id: t.getAttribute("data-psave") || null, name: v("#f-name"), position: v("#f-pos"), dept: v("#f-dept"), manager: v("#f-mgr"), login: v("#f-login"), tg: v("#f-tg"), status: v("#f-status"), hired: v("#f-hired") };
+      var body = { action: "person_save", id: t.getAttribute("data-psave") || null, name: v("#f-name"), position: v("#f-pos"), dept: v("#f-dept"), login: v("#f-login"), tg: v("#f-tg"), status: v("#f-status"), hired: v("#f-hired") };
       if (D.is_hr) {
         body.birth = v("#f-birth"); body.leave_year = v("#f-lyear"); body.leave_adj = v("#f-ladj");
         body.children = [].map.call(dIn.querySelectorAll(".kid"), function (k) { return { name: k.querySelector(".k-name").value, birth: k.querySelector(".k-birth").value }; }).filter(function (k) { return k.name.trim(); });
