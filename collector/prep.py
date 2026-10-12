@@ -945,9 +945,16 @@ def domain(url):
 
 
 def registry_growth_text(org_name, inn, org_id, rev, y, paid_at):
-    """Выручка «год до тренинга → последний отчётный год» по ГИР БО → текст в формате базы «было → стало» (или None)."""
-    base, last = rev.get(y - 1), max(rev) if rev else None
-    if not base or not last or last < y:
+    """Выручка «год до тренинга → последний отчётный год» по ГИР БО → текст в формате базы «было → стало» (или None).
+    Ловушка (12.10.2026): если компания открылась в год до тренинга, её первая отчётность — за неполный год и рост выходит
+    ложным. ГИР БО отдаёт отчёты с 2021, поэтому «первый отчёт за 2022+ = год открытия»; тогда сравниваем от года тренинга."""
+    rev = {int(k): v for k, v in (rev or {}).items()}
+    last = max(rev) if rev else None
+    by, note = y - 1, "год до тренинга"
+    if rev and min(rev) == by and by >= 2022:
+        by, note = y, "год тренинга; годом раньше компания только открылась"
+    base = rev.get(by)
+    if not base or not last or last <= by:
         return None
     mln = lambda v: ("%.1f" % (v / 1000)).replace(".", ",")
     g = rev[last] / base - 1
@@ -956,10 +963,10 @@ def registry_growth_text(org_name, inn, org_id, rev, y, paid_at):
     elif g < -0.05:
         ch = "снижение выручки на %d%%" % round(-g * 100)
     else:
-        ch = "без роста (выручка %d%% к году до тренинга)" % round(g * 100)
+        ch = "без роста (выручка %d%% к базовому году)" % round(g * 100)
     src = "ГИР БО ФНС, %s, ИНН %s" % (org_name, inn)
     return "\n".join([
-        "Тогда (%d, год до тренинга): выручка %s млн ₽ (источник: %s)" % (y - 1, mln(base), src),
+        "Тогда (%d, %s): выручка %s млн ₽ (источник: %s)" % (by, note, mln(base), src),
         "Сейчас (%d): выручка %s млн ₽ (источник: %s)" % (last, mln(rev[last]), src),
         "Изменение: " + ch,
         "Что ещё заметно: тренинг %s; сравниваются целые годы, часть изменения могла случиться до тренинга. %s/organizations-card/%s" % (
