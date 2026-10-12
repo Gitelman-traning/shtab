@@ -1,5 +1,5 @@
 // Подготовка диагноста к встрече (collector/prep.py, страница /sales/l2/prep/).
-// GET  /api/prep?days=14            — список подготовок (право sales.l2): встречи от вчера и на две недели вперёд + очередь и ошибки.
+// GET  /api/prep?days=14&back=30    — список подготовок (право sales.l2): встречи за 30 дней назад и на две недели вперёд + очередь и ошибки.
 //                                     Заодно дотягивает диагноста из копии сделки на Второй линии для подготовок, где он не определён (до 3 за запрос).
 // GET  /api/prep?deal=ID            — одна подготовка целиком (досье, участники, текст, обратная связь)
 // GET  /api/prep?mode=managers      — список людей amo для выбора диагноста (кэш в KV на сутки)
@@ -102,7 +102,8 @@ export async function onRequestGet(context) {
     return json({ ok: true, row: { ...row, sources, cases }, feedback: fb.results || [], me: user.login });
   }
   const days = Math.min(Number(u.searchParams.get("days")) || 14, 60);
-  const from = new Date(Date.now() - 1 * 864e5).toISOString().slice(0, 10);
+  const back = Math.min(Number(u.searchParams.get("back")) || 30, 120);   // прошедшие встречи тоже видны — подготовку смотрят и после встречи
+  const from = new Date(Date.now() - back * 864e5).toISOString().slice(0, 10);
   const to = new Date(Date.now() + days * 864e5).toISOString().slice(0, 10) + " 99";
   const rows = (await env.DB.prepare(
     "SELECT " + LIST_COLS + " FROM prep WHERE (meet_at >= ? AND meet_at <= ?) OR status != 'ready' OR meet_at = '' ORDER BY meet_at DESC, updated_at DESC LIMIT 300")
