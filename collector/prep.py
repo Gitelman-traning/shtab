@@ -761,7 +761,8 @@ def build_brief(ctx, facts, picked, prompt, owner=""):
     for i, c in enumerate(picked, 1):
         cases_txt.append("### Выпускник %d: %s\nЧем похож: %s\nДинамика по открытым источникам:\n%s" % (
             i, cases_lines([c]), c.get("why", ""), c.get("growth") or "не проверялось"))
-    heroes = open(HEROES_PATH, encoding="utf-8").read() if os.path.exists(HEROES_PATH) else ""
+    # истории журнала — только если подтверждённых выпускников меньше двух (13.10.2026: иначе модель брала их вместо наших кейсов)
+    heroes = open(HEROES_PATH, encoding="utf-8").read() if os.path.exists(HEROES_PATH) and len(picked) < 2 else ""
     style = STYLES.get(ctx.get("manager") or "")
     style_txt = ("\n\n# СТИЛЬ ВОПРОСОВ ДИАГНОСТА (%s) — из его реальных встреч\nЗаход (раздел 4) формулируй в этой манере, не копируя дословно:\n%s" % (ctx["manager"], style)) if style else ""
     user = "%s\n\n# МАТЕРИАЛЫ ПО ОТКРЫТЫМ ИСТОЧНИКАМ (тексты страниц сайта, отчётность ФНС, найденные страницы)\n%s\n\n# О СОБСТВЕННИКЕ: ИНТЕРВЬЮ, ПОБЕДЫ, ФАКТЫ\n%s\n\n# ВЫПУСКНИКИ С ПОДТВЕРЖДЁННЫМ РОСТОМ (подобраны по сходству)\n%s\n\n# ГОТОВЫЕ ИСТОРИИ ВЫПУСКНИКОВ (журнал; результат со слов выпускника)\n%s%s" % (
