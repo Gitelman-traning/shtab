@@ -1002,6 +1002,42 @@ def cmd_registry_growth(dry, out=None):
             rows.append({"deal": l["id"], "result": text, "checked_at": dt.datetime.now(MSK).strftime("%Y-%m-%d")})
             time.sleep(0.2)
     log("ФНС по ИНН: %s" % ", ".join("%s %d" % kv for kv in stats.items()))
+    # второй проход: выпускники с сайтом (в основном таблица Жени с 2021 года) → ИНН в подвале/реквизитах сайта → ГИР БО
+    done = {r["deal"] for r in rows}
+    sites = re.compile(r"instagram|t\.me|vk\.com|wa\.me|taplink|youtube|facebook|tiktok|linktr|ok\.ru|2gis|hh\.ru", re.I)
+    stats2 = {}
+
+    def by_site(c):
+        y = int((c.get("paid_at") or "0")[:4] or 0)
+        for tok in re.split(r"[\s,;]+", c.get("site") or "")[:3]:
+            tok = tok.strip().rstrip("/.")
+            if not tok or "." not in tok or sites.search(tok):
+                continue
+            pages = site_pages(tok if tok.startswith("http") else "https://" + tok, extra=2)
+            for inn in [i for i in find_inns([t for _, t in pages]) if len(i) == 10][:2]:
+                found = _girbo("/advanced-search/organizations/search", {"query": inn, "page": 0}).get("content") or []
+                org = next((o for o in found if re.sub(r"<[^>]+>", "", o.get("inn") or "") == inn), None)
+                if not org:
+                    continue
+                rev = {int(x["period"]): x["gainSum"] for x in _girbo("/nbo/organizations/%s/bfo/" % org["id"]) if x.get("period") and x.get("gainSum")}
+                return registry_growth_text(re.sub(r"<[^>]+>", "", org.get("shortName") or ""), inn, org["id"], rev, y, c.get("paid_at") or "") if y else None
+        return None
+
+    from concurrent.futures import ThreadPoolExecutor
+    todo = [c for c in load_cases(None) if c["deal"] not in done and c.get("site") and (c.get("paid_at") or "")[:4] < dt.datetime.now(MSK).strftime("%Y")]
+
+    def safe(c):
+        try:
+            return c, by_site(c)
+        except Exception:
+            return c, None
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        for c, text in ex.map(safe, todo):
+            if text:
+                key = "рост" if growth_confirmed(text) else "без роста"
+                stats2[key] = stats2.get(key, 0) + 1
+                rows.append({"deal": c["deal"], "result": text[:3000], "checked_at": dt.datetime.now(MSK).strftime("%Y-%m-%d")})
+    log("ФНС через ИНН с сайта: проверено %d, %s" % (len(todo), ", ".join("%s %d" % kv for kv in stats2.items())))
     if out:
         json.dump(rows, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     if rows and not dry and URL and STOKEN:
