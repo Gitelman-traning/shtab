@@ -5,6 +5,7 @@
 
   python collector/prep.py cases [--out cases.json]          — база участников: купившие из amo → витрина (prep_cases)
   python collector/prep.py run [--deal ID] [--dry] [--out brief.md] [--cases cases.json]
+  python collector/prep.py registry [--dry] [--out r.json]  — рост выпускников по отчётности ФНС (ИНН из оплаченных сделок), без модели
   python collector/prep.py material --deal ID [--out m.md]  — отладка шага 1 без модели: сайт, ИНН, отчётность ФНС
         — сделки на этапе «Встреча подтверждена» (и поставленные в очередь на странице) → четыре шага → витрина (prep)
 
@@ -943,6 +944,72 @@ def domain(url):
     return m.group(1) if m else ""
 
 
+def registry_growth_text(org_name, inn, org_id, rev, y, paid_at):
+    """Выручка «год до тренинга → последний отчётный год» по ГИР БО → текст в формате базы «было → стало» (или None)."""
+    base, last = rev.get(y - 1), max(rev) if rev else None
+    if not base or not last or last < y:
+        return None
+    mln = lambda v: ("%.1f" % (v / 1000)).replace(".", ",")
+    g = rev[last] / base - 1
+    if g > 0.05:
+        ch = "рост выручки ×%s (+%d%%)" % (("%.1f" % (rev[last] / base)).replace(".", ","), round(g * 100))
+    elif g < -0.05:
+        ch = "снижение выручки на %d%%" % round(-g * 100)
+    else:
+        ch = "без роста (выручка %d%% к году до тренинга)" % round(g * 100)
+    src = "ГИР БО ФНС, %s, ИНН %s" % (org_name, inn)
+    return "\n".join([
+        "Тогда (%d, год до тренинга): выручка %s млн ₽ (источник: %s)" % (y - 1, mln(base), src),
+        "Сейчас (%d): выручка %s млн ₽ (источник: %s)" % (last, mln(rev[last]), src),
+        "Изменение: " + ch,
+        "Что ещё заметно: тренинг %s; сравниваются целые годы, часть изменения могла случиться до тренинга. %s/organizations-card/%s" % (
+            paid_at[:7] or str(y), GIRBO, org_id)])
+
+
+def cmd_registry_growth(dry, out=None):
+    """База «было → стало» без модели (решение 12.10.2026): ИНН юрлица из оплаченной сделки amo → открытая отчётность ФНС (ГИР БО).
+    Бесплатно; обновлять раз в год, когда выходит новая отчётность (апрель). ИП и нерезиденты отчётность в ГИР БО не сдают."""
+    rows, stats = [], {}
+    for pid in L2_PIPES:
+        for l in leads_pages({"filter[statuses][0][pipeline_id]": pid, "filter[statuses][0][status_id]": WIN}):
+            inn = ""
+            for f in l.get("custom_fields_values") or []:
+                if (f.get("field_name") or "").strip().upper() == "ИНН":
+                    inn = re.sub(r"\D", "", str(((f.get("values") or [{}])[0]).get("value", "")))
+            if len(inn) != 10:
+                stats["нет ИНН юрлица"] = stats.get("нет ИНН юрлица", 0) + 1
+                continue
+            paid = l.get("closed_at") or l.get("created_at")
+            paid_at = dt.datetime.fromtimestamp(int(paid), MSK).strftime("%Y-%m-%d") if paid else ""
+            try:
+                found = _girbo("/advanced-search/organizations/search", {"query": inn, "page": 0}).get("content") or []
+                org = next((o for o in found if re.sub(r"<[^>]+>", "", o.get("inn") or "") == inn), None)
+                if not org:
+                    stats["нет в ГИР БО"] = stats.get("нет в ГИР БО", 0) + 1
+                    continue
+                rev = {int(x["period"]): x["gainSum"] for x in _girbo("/nbo/organizations/%s/bfo/" % org["id"])
+                       if x.get("period") and x.get("gainSum")}
+            except Exception as e:
+                stats["ошибка"] = stats.get("ошибка", 0) + 1
+                log("  сделка %d: ГИР БО не ответил (%s)" % (l["id"], str(e)[:80]))
+                continue
+            text = registry_growth_text(re.sub(r"<[^>]+>", "", org.get("shortName") or ""), inn, org["id"], rev, int(paid_at[:4] or 0), paid_at)
+            if not text:
+                stats["нет отчётности после тренинга"] = stats.get("нет отчётности после тренинга", 0) + 1
+                continue
+            key = "рост" if growth_confirmed(text) else "без роста"
+            stats[key] = stats.get(key, 0) + 1
+            rows.append({"deal": l["id"], "result": text, "checked_at": dt.datetime.now(MSK).strftime("%Y-%m-%d")})
+            time.sleep(0.2)
+    log("ФНС по ИНН: %s" % ", ".join("%s %d" % kv for kv in stats.items()))
+    if out:
+        json.dump(rows, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    if rows and not dry and URL and STOKEN:
+        for i in range(0, len(rows), 100):
+            shtab("POST", "/api/ingest", {"collector": "prep", "prep_growth": rows[i:i + 100]})
+        log("записано в базу «было → стало»: %d" % len(rows))
+
+
 def cmd_sheet():
     """Таблица Жени → prep_cases (source=sheet): имя, сайт, ниша, штат, оборот, месяц тренинга. Телефоны и ТГ не берём."""
     import csv
@@ -1208,7 +1275,7 @@ def cmd_run(deal, dry, out_path, cases_path, facts_path=None, picked_path=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["cases", "sheet", "growth", "style", "run", "material"])
+    ap.add_argument("cmd", choices=["cases", "sheet", "growth", "registry", "style", "run", "material"])
     ap.add_argument("--deal", type=int)
     ap.add_argument("--user", type=int, help="style: id пользователя amo (диагност)")
     ap.add_argument("--limit", type=int, default=int(os.environ.get("PREP_GROWTH_LIMIT", "100")), help="growth: сколько участников проверить за прогон")
@@ -1228,6 +1295,8 @@ def main():
         if not LLM_KEY:
             sys.exit("нет LLM_API_KEY")
         cmd_growth(a.limit, a.cases, a.out)
+    elif a.cmd == "registry":     # рост выпускников по отчётности ФНС через ИНН из amo — без модели
+        cmd_registry_growth(a.dry, a.out)
     elif a.cmd == "material":     # отладка шага 1 без модели: сайт + ИНН + реестр ФНС
         if not a.deal:
             sys.exit("нужен --deal")
