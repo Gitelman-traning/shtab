@@ -502,10 +502,22 @@ RESEARCH_USER = """%s
 
 
 def research_company(ctx):
+    """13.10.2026: отдельное досье моделью убрано (его никто не читал, ~20 ₽) — подготовка пишется прямо по материалам.
+    PREP_DOSSIER=1 возвращает прежний шаг."""
     material, sources, usage = gather_material(ctx)
+    if os.environ.get("PREP_DOSSIER") != "1":
+        usage.setdefault("search", 0)
+        return material or "Материалов не нашлось.", sources, usage
     text, _, u = claude(RESEARCH_SYS, RESEARCH_USER % (card_text(ctx), material or "Материалов не нашлось."), max_tokens=5000)
     add_usage(usage, u)
     return text, sources, usage
+
+
+def cost(u, cheap=False):
+    """Рубли одного шага (та же оценка, что в add_usage)."""
+    if "rub" in u:
+        return u["rub"]
+    return ((u.get("in") or 0) * (200 if cheap else 600) + (u.get("out") or 0) * (1010 if cheap else 3030)) / 1e6
 
 
 # ---------- шаг 2: подбор участников ----------
@@ -585,8 +597,10 @@ def shortlist(ctx, facts, cases, limit=None):
 
 
 def pick_cases(ctx, facts, cases):
-    short = shortlist(ctx, facts, cases)
-    log("  подбор участников: модели отдано %d из %d (отсев по нише и масштабу)" % (len(short), len(cases)))
+    # 13.10.2026: рост выпускников проверен заранее (prep.py registry + ручной добор) — модели даём только подтверждённых
+    conf = [c for c in cases if growth_confirmed(c.get("result"))]
+    short = shortlist(ctx, facts, conf if conf else cases)
+    log("  подбор участников: модели отдано %d (подтверждённых в базе %d из %d)" % (len(short), len(conf), len(cases)))
     user = "%s\n\nДосье по открытым источникам:\n%s\n\nБаза участников (id | компания | ниша | оборот | штат | география | сайт | когда):\n%s" % (
         card_text(ctx), facts[:6000], cases_lines(short))
     text, _, usage = claude(PICK_SYS, user, max_tokens=2000, model=MODEL_GROWTH)   # после отсева ~150 строк — дешёвой моделью
@@ -749,8 +763,8 @@ def build_brief(ctx, facts, picked, prompt, owner=""):
             i, cases_lines([c]), c.get("why", ""), c.get("growth") or "не проверялось"))
     heroes = open(HEROES_PATH, encoding="utf-8").read() if os.path.exists(HEROES_PATH) else ""
     style = STYLES.get(ctx.get("manager") or "")
-    style_txt = ("\n\n# СТИЛЬ ВОПРОСОВ ДИАГНОСТА (%s) — из его реальных встреч\nВопросы в разделах 4–6 формулируй в этой манере, не копируя дословно:\n%s" % (ctx["manager"], style)) if style else ""
-    user = "%s\n\n# ДОСЬЕ ПО ОТКРЫТЫМ ИСТОЧНИКАМ\n%s\n\n# О СОБСТВЕННИКЕ: ИНТЕРВЬЮ, ПОБЕДЫ, ФАКТЫ\n%s\n\n# ВЫПУСКНИКИ С ПОДТВЕРЖДЁННЫМ РОСТОМ (подобраны по сходству)\n%s\n\n# ГОТОВЫЕ ИСТОРИИ ВЫПУСКНИКОВ (журнал; результат со слов выпускника)\n%s%s" % (
+    style_txt = ("\n\n# СТИЛЬ ВОПРОСОВ ДИАГНОСТА (%s) — из его реальных встреч\nЗаход (раздел 4) формулируй в этой манере, не копируя дословно:\n%s" % (ctx["manager"], style)) if style else ""
+    user = "%s\n\n# МАТЕРИАЛЫ ПО ОТКРЫТЫМ ИСТОЧНИКАМ (тексты страниц сайта, отчётность ФНС, найденные страницы)\n%s\n\n# О СОБСТВЕННИКЕ: ИНТЕРВЬЮ, ПОБЕДЫ, ФАКТЫ\n%s\n\n# ВЫПУСКНИКИ С ПОДТВЕРЖДЁННЫМ РОСТОМ (подобраны по сходству)\n%s\n\n# ГОТОВЫЕ ИСТОРИИ ВЫПУСКНИКОВ (журнал; результат со слов выпускника)\n%s%s" % (
         card_text(ctx), facts, owner or "не искали", "\n\n".join(cases_txt) or "Подтверждённых нет.", heroes or "нет", style_txt)
     return claude(prompt, user, max_tokens=8000)
 
@@ -1155,17 +1169,18 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
     else:
         facts, sources, u = research_company(ctx)
         add_usage(usage, u)
-        log("  исследование: %d символов, %d источников, поисков %d" % (len(facts), len(sources), u["search"]))
+        log("  материалы: %d символов, %d источников, поисков %d, ≈ %.0f ₽" % (len(facts), len(sources), u["search"], cost(u)))
     if picked_path and os.path.exists(picked_path):
         picked = json.load(open(picked_path, encoding="utf-8"))
         log("  участники с проверкой роста взяты из файла %s (%d)" % (picked_path, len(picked)))
     else:
         candidates, u = pick_cases(ctx, facts, cases)
         add_usage(usage, u, cheap=True)
+        log("  подбор кейсов ≈ %.0f ₽" % cost(u, True))
         # в подготовку идут только выпускники с ПОДТВЕРЖДЁННЫМ ростом (решение 07.10.2026): идём по кандидатам от самого похожего,
         # рост берём из базы «было → стало», кого там нет — проверяем сейчас (дешёвая модель, ≤ PREP_GROWTH_CHECKS штук) и кладём в базу
         picked, fresh_rows, checks = [], [], 0
-        max_checks = int(os.environ.get("PREP_GROWTH_CHECKS", "2"))      # 12.10.2026: 5 проверок съедали ~15 поисков без результата
+        max_checks = int(os.environ.get("PREP_GROWTH_CHECKS", "0"))      # 13.10.2026: рост проверен заранее, при подготовке не проверяем
         today = dt.datetime.now(MSK).strftime("%Y-%m-%d")
         for c in candidates:
             if len(picked) >= 3:
@@ -1206,16 +1221,19 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
             owner, owner_src, u = owner_notes(ctx, facts)
             add_usage(usage, u, cheap=True)
             sources = sources + [s for s in owner_src if s["url"] not in [x["url"] for x in sources]]
-            log("  о собственнике: %d символов, поисков %d" % (len(owner), u["search"]))
+            log("  о собственнике: %d символов, поисков %d, ≈ %.0f ₽" % (len(owner), u["search"], cost(u, True)))
             if owner_cache:
                 open(owner_cache, "w", encoding="utf-8").write(owner)
         except Exception as e:
             owner = ""
             log("  о собственнике: не получилось (%s)" % str(e)[:100])
-    facts_full = facts + ("\n\n## О собственнике: интервью, победы, факты\n" + owner if owner else "")
+    facts_full = facts[:20000] + ("\n\n## О собственнике: интервью, победы, факты\n" + owner if owner else "")
     brief, _, u = build_brief(ctx, facts, picked, prompt, owner)
     add_usage(usage, u)
+    log("  текст подготовки: %d/%d токенов, ≈ %.0f ₽" % (u.get("in", 0), u.get("out", 0), cost(u)))
+    before = usage.get("rub", 0)
     brief = factcheck_brief(brief, usage)
+    log("  проверка фактов ≈ %.0f ₽" % (usage.get("rub", 0) - before))
     log("  подготовка: %d символов, всего токенов %d/%d, поисков %d, %d сек, ≈ %.0f ₽" % (
         len(brief), usage["in"], usage["out"], usage["search"], time.time() - t0, usage.get("rub", 0)))
     row = {"deal": deal, "contact": ctx["contact"], "meet_at": ctx["meet_at"], "manager": ctx["manager"], "client": ctx["card"].get("Имя", ""),
