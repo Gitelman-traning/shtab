@@ -38,8 +38,8 @@ URL = (os.environ.get("SHTAB_URL", "").strip() or "https://shtab-20v.pages.dev")
 STOKEN = os.environ.get("SHTAB_TOKEN", "").strip()
 LLM_KEY = os.environ.get("LLM_API_KEY", "").strip()
 LLM_BASE = os.environ.get("PREP_ANTHROPIC_BASE", "https://api.proxyapi.ru/anthropic").rstrip("/")
-MODEL = os.environ.get("PREP_MODEL", "claude-sonnet-5")
-MODEL_GROWTH = os.environ.get("PREP_MODEL_GROWTH", "claude-haiku-4-5")   # рост выпускников: задача простая, модель дешёвая
+MODEL = os.environ.get("PREP_MODEL") or "claude-sonnet-5"      # пустая переменная GitHub (vars.PREP_MODEL) = по умолчанию
+MODEL_GROWTH = os.environ.get("PREP_MODEL_GROWTH") or "claude-haiku-4-5"   # рост выпускников: задача простая, модель дешёвая
 MAX_PER_RUN = int(os.environ.get("PREP_MAX", "10"))
 MAX_PER_DAY = int(os.environ.get("PREP_DAILY", "10"))     # предохранитель расхода: больше N подготовок в день не считаем (решение 05.10.2026)
 
