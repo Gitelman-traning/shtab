@@ -541,10 +541,54 @@ def cases_lines(cases):
     return "\n".join(out)
 
 
+RE_WORD = re.compile(r"[a-zа-яё]{4,}", re.I)
+STOP = {"компа", "бизне", "услуг", "проче", "собст", "дирек", "предп", "сотру", "клиен", "товар", "работ", "групп", "холди"}
+
+
+def _stems(text):
+    """Грубые основы слов (5 букв) — для отсева базы без модели."""
+    return {w.lower().replace("ё", "е")[:5] for w in RE_WORD.findall(text or "")} - STOP
+
+
+def _num(x):
+    try:
+        return float(str(x).replace(",", ".").split()[0])
+    except (ValueError, IndexError):
+        return 0.0
+
+
+def shortlist(ctx, facts, cases, limit=None):
+    """Отсев базы до модели (решение 12.10.2026): совпадение ниши, близкий масштаб, подтверждённый рост, страна.
+    Модели уходят ~150 строк вместо ~2 000 — подбор дешевле в 10+ раз, сходство «по смыслу» потом решает модель."""
+    import math
+    limit = limit or int(os.environ.get("PREP_SHORTLIST", "150"))
+    if len(cases) <= limit:
+        return cases
+    niche = _stems(" ".join(ctx["card"].get(k, "") for k in ("Ниша", "Ниша (список)", "Сфера деятельности")))
+    head = _stems((facts or "")[:2500])
+    turn, country = _num(ctx.get("turn")), (ctx.get("country") or "").lower()[:4]
+    scored = []
+    for c in cases:
+        cs = _stems(" ".join(str(c.get(k) or "") for k in ("niche", "sphere", "company")))
+        score = 3 * len(niche & cs) + len(head & cs)
+        t = _num(c.get("turn"))
+        if turn > 0 and t > 0:
+            score += max(0.0, 2 - abs(math.log10(t / turn)) * 2)      # тот же масштаб → +2, в 10 раз больше/меньше → 0
+        if growth_confirmed(c.get("result")):
+            score += 3
+        if country and (c.get("country") or "").lower()[:4] == country:
+            score += 0.5
+        scored.append((score, c))
+    scored.sort(key=lambda x: -x[0])
+    return [c for _, c in scored[:limit]]
+
+
 def pick_cases(ctx, facts, cases):
+    short = shortlist(ctx, facts, cases)
+    log("  подбор участников: модели отдано %d из %d (отсев по нише и масштабу)" % (len(short), len(cases)))
     user = "%s\n\nДосье по открытым источникам:\n%s\n\nБаза участников (id | компания | ниша | оборот | штат | география | сайт | когда):\n%s" % (
-        card_text(ctx), facts[:6000], cases_lines(cases))
-    text, _, usage = claude(PICK_SYS, user, max_tokens=2000, model=MODEL_GROWTH)   # база ~1 800 строк — дешёвой моделью
+        card_text(ctx), facts[:6000], cases_lines(short))
+    text, _, usage = claude(PICK_SYS, user, max_tokens=2000, model=MODEL_GROWTH)   # после отсева ~150 строк — дешёвой моделью
     by_id = {int(c["deal"]): c for c in cases}
     picked = []
     for line in text.splitlines():
@@ -1011,7 +1055,7 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
         # в подготовку идут только выпускники с ПОДТВЕРЖДЁННЫМ ростом (решение 07.10.2026): идём по кандидатам от самого похожего,
         # рост берём из базы «было → стало», кого там нет — проверяем сейчас (дешёвая модель, ≤ PREP_GROWTH_CHECKS штук) и кладём в базу
         picked, fresh_rows, checks = [], [], 0
-        max_checks = int(os.environ.get("PREP_GROWTH_CHECKS", "5"))
+        max_checks = int(os.environ.get("PREP_GROWTH_CHECKS", "2"))      # 12.10.2026: 5 проверок съедали ~15 поисков без результата
         today = dt.datetime.now(MSK).strftime("%Y-%m-%d")
         for c in candidates:
             if len(picked) >= 3:
