@@ -51,7 +51,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 .v-dl{display:grid;grid-template-columns:150px 1fr;gap:8px 14px;font-size:13.5px;margin:0}
 .v-dl dt{color:var(--gold);font-size:12px;padding-top:2px} .v-dl dd{margin:0}
 @media (max-width:520px){.v-dl{grid-template-columns:1fr;gap:2px}.v-dl dd{margin-bottom:8px}}
-.v-cmp{width:100%;font-size:13px} .v-cmp td{padding:7px 8px}
+.v-cmp{width:100%;font-size:13px} .v-cmp td,.v-cmp th{padding:7px 8px;white-space:normal;overflow-wrap:anywhere;min-width:0} .v-cmp th{font-size:11.5px;color:var(--faint);font-weight:600;text-align:left}
 .v-cmp tr.crm td{background:var(--mid-bg)}
 .v-verdict{margin-top:10px;font-size:12.5px;color:var(--dim);padding:10px 12px;border-radius:10px;background:var(--soft)}
 .v-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}
@@ -223,7 +223,12 @@ function v3cheat(L){
 }
 function v3cmp(L){
   var rows = [], rest = [];
-  L.forEach(function(t){ var it = v3item(t); if (it != null) { var lv = v3label(it); rows.push('<tr' + (/карточк|crm/i.test(lv[0]) ? ' class="crm"' : '') + '><td>' + inline(lv[0]) + '</td><td>' + inline(lv[1]) + '</td></tr>'); } else if (!/^\|/.test(t)) rest.push(t); });
+  L.forEach(function(t){ var it = v3item(t);
+    if (/^\|/.test(t)) {   // модель иногда отдаёт сверку markdown-таблицей
+      if (/^\|[\s:|-]+\|?$/.test(t)) return;
+      var cells = t.replace(/^\||\|$/g, "").split("|").map(function(c){ return c.trim(); }), tag = rows.length ? "td" : "th";
+      rows.push('<tr>' + cells.map(function(c){ return '<' + tag + '>' + inline(c) + '</' + tag + '>'; }).join("") + '</tr>'); return; }
+    if (it != null) { var lv = v3label(it); rows.push('<tr' + (/карточк|crm/i.test(lv[0]) ? ' class="crm"' : '') + '><td>' + inline(lv[0]) + '</td><td>' + inline(lv[1]) + '</td></tr>'); } else rest.push(t); });
   return '<div class="card" id="v-cmp"><p class="v-lbl">Сверка цифр</p><table class="v-cmp"><tbody>' + rows.join("") + '</tbody></table>' + (rest.length ? '<div class="v-verdict">' + inline(rest.join(" ")) + '</div>' : "") + '</div>';
 }
 function v3facts(L){
@@ -285,8 +290,10 @@ var CORE_CHAIN = [["Вопрос", "Где сейчас команда силь�
 var MONEY_STEP = /^(деньги|добивающий|год|цена бездействия|бездействие|итог)/i;
 
 function v4branches(L, calc){
-  var br = [], others = [], cur = null, inOthers = false;
+  var br = [], others = [], cur = null, inOthers = false, trans = "";
   L.forEach(function(t){
+    var tm = t.replace(/^[-*•]\s+/, "").match(/^\**\s*Переход к продаже\s*\**\s*:\s*(.*)$/i);
+    if (tm) { trans = tm[1]; return; }   // подготовка без калькулятора (12.10.2026): фраза перехода — в конце раздела веток
     var m = t.match(/^\*\*\s*Ветка\s*(\d+)\s*[.—–-]*\s*(.+?)\*\*\s*(.*)$/i);
     if (m) { cur = { n: Number(m[1]), title: m[2].replace(/[.\s]+$/, ""), basis: m[3], steps: [] }; br.push(cur); inOthers = false; return; }
     if (/^\**другие ветки/i.test(t)) { inOthers = true; return; }
@@ -312,6 +319,7 @@ function v4branches(L, calc){
   return '<div class="card" id="v-branch"><h2>Ветки диагностики <small>одна проблема — до денег; отмечайте вопросы по ходу встречи</small></h2>' + rules
     + '<div class="v-hyps two">' + html + '</div>'
     + (others.length ? '<p class="v-lbl" style="margin-top:16px">Другие ветки — если клиент сам туда уйдёт</p><div class="v-more">' + others.map(function(o){ return '<div><b>' + esc((o.n ? o.n + ". " : "") + o.title) + '</b>' + inline(o.q) + '</div>'; }).join("") + '</div>' : "")
+    + (trans ? '<div class="v-final"><small>Переход к продаже</small>' + inline(trans) + '<div class="v-after">После подтверждения: «Тогда давайте посмотрим, можем ли мы за счёт нашей работы вернуть хотя бы часть этих денег в бизнес». Только после этого — презентация «Команды» через проблему клиента.</div></div>' : "")
     + uni + '</div>';
 }
 
