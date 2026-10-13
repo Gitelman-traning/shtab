@@ -59,9 +59,10 @@ async function tg(env, method, payload) {
   } catch { return null; }
 }
 
+// дашборд личный: задачи принимаем только от его владельца (DASH_OWNER, по умолчанию nikita), другие админы — как все
 async function isAdminTg(env, tgId) {
   if (!env.DB || !tgId) return null;
-  const r = await env.DB.prepare("SELECT login, name FROM users WHERE tg_id = ? AND role = 'admin' AND active = 1").bind(tgId).first();
+  const r = await env.DB.prepare("SELECT login, name FROM users WHERE tg_id = ? AND role = 'admin' AND active = 1 AND login = ?").bind(tgId, env.DASH_OWNER || "nikita").first();
   return r || null;
 }
 
