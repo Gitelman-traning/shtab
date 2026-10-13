@@ -348,9 +348,12 @@ export async function onRequestPost({ request, env }) {
     if (!hasIngestToken(request, env)) return bad("нет доступа", 401);
     const body = await request.json().catch(() => ({}));
     // без chat_id или с login — шлём администратору Штаба в личку бота по его tg_id из users
-    if (!body.chat_id && body.login && env.DB) {
-      const u = await env.DB.prepare("SELECT tg_id FROM users WHERE login = ? AND role = 'admin' AND active = 1").bind(body.login).first();
-      body.chat_id = u && u.tg_id;
+    // (логин не совпал, а администратор с Telegram один — ему); иначе отвечаем списком логинов, чтобы указать нужный
+    if (!body.chat_id && env.DB) {
+      const { results } = await env.DB.prepare("SELECT login, tg_id FROM users WHERE role = 'admin' AND active = 1 AND tg_id IS NOT NULL AND tg_id <> ''").all();
+      const hit = (results || []).find((u) => u.login === body.login) || ((results || []).length === 1 ? results[0] : null);
+      if (hit) body.chat_id = hit.tg_id;
+      else return bad("укажи login администратора: " + (results || []).map((u) => u.login).join(", "));
     }
     if (!body.chat_id) return bad("нужен chat_id или login администратора с привязанным Telegram");
     return json({ ok: true, ...(await sendDigest(env, body.chat_id, Math.min(+body.limit || 10, 15), !!body.force)) });
