@@ -139,7 +139,18 @@ export async function onRequestPost({ request, env }) {
       "ON CONFLICT(deal) DO UPDATE SET status = 'queued', queued_by = excluded.queued_by, error = '', updated_at = excluded.updated_at")
       .bind(deal, user.login, "https://pavelgitelman.amocrm.ru/leads/detail/" + deal, stamp, stamp).run();
     await audit(env, user.login, "prep.recalc", String(deal), "");
-    return json({ ok: true });
+    // 13.10.2026: прогон сразу по нажатию (без расписания) — GitHub Actions repository_dispatch «prep_deal» с номером сделки
+    let started = false;
+    if (env.GH_DISPATCH_TOKEN) {
+      const r = await fetch("https://api.github.com/repos/Gitelman-traning/shtab/dispatches", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + env.GH_DISPATCH_TOKEN, "Accept": "application/vnd.github+json", "User-Agent": "shtab-prep" },
+        body: JSON.stringify({ event_type: "prep_deal", client_payload: { deal: String(deal) } }),
+      }).catch(() => null);
+      started = !!(r && r.status === 204);
+      if (!started) await audit(env, user.login, "prep.dispatch_fail", String(deal), r ? String(r.status) : "сеть");
+    }
+    return json({ ok: true, started });
   }
   if (b.action === "feedback") {
     const useful = b.useful ? 1 : 0;

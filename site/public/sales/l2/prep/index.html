@@ -142,7 +142,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
       <input type="number" id="add-deal" placeholder="id сделки amo" style="width:150px">
       <button class="btn gold" id="add-btn" type="button">Подготовить</button>
     </div>
-    <p class="hint" style="margin:10px 0 0">Автоматическая подготовка пока выключена: подготовки запускаются вручную по id сделки. Подготовка занимает 3–6 минут.</p>
+    <p class="hint" style="margin:10px 0 0" id="add-hint">Введите id сделки amo и нажмите «Подготовить» — прогон запускается сразу, подготовка будет готова через 2–3 минуты (сделки с этапа amo сами не берутся).</p>
   </div>
   <div class="card wide"><h2>Встречи <small id="list-sub"></small></h2><div id="rows"><p class="empty">Загружаю…</p></div></div>
   <footer>Участники для кейсов — купившие клиенты из amoCRM (<span id="cases-n">—</span>); когда появится таблица «Участники тренинга НИШИ», база расширится. Подготовка считается моделью с веб-поиском; цифры без источника — гипотезы, их надо проверить на встрече.</footer>
@@ -528,6 +528,8 @@ function loadList(){
   api("days=21").then(function(res){
     if (!res.ok) { document.getElementById("rows").innerHTML = '<p class="empty">' + esc(res.error || "нет доступа") + '</p>'; return; }
     ROWS = res.rows || [];
+    clearTimeout(window._prepPoll);   // есть подготовки в очереди — обновляем список, пока не будут готовы
+    if (ROWS.some(function(r){ return r.status === "queued"; }) && !document.getElementById("list").hidden) window._prepPoll = setTimeout(loadList, 20000);
     document.getElementById("cases-n").textContent = res.cases ? res.cases + " компаний, рост проверен у " + (res.checked || 0) : "база пуста";
     var last = ROWS.map(function(r){ return r.updated_at || ""; }).sort().pop();
     document.getElementById("stamp").textContent = last ? "обновлено " + last.slice(0, 16).replace("T", " ") + " UTC" : "";
@@ -543,7 +545,11 @@ document.getElementById("add-btn").addEventListener("click", function(){
   var d = Number(document.getElementById("add-deal").value);
   if (!d) return;
   this.disabled = true;
-  post({ action: "recalc", deal: d }).then(function(res){ document.getElementById("add-btn").disabled = false; if (res.ok) { document.getElementById("add-deal").value = ""; loadList(); } else alert(res.error || "не получилось"); });
+  post({ action: "recalc", deal: d }).then(function(res){ document.getElementById("add-btn").disabled = false;
+    if (!res.ok) { alert(res.error || "не получилось"); return; }
+    document.getElementById("add-deal").value = "";
+    document.getElementById("add-hint").textContent = res.started ? "Сделка " + d + ": прогон запущен, подготовка будет готова через 2–3 минуты — список обновится сам." : "Сделка " + d + " поставлена в очередь, но автозапуск не сработал — напишите Никите.";
+    loadList(); });
 });
 
 // ---------- карточка ----------
@@ -597,7 +603,7 @@ function showDetail(deal){
     document.getElementById("fb-was").textContent = mine ? "вы отметили: " + (mine.useful ? "полезно" : "не полезно") : ((res.feedback || []).length ? (res.feedback.length + " отзывов") : "");
     document.getElementById("fb-comment").value = mine ? mine.comment : "";
     document.getElementById("fb-msg").textContent = "";
-    if (r.status === "queued") setTimeout(function(){ if (CUR && CUR.deal === r.deal && !document.getElementById("detail").hidden) showDetail(r.deal); }, 45000);
+    if (r.status === "queued") setTimeout(function(){ if (CUR && CUR.deal === r.deal && !document.getElementById("detail").hidden) showDetail(r.deal); }, 20000);
   });
 }
 Array.prototype.forEach.call(document.querySelectorAll(".fb button"), function(b){
@@ -610,7 +616,7 @@ Array.prototype.forEach.call(document.querySelectorAll(".fb button"), function(b
 document.getElementById("d-recalc").addEventListener("click", function(){
   if (!CUR) return;
   var btn = this; btn.disabled = true;
-  post({ action: "recalc", deal: CUR.deal }).then(function(res){ btn.disabled = false; if (res.ok) showDetail(CUR.deal); else alert(res.error || "не получилось"); });
+  post({ action: "recalc", deal: CUR.deal }).then(function(res){ btn.disabled = false; if (res.ok) { if (!res.started) alert("Поставлено в очередь, но автозапуск не сработал — напишите Никите."); showDetail(CUR.deal); } else alert(res.error || "не получилось"); });
 });
 function route(){
   var m = location.hash.match(/deal=(\d+)/);
