@@ -347,7 +347,12 @@ export async function onRequestPost({ request, env }) {
   if (url.searchParams.get("digest")) {
     if (!hasIngestToken(request, env)) return bad("нет доступа", 401);
     const body = await request.json().catch(() => ({}));
-    if (!body.chat_id) return bad("нужен chat_id");
+    // без chat_id или с login — шлём администратору Штаба в личку бота по его tg_id из users
+    if (!body.chat_id && body.login && env.DB) {
+      const u = await env.DB.prepare("SELECT tg_id FROM users WHERE login = ? AND role = 'admin' AND active = 1").bind(body.login).first();
+      body.chat_id = u && u.tg_id;
+    }
+    if (!body.chat_id) return bad("нужен chat_id или login администратора с привязанным Telegram");
     return json({ ok: true, ...(await sendDigest(env, body.chat_id, Math.min(+body.limit || 10, 15), !!body.force)) });
   }
 
