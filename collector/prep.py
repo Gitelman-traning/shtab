@@ -415,7 +415,7 @@ def find_pages(ctx, site, inns):
     if inns:
         hint += "\nИНН уже известны: %s — реестр по ним искать не нужно." % ", ".join(inns)
     text, sources, usage = claude(FIND_SYS, card_text(ctx) + hint, search_uses=int(os.environ.get("PREP_FIND_SEARCHES", "5")),
-                                  max_tokens=900, model=MODEL_GROWTH)
+                                  max_tokens=1500, model=MODEL_GROWTH)
     links, found_inns = [], []
     for line in text.replace("*", "").splitlines():
         m = re.match(r"\s*[-\d.)]*\s*ИНН:?\s*(\d{10}|\d{12})", line)
@@ -1202,6 +1202,9 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
                     log("  рост участника %d: %s" % (c["deal"], str(e)[:100]))
                     continue
             if growth_confirmed(c.get("result")):
+                same = (c.get("result") or "").split("\n")[0]       # одна компания под двумя сделками — берём один раз
+                if any((p.get("result") or "").split("\n")[0] == same for p in picked):
+                    continue
                 c["growth"] = c["result"] + ("\n(проверено %s)" % c["checked_at"][:10] if c.get("checked_at") else "")
                 picked.append(c)
         log("  кандидатов %d, проверено сейчас %d, с подтверждённым ростом взято %d" % (len(candidates), checks, len(picked)))
