@@ -1180,6 +1180,9 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
     usage = {}
     ctx = lead_context(deal)
     log("сделка %d: контекст собран (%d полей, %d заметок), диагност %s" % (deal, len(ctx["card"]), len(ctx["notes"]), ctx["manager"]))
+    # решение Никиты 13.10.2026: без названия компании или сайта в карточке подготовку не считаем — поиск «по нише» находит чужие фирмы
+    if not facts_path and not identified(ctx, site_url(ctx)):
+        raise RuntimeError("в карточке amo нет названия компании и сайта — заполните поле «Компания» или «Сайт» и нажмите «Пересчитать»")
     if facts_path:
         facts, sources = open(facts_path, encoding="utf-8").read(), []
         log("  досье взято из файла %s (%d символов)" % (facts_path, len(facts)))
