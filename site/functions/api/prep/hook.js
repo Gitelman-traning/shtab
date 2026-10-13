@@ -9,6 +9,8 @@ import { json, now, audit } from "../_lib.js";
 const STAGE = 70704326;
 const PIPE = 8733326;
 const REPO = "Gitelman-traning/shtab";
+// 13.10.2026 (решение Никиты): вебхук выключен — подготовки только по кнопке в Штабе. Включить: true.
+const ENABLED = false;
 
 // каждый вызов — в журнал (audit, действие prep.hook): видно, доходит ли amo вообще и с чем
 async function log(env, note) {
@@ -42,6 +44,10 @@ export async function onRequestPost({ request, env, waitUntil }) {
   if (!deals.length) {
     await log(env, "не тот этап; ключей leads " + Object.keys(found).length + "; тело: " + text.slice(0, 200));
     return json({ ok: true, skipped: "не тот этап", seen: Object.keys(found).length });
+  }
+  if (!ENABLED) {   // amo продолжает слать вебхук — отвечаем 200, чтобы его не отключили, но в очередь не ставим
+    await log(env, "выключен, не ставим: " + deals.join(", "));
+    return json({ ok: true, skipped: "вебхук выключен" });
   }
   await log(env, "в очередь: " + deals.join(", "));
   const stamp = now();
