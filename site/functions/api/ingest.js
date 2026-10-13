@@ -33,7 +33,7 @@ export async function onRequestPost({ request, env }) {
   const plans = Array.isArray(body.plans) ? body.plans : [];
   const collector = String(body.collector || "unknown").slice(0, 60);
   const has = (k) => Array.isArray(body[k]) && body[k].length;
-  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("expenses")) return bad("пустая пачка");
+  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("prep_debrief") && !has("expenses")) return bad("пустая пачка");
 
   const stamp = now();
   const stmt = env.DB.prepare(
@@ -159,6 +159,17 @@ export async function onRequestPost({ request, env }) {
     if (!r || !r.manager || !r.text) continue;
     await env.DB.prepare("INSERT INTO prep_style (manager, text, meetings, updated_at) VALUES (?,?,?,?) ON CONFLICT(manager) DO UPDATE SET text = excluded.text, meetings = excluded.meetings, updated_at = excluded.updated_at")
       .bind(String(r.manager).slice(0, 80), String(r.text).slice(0, 8000), Number(r.meetings) || 0, stamp).run();
+    written++;
+  }
+  // разбор встречи (13.10.2026): лояльность, ключ для следующей встречи, PING_CONTEXT — одна строка на сделку
+  const deb = Array.isArray(body.prep_debrief) ? body.prep_debrief : [];
+  for (const r of deb.slice(0, 20)) {
+    if (!r || !Number(r.deal) || !r.text) continue;
+    const v = (x, n) => String(x || "").slice(0, n);
+    await env.DB.prepare("INSERT INTO prep_debrief (deal, text, loyalty, client, company, manager, meeting_at, model, cost, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) " +
+      "ON CONFLICT(deal) DO UPDATE SET text = excluded.text, loyalty = excluded.loyalty, client = excluded.client, company = excluded.company, manager = excluded.manager, " +
+      "meeting_at = excluded.meeting_at, model = excluded.model, cost = excluded.cost, updated_at = excluded.updated_at")
+      .bind(Number(r.deal), v(r.text, 30000), Number(r.loyalty) || null, v(r.client, 80), v(r.company, 120), v(r.manager, 80), v(r.meeting_at, 20), v(r.model, 120), v(r.cost, 60), stamp, stamp).run();
     written++;
   }
   // база «было → стало»: результат проверки роста участника (prep.py growth), ночная пересборка базы его не трогает

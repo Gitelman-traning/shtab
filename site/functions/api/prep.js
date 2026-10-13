@@ -1,7 +1,7 @@
 // Подготовка диагноста к встрече (collector/prep.py, страница /sales/l2/prep/).
 // GET  /api/prep?days=14&back=30    — список подготовок (право sales.l2): встречи за 30 дней назад и на две недели вперёд + очередь и ошибки.
 //                                     Заодно дотягивает диагноста из копии сделки на Второй линии для подготовок, где он не определён (до 3 за запрос).
-// GET  /api/prep?deal=ID            — одна подготовка целиком (досье, участники, текст, обратная связь)
+// GET  /api/prep?deal=ID            — одна подготовка целиком (досье, участники, текст, обратная связь) + разбор встречи, если есть
 // GET  /api/prep?mode=managers      — список людей amo для выбора диагноста (кэш в KV на сутки)
 // GET  /api/prep?mode=collector     — для сборщика (токен): {queued, known, no_manager, done_today, cases, styles}
 // GET  /api/prep?mode=transcripts&deals=1,2,3 — для сборщика (токен): расшифровки встреч из KV (t:<deal>), которые есть
@@ -93,13 +93,18 @@ export async function onRequestGet(context) {
   }
   const deal = Number(u.searchParams.get("deal"));
   if (deal) {
-    const row = await env.DB.prepare("SELECT * FROM prep WHERE deal = ?").bind(deal).first();
-    if (!row) return bad("подготовки нет", 404);
+    let row = await env.DB.prepare("SELECT * FROM prep WHERE deal = ?").bind(deal).first();
+    // разбор встречи (13.10.2026): может быть и без подготовки
+    let debrief = null;
+    try { debrief = await env.DB.prepare("SELECT text, loyalty, client, company, manager, meeting_at, model, cost, updated_at FROM prep_debrief WHERE deal = ?").bind(deal).first(); } catch (e) { debrief = null; }
+    if (!row && !debrief) return bad("подготовки нет", 404);
+    if (!row) row = { deal, status: "none", brief: "", client: debrief.client, company: debrief.company, manager: debrief.manager,
+                      meet_at: debrief.meeting_at, amo_url: "https://pavelgitelman.amocrm.ru/leads/detail/" + deal };
     let sources = [], cases = [];
     try { sources = JSON.parse(row.sources || "[]"); } catch (e) { sources = []; }
     try { cases = JSON.parse(row.cases || "[]"); } catch (e) { cases = []; }
     const fb = await env.DB.prepare("SELECT login, useful, comment, at FROM prep_feedback WHERE deal = ? ORDER BY at DESC").bind(deal).all();
-    return json({ ok: true, row: { ...row, sources, cases }, feedback: fb.results || [], me: user.login });
+    return json({ ok: true, row: { ...row, sources, cases }, debrief, feedback: fb.results || [], me: user.login });
   }
   const days = Math.min(Number(u.searchParams.get("days")) || 14, 60);
   const back = Math.min(Number(u.searchParams.get("back")) || 30, 120);   // прошедшие встречи тоже видны — подготовку смотрят и после встречи
@@ -108,6 +113,19 @@ export async function onRequestGet(context) {
   const rows = (await env.DB.prepare(
     "SELECT " + LIST_COLS + " FROM prep WHERE (meet_at >= ? AND meet_at <= ?) OR status != 'ready' OR meet_at = '' ORDER BY meet_at DESC, updated_at DESC LIMIT 300")
     .bind(from, to).all()).results || [];
+  // разборы встреч: отметка у подготовки + сделки, где есть только разбор (без подготовки)
+  try {
+    const deb = (await env.DB.prepare("SELECT deal, loyalty, client, company, manager, meeting_at, updated_at FROM prep_debrief").all()).results || [];
+    const byDeal = {};
+    for (const r of rows) byDeal[r.deal] = r;
+    for (const d of deb) {
+      if (byDeal[d.deal]) { byDeal[d.deal].debrief = d.loyalty || 0; continue; }
+      if (d.meeting_at && d.meeting_at < from) continue;
+      rows.push({ deal: d.deal, status: "none", meet_at: d.meeting_at, client: d.client, company: d.company, manager: d.manager,
+                  debrief: d.loyalty || 0, updated_at: d.updated_at, amo_url: "https://pavelgitelman.amocrm.ru/leads/detail/" + d.deal });
+    }
+    rows.sort((a, b) => String(b.meet_at || "").localeCompare(String(a.meet_at || "")));
+  } catch (e) { /* таблицы разборов может ещё не быть */ }
   // диагност не определён — копия на Второй линии могла появиться позже; дотягиваем прямо здесь, не дожидаясь сборщика
   const pending = rows.filter((r) => !r.manager && r.status === "ready").slice(0, 3);
   if (pending.length && amoToken(env)) {

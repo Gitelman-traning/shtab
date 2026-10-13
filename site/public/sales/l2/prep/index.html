@@ -97,6 +97,13 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 .v-note{margin-top:10px;font-size:12.5px;color:var(--dim)}
 .v-chk{align-self:flex-start;font-size:11px;padding:2px 8px;border-radius:7px;background:var(--soft);color:var(--faint);border:1px solid var(--line-2)}
 .v-chk.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+/* разбор встречи (13.10.2026) */
+.v-deb-head{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+.v-loy{font-size:34px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;padding:10px 14px;border-radius:14px;background:var(--soft)}
+.v-loy small{font-size:13px;font-weight:500;color:var(--dim)} .v-loy.hi{background:var(--ok-bg);color:var(--ok)} .v-loy.mid{background:var(--gold-soft);color:var(--gold)} .v-loy.lo{background:var(--bad-bg);color:var(--bad)}
+.v-deb-meta{font-size:12.5px;color:var(--dim);line-height:1.6}
+.v-deb-key{border-left:4px solid var(--gold-b);padding:4px 0 4px 14px;margin:12px 0}
+#v-debrief details summary{cursor:pointer;font-size:13px;color:var(--dim);margin-top:10px}
 .calc-rate{font-size:12.5px;color:var(--dim);margin:0 0 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap} .calc-rate input{width:80px}
 .v-hyps.two{grid-template-columns:repeat(2,1fr)} @media (max-width:1000px){.v-hyps.two{grid-template-columns:1fr}}
 .v-rules{font-size:13px;line-height:1.55;padding:10px 14px;border-radius:12px;background:var(--gold-soft);margin:0 0 14px} .v-rules b{color:var(--gold)} .v-rules .hint{display:block;margin-top:4px}
@@ -150,6 +157,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 <main id="detail" hidden>
   <div class="bar-row"><a class="btn ghost" href="#">← К списку</a><span class="spacer" style="flex:1"></span><a class="btn" id="d-amo" target="_blank" rel="noopener">Сделка в amo ↗</a><a class="btn" id="d-quiz" target="_blank" rel="noopener" hidden>Анкета клиента ↗</a><button class="btn" id="d-recalc" type="button">Пересчитать</button></div>
   <div class="card head"><div class="who"><h2 id="d-title">—</h2><div class="meta" id="d-meta"></div></div><div class="meta" id="d-tech"></div></div>
+  <div class="card" id="v-debrief" hidden></div>
   <nav class="v-toc" id="d-toc" hidden><div class="in"></div></nav>
   <div id="d-v3" hidden></div>
   <div class="cheat" id="d-cheat" hidden><h2>Шпаргалка на 30 секунд</h2><div id="d-cheat-body"></div></div>
@@ -165,7 +173,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 var H = { "Content-Type": "application/json" };
 function api(q){ return fetch("/api/prep" + (q ? "?" + q : ""), { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
 function post(body){ return fetch("/api/prep", { method: "POST", headers: H, credentials: "same-origin", body: JSON.stringify(body) }).then(function(r){ return r.json(); }); }
-var ST = { ready: "готово", queued: "в очереди", error: "ошибка" };
+var ST = { ready: "готово", queued: "в очереди", error: "ошибка", none: "нет подготовки" };
 var ROWS = [];
 
 // ---------- markdown → html (заголовки, списки, жирный, ссылки) ----------
@@ -508,6 +516,29 @@ window.addEventListener("scroll", function(){
   links.forEach(function(a, i){ a.classList.toggle("on", i === cur); });
 }, { passive: true });
 
+// ---------- разбор встречи (13.10.2026): лояльность, ключ для следующей встречи, PING_CONTEXT ----------
+function renderDebrief(d){
+  if (!d || !d.text) return "";
+  var parts = String(d.text).split(/\n(?=## )/), head = "", body = [], key = "", ping = "", tail = "";
+  parts.forEach(function(p){
+    var t = p.trim(), h = (t.match(/^##\s+\d*\.?\s*(.*)$/m) || [])[1] || "";
+    var rest = t.replace(/^##[^\n]*\n?/, "");
+    if (/^#\s/.test(t)) { head = t.split("\n")[0].replace(/^#\s*/, ""); var more = t.split("\n").slice(1).join("\n").trim(); if (more) body.push(more); return; }
+    if (/лояльн/i.test(h)) { body.push(rest); return; }
+    if (/ключ/i.test(h)) { key = rest; return; }
+    if (/PING/i.test(h)) { var cut = rest.split(/\n---\n/); ping = cut[0]; tail = cut.slice(1).join("\n"); return; }
+    body.push((h ? "**" + h + "**\n" : "") + rest);
+  });
+  var L = d.loyalty || Number((String(d.text).match(/Лояльность:\s*(\d+)/) || [])[1]) || 0;
+  var cls = L >= 9 ? "hi" : L >= 7 ? "mid" : L ? "lo" : "";
+  return '<h2>Разбор встречи <small>после диагностики · клиенту не показывается</small></h2>'
+    + '<div class="v-deb-head">' + (L ? '<div class="v-loy ' + cls + '">' + L + '<small>/10</small></div>' : '') + '<div class="v-deb-meta">' + esc(head) + (d.model ? '<br>' + esc(d.model) + (d.cost ? ' · ' + esc(d.cost) : '') : '') + '</div></div>'
+    + '<div class="md" style="padding:0">' + md(body.join("\n\n")) + '</div>'
+    + (key ? '<p class="v-lbl" style="margin-top:14px">Ключ для следующей встречи</p><div class="v-deb-key md">' + md(key) + '</div>' : '')
+    + (ping ? '<details><summary>PING_CONTEXT — для бота пингов</summary><div class="md" style="padding:8px 0 0">' + md(ping) + '</div></details>' : '')
+    + (tail ? '<div class="v-note">' + md(tail) + '</div>' : '');
+}
+
 // ---------- список ----------
 function dateLabel(s){ if (!s) return "<span class='sub'>дата встречи не указана</span>"; var d = s.slice(0,10).split("-"); return d[2] + "." + d[1] + "." + d[0] + (s.length > 10 ? " <span class='sub'>" + s.slice(11) + " МСК</span>" : ""); }
 function renderList(){
@@ -519,13 +550,14 @@ function renderList(){
     + rows.map(function(r){
       var biz = [r.niche, r.turn ? r.turn + " млн ₽" : "", r.staff ? r.staff + " чел" : "", r.geo].filter(Boolean).join(" · ");
       var status = '<span class="st ' + r.status + '">' + (ST[r.status] || r.status) + '</span>' + (r.status === "error" && r.error ? '<span class="sub">' + esc(r.error.slice(0, 90)) + '</span>' : "");
+      if (r.debrief != null) status += ' <span class="v-chip ' + (r.debrief >= 9 ? "" : "gold") + '" title="есть разбор встречи">разбор' + (r.debrief ? " " + r.debrief + "/10" : "") + '</span>';
       var mgr = r.manager ? esc(r.manager) : '<span class="st">не определён</span>';
       return '<tr class="row" data-deal="' + r.deal + '"><td>' + dateLabel(r.meet_at) + '</td><td>' + esc(r.client || "—") + (r.company ? '<span class="sub">' + esc(r.company) + '</span>' : '') + '</td><td>' + (esc(biz) || '<span class="sub">поля не заполнены</span>') + '</td><td>' + mgr + '</td><td>' + status + '</td><td class="num"><a class="btn ghost" href="' + esc(r.amo_url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">amo ↗</a></td></tr>';
     }).join("") + '</tbody></table>';
   Array.prototype.forEach.call(document.querySelectorAll("tr.row"), function(tr){ tr.addEventListener("click", function(){ location.hash = "deal=" + tr.getAttribute("data-deal"); }); });
 }
 function loadList(){
-  api("days=21").then(function(res){
+  api("days=21&back=60").then(function(res){
     if (!res.ok) { document.getElementById("rows").innerHTML = '<p class="empty">' + esc(res.error || "нет доступа") + '</p>'; return; }
     ROWS = res.rows || [];
     clearTimeout(window._prepPoll);   // есть подготовки в очереди — обновляем список, пока не будут готовы
@@ -584,11 +616,16 @@ function showDetail(deal){
     document.getElementById("d-v3").innerHTML = v3 ? v3.html : "";
     document.querySelector("#d-toc .in").innerHTML = v3 ? v3.toc : "";
     if (v3) calcInit(calc);
-    document.getElementById("d-sections-card").hidden = !!v3; document.getElementById("d-cases-card").hidden = !!v3; document.getElementById("v-dossier").hidden = !!v3;
+    var deb = renderDebrief(res.debrief);
+    document.getElementById("v-debrief").hidden = !deb; document.getElementById("v-debrief").innerHTML = deb || "";
+    if (deb && v3) document.querySelector("#d-toc .in").innerHTML = '<a href="#v-debrief" data-v="v-debrief">Разбор</a>' + v3.toc;
+    if (r.status === "none") { document.getElementById("d-sections-card").hidden = true; document.getElementById("d-cases-card").hidden = true; document.getElementById("v-dossier").hidden = true; document.getElementById("d-recalc").textContent = "Подготовить"; }
+    var noPrep = r.status === "none"; document.getElementById("d-sections-card").hidden = !!v3 || noPrep; document.getElementById("d-cases-card").hidden = !!v3 || noPrep; document.getElementById("v-dossier").hidden = !!v3 || noPrep;
     if (v3) cheat = null;
     document.getElementById("d-cheat").hidden = !cheat;
     if (cheat) document.getElementById("d-cheat-body").innerHTML = md(cheat.body.join("\n"));
     var rest = secs.filter(function(s){ return s !== cheat; });
+    if (r.status === "none") { document.getElementById("d-cheat").hidden = true; }
     document.getElementById("d-sections").innerHTML = rest.length ? rest.map(function(s, i){
       return '<details class="sec"' + (i < 1 ? " open" : "") + '><summary><span class="n">' + (s.n || "") + '</span>' + esc(s.title || "Вступление") + '</summary><div class="md">' + md(s.body.join("\n")) + '</div></details>';
     }).join("") : '<p class="empty">' + (r.status === "queued" ? "Подготовка ещё считается — страница обновится сама." : "Текста подготовки нет.") + '</p>';
