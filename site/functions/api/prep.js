@@ -2,6 +2,7 @@
 // GET  /api/prep?days=14&back=30    — список подготовок (право sales.l2): встречи за 30 дней назад и на две недели вперёд + очередь и ошибки.
 //                                     Заодно дотягивает диагноста из копии сделки на Второй линии для подготовок, где он не определён (до 3 за запрос).
 // GET  /api/prep?deal=ID            — одна подготовка целиком (досье, участники, текст, обратная связь) + разбор встречи, если есть
+// GET  /api/prep?mode=debriefs      — список разборов встреч (раздел «Разбор встречи»)
 // GET  /api/prep?mode=managers      — список людей amo для выбора диагноста (кэш в KV на сутки)
 // GET  /api/prep?mode=collector     — для сборщика (токен): {queued, known, no_manager, done_today, cases, styles}
 // GET  /api/prep?mode=transcripts&deals=1,2,3 — для сборщика (токен): расшифровки встреч из KV (t:<deal>), которые есть
@@ -87,6 +88,10 @@ export async function onRequestGet(context) {
   }
   const user = await canRead(request, env);
   if (!user || level(user, "sales.l2") < 1) return bad("нет доступа", 401);
+  if (mode === "debriefs") {   // раздел «Разбор встречи» (13.10.2026)
+    const r = await env.DB.prepare("SELECT deal, loyalty, client, company, manager, meeting_at, model, updated_at FROM prep_debrief ORDER BY meeting_at DESC LIMIT 500").all();
+    return json({ ok: true, rows: r.results || [] });
+  }
   if (mode === "managers") {
     const users = await amoUsers(env);
     return json({ ok: true, managers: Object.values(users).sort((a, b) => a.localeCompare(b, "ru")) });

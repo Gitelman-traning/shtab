@@ -37,7 +37,8 @@
         { name: "Менеджеры", href: "/sales/l2/managers", sec: "sales.l2.okk" },
         { name: "Сверка", href: "/sales/l2/compare", sec: "sales.l2.okk" },
         { name: "Коуч по диагностикам", href: "/sales/l2/coach", sec: "sales.l2.okk" },
-        { name: "Подготовка к встрече", href: "/sales/l2/prep/", sec: "sales.l2" }
+        { name: "Подготовка к встрече", href: "/sales/l2/prep/", sec: "sales.l2" },
+        { name: "Разбор встречи", href: "/sales/l2/debrief/", sec: "sales.l2" }
       ] }
     ] },
     { id: "mkt", name: "Маркетинг", icon: I.mkt, href: "/marketing/", sec: "marketing", children: [
