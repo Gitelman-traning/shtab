@@ -8,7 +8,10 @@
 //   PUT  {"tasks": [...], "projects": [...]} — копия tasks.json и проекты с ключевыми словами (бот подбирает проект)
 //   GET  ?inbox=1           — очередь правок, накопленных ботом (новые задачи, закрытия)
 //   POST ?ack=1 {"ids":[…]} — убрать из очереди уже применённые
-import { json, bad, hasIngestToken, currentUser, isAdmin, now } from "./_lib.js";
+// Кнопки на вкладке «Задачи и сроки» (сессия владельца дашборда):
+//   POST ?task=1 {"id", "op": "prio"|"status", "value"} — приоритет high/low/null, статус open/waiting/parked/done/archived;
+//   правка ложится в ту же очередь, что и у бота, в tasks.json её забирает sync.mjs
+import { json, bad, hasIngestToken, currentUser, isAdmin, now, randomId } from "./_lib.js";
 
 const PAGES = ["projects", "tasks", "brief", "months"];
 const KEY = (p) => "dash:" + p;
@@ -32,8 +35,35 @@ async function put({ request, env }) {
 }
 export const onRequestPut = put;
 
+const STATUSES = ["open", "waiting", "parked", "done", "archived"];
+async function taskEdit({ request, env }) {
+  const user = await currentUser(request, env);
+  if (!isAdmin(user) || user.login !== (env.DASH_OWNER || "nikita")) return bad("только владелец дашборда", 403);
+  const b = await request.json().catch(() => ({}));
+  const tasks = JSON.parse((await env.OKK_KV.get("dash:tg-tasks")) || "[]");
+  const t = tasks.find((x) => x.id === b.id);
+  if (!t) return bad("задача не найдена — пересоберите дашборд", 404);
+  const ts = new Date(Date.now() + 3 * 3600e3).toISOString();
+  let entry;
+  if (b.op === "prio") {
+    if (![null, "high", "low"].includes(b.value ?? null)) return bad("prio: high | low | null");
+    if (b.value) t.prio = b.value; else delete t.prio;
+    entry = { action: "prio", taskId: t.id, prio: t.prio || null };
+  } else if (b.op === "status") {
+    if (!STATUSES.includes(b.value)) return bad("status: " + STATUSES.join(" | "));
+    t.status = b.value; if (b.value === "done") t.done = ts.slice(0, 10); else delete t.done;
+    entry = { action: "status", taskId: t.id, status: b.value };
+  } else return bad("op: prio | status");
+  await env.OKK_KV.put("dash:tg-tasks", JSON.stringify(tasks));
+  const inbox = JSON.parse((await env.OKK_KV.get(KEY("inbox"))) || "[]");
+  inbox.push({ id: randomId(6), ts, source: "web", ...entry });
+  await env.OKK_KV.put(KEY("inbox"), JSON.stringify(inbox));
+  return json({ ok: true, task: { id: t.id, status: t.status, prio: t.prio || null } });
+}
+
 export async function onRequestPost(ctx) {
   const url = new URL(ctx.request.url);
+  if (url.searchParams.get("task")) return taskEdit(ctx);
   if (!url.searchParams.get("ack")) return put(ctx);
   if (!hasIngestToken(ctx.request, ctx.env)) return bad("нет доступа", 401);
   const body = await ctx.request.json().catch(() => ({}));

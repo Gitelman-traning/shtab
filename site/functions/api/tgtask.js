@@ -38,7 +38,11 @@ const PROJECTS = {
 // короткие подписи для кнопок и списка (в projects.json названия длинные)
 const NAMES = { shtab: "Штаб", "amo-auto": "Отчёты amo", "site-chat": "Чат", okk: "ОКК", hh: "HH", bot: "Salebot", journal: "Журнал", potok: "Поток", youtube: "YouTube", inbox: "Без проекта" };
 const DOW = { пн: 1, вт: 2, ср: 3, чт: 4, пт: 5, сб: 6, вс: 0 };
-const STATUS = { open: "в работе", waiting: "ждём", done: "✅ сделано", parked: "отложено", deleted: "удалено" };
+const STATUS = { open: "в работе", waiting: "ждём", done: "✅ сделано", parked: "⏸ на паузе", archived: "📦 в архиве", deleted: "удалено" };
+// приоритет задачи (поле prio): high — 🔥 первым в плане, low — ↓ в конец; без поля — обычный
+const PRIO_UP = { low: null, undefined: "high", null: "high", high: "high" };
+const PRIO_DOWN = { high: null, undefined: "low", null: "low", low: "low" };
+const prioMark = (t) => (t.prio === "high" ? "🔥 " : t.prio === "low" ? "↓ " : "");
 
 const msk = () => new Date(Date.now() + 3 * 3600e3);
 const today = () => msk().toISOString().slice(0, 10);
@@ -144,14 +148,15 @@ async function pushInbox(env, entry) {
 
 function openTasks(tasks) {
   const rank = (t) => (t.status === "open" ? 0 : 1);
+  const pr = (t) => (t.prio === "high" ? 0 : t.prio === "low" ? 2 : 1);
   return tasks.filter((t) => t.status === "open" || t.status === "waiting")
-    .sort((a, b) => rank(a) - rank(b) || (a.due || "9999").localeCompare(b.due || "9999"));
+    .sort((a, b) => pr(a) - pr(b) || rank(a) - rank(b) || (a.due || "9999").localeCompare(b.due || "9999"));
 }
 
 // карточка задачи: текст + кнопки под ним (callback_data до 64 байт: «д:<id>»)
 function card(projects, t, from, menu) {
   const lines = [
-    (t.status === "open" ? "Записал: " : "") + t.title,
+    prioMark(t) + t.title,
     [labelOf(projects, t.project), t.status === "open" ? (t.due ? "до " + dm(t.due) : "") : STATUS[t.status] || t.status, from ? "от " + from : ""].filter(Boolean).join(" · "),
   ];
   if (t.status === "deleted") return { text: "Удалил: " + t.title, reply_markup: { inline_keyboard: [[{ text: "Вернуть", callback_data: "o:" + t.id }]] } };
@@ -163,15 +168,20 @@ function card(projects, t, from, menu) {
     for (let i = 0; i < opts.length; i += 3) kb.push(opts.slice(i, i + 3));
   }
   if (t.status === "open" || t.status === "waiting") {
-    kb.push([{ text: "✅ Готово", callback_data: "d:" + t.id }, { text: "Отложить", callback_data: "p:" + t.id }, { text: "Удалить", callback_data: "x:" + t.id }]);
-    if (!menu && t.project !== "inbox") kb.push([{ text: "Сменить проект", callback_data: "m:" + t.id }]);
+    kb.push([{ text: "✅ Сделано", callback_data: "d:" + t.id }, { text: "⏸ Пауза", callback_data: "p:" + t.id }, { text: "📦 Архив", callback_data: "a:" + t.id }]);
+    kb.push([
+      ...(t.prio !== "high" ? [{ text: "🔥 Выше", callback_data: "u:" + t.id }] : []),
+      ...(t.prio !== "low" ? [{ text: "↓ Ниже", callback_data: "w:" + t.id }] : []),
+      ...(!menu && t.project !== "inbox" ? [{ text: "Проект", callback_data: "m:" + t.id }] : []),
+      { text: "🗑", callback_data: "x:" + t.id },
+    ]);
   } else {
-    kb.push([{ text: "Вернуть в работу", callback_data: "o:" + t.id }]);
+    kb.push([{ text: "▶️ В работу", callback_data: "o:" + t.id }]);
   }
   return { text: lines.join("\n"), reply_markup: { inline_keyboard: kb } };
 }
 
-const HELP = "Перешли мне сообщение коллеги — запишу задачей и сам подберу проект. Или напиши задачу сам: «Проверить таблицу hh 2д», «Ключ Wazzup в Doppler до пт».\nПод каждой задачей кнопки: ✅ Готово, Отложить, сменить проект.\n«список» — открытые задачи, «готово 3» — закрыть третью из списка.";
+const HELP = "Перешли мне сообщение коллеги — запишу задачей и сам подберу проект. Или напиши задачу сам: «Проверить таблицу hh 2д», «Ключ Wazzup в Doppler до пт».\nПод каждой задачей кнопки: ✅ сделано, ⏸ пауза, 📦 архив, 🔥 выше / ↓ ниже приоритет, сменить проект.\n«список» — открытые задачи, «готово 3» — закрыть третью из списка.";
 
 // «удалено» в tasks.json не попадает: sync.mjs убирает задачу, а «Вернуть» присылает её заново целиком
 async function setStatus(env, tasks, t, status) {
@@ -199,7 +209,7 @@ async function handle(env, msg) {
     if (!list.length) { await tgSend(env, chat, "Открытых задач нет."); return; }
     const map = {};
     const shown = list.slice(0, 30);
-    const lines = shown.map((t, i) => { map[i + 1] = t.id; return `${i + 1}. [${labelOf(projects, t.project)}] ${t.title}${t.status === "waiting" ? " · ждём" : t.due ? " · до " + dm(t.due) : ""}`; });
+    const lines = shown.map((t, i) => { map[i + 1] = t.id; return `${i + 1}. ${prioMark(t)}[${labelOf(projects, t.project)}] ${t.title}${t.status === "waiting" ? " · ждём" : t.due ? " · до " + dm(t.due) : ""}`; });
     await writeJson(env, K.list, { at: msk().toISOString(), map });
     const kb = [];
     for (let i = 0; i < shown.length; i += 6) kb.push(shown.slice(i, i + 6).map((t, j) => ({ text: `✅ ${i + j + 1}`, callback_data: "d:" + t.id })));
@@ -253,6 +263,7 @@ function renderDigest(projects, tasks, ids, total) {
     const tag = `[${labelOf(projects, t.project)}] `;
     if (t.status === "done") lines.push(`${n}. ✅ ${t.title}`);
     else if (t.status === "parked") lines.push(`${n}. ⏸ ${t.title}`);
+    else if (t.status === "archived") lines.push(`${n}. 📦 ${t.title}`);
     else if (!isLate(t)) lines.push(`${n}. ⏩ ${t.title} · до ${dm(t.due)}`);
     else {
       lines.push(`${n}. ${tag}${t.title} · −${daysLate(t.due)} дн${t.moved ? ` · переносил ${t.moved}×` : ""}`);
@@ -281,7 +292,7 @@ async function sendDigest(env, chat, limit, force) {
 // нажатие кнопки под задачей
 async function handleButton(env, cq) {
   const answer = (text) => tg(env, "answerCallbackQuery", { callback_query_id: cq.id, text: text || "" });
-  const m = /^([dpxomjr]):(?:([^:]+):)?(.+)$/.exec(String(cq.data || ""));
+  const m = /^([dpxomjrauw]):(?:([^:]+):)?(.+)$/.exec(String(cq.data || ""));
   if (!m) return answer();
   const [, op0, proj, id] = m;
   const tasks = await readJson(env, K.tasks, []);
@@ -310,7 +321,15 @@ async function handleButton(env, cq) {
   const fromLine = t.source === "telegram-forward" ? (/переслано от (.+?), \d/.exec(t.why || "") || [])[1] : null;
   let menu = false, note = "";
   if (op === "d") { await setStatus(env, tasks, t, "done"); note = "Закрыл"; }
-  else if (op === "p") { await setStatus(env, tasks, t, "parked"); note = "Отложил"; }
+  else if (op === "p") { await setStatus(env, tasks, t, "parked"); note = "На паузе"; }
+  else if (op === "a") { await setStatus(env, tasks, t, "archived"); note = "В архиве"; }
+  else if (op === "u" || op === "w") {
+    const next = (op === "u" ? PRIO_UP : PRIO_DOWN)[t.prio ?? "undefined"];
+    if (next) t.prio = next; else delete t.prio;
+    await writeJson(env, K.tasks, tasks);
+    await pushInbox(env, { action: "prio", taskId: t.id, prio: t.prio || null });
+    note = t.prio === "high" ? "🔥 Высокий приоритет" : t.prio === "low" ? "↓ Низкий приоритет" : "Обычный приоритет";
+  }
   else if (op === "x") { await setStatus(env, tasks, t, "deleted"); note = "Удалил"; }
   else if (op === "o") { await setStatus(env, tasks, t, "open"); note = "Вернул в работу"; }
   else if (op === "m") { menu = true; }
