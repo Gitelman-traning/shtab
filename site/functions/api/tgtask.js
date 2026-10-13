@@ -10,10 +10,12 @@
 //   проект не угадан → сразу кнопки выбора проекта
 //   «список» / /list                   → открытые задачи с номерами и кнопками «✅ N»
 //   «готово 3» / «сделано 3»           → закрыть задачу № из последнего списка; «отложи 3» → отложить
+//   POST ?digest=1 (токен сборщика)     → утренний разбор хвоста: до 10 самых старых просроченных с кнопками,
+//                                         ⏩ переносит на 2 рабочих дня и считает переносы (поле moved)
 // Проект угадывается по ключевым словам из projects.json (их присылает sync.mjs в KV dash:tg-projects),
 // а пока их нет — по запасному списку ниже.
 // Данные: KV dash:tg-tasks — копия tasks.json (присылает sync.mjs с компьютера Никиты), dash:inbox — очередь правок
-// (add / status / project / delete), которую sync.mjs забирает перед каждой сборкой дашборда и применяет к tasks.json.
+// (add / status / project / due / delete), которую sync.mjs забирает перед каждой сборкой дашборда и применяет к tasks.json.
 //
 // Настройка вебхука: POST /api/tgtask?setup=1 с Bearer INGEST_TOKEN — ставит setWebhook на этот адрес
 // с секретом (KV dash:tg-secret), слушает message и callback_query. GET с тем же токеном — куда смотрит вебхук.
@@ -236,16 +238,74 @@ async function handle(env, msg) {
   await tg(env, "sendMessage", { chat_id: chat, disable_web_page_preview: true, reply_to_message_id: msg.message_id, ...card(projects, task, from) });
 }
 
+// ── утренний разбор хвоста: самые старые просроченные задачи одним сообщением, под каждой ✅ / ⏩ +2 дня / ⏸ / 🗑 ──
+// Шлёт sync.mjs --digest (из brief.mjs) раз в день; какие задачи в каком сообщении — KV dash:tg-digest:<чат>:<сообщение>.
+const daysLate = (due) => Math.round((new Date(today() + "T00:00:00Z") - new Date(due + "T00:00:00Z")) / 864e5);
+const isLate = (t) => t.status === "open" && t.due && t.due < today();
+const digestKey = (chat, msgId) => `dash:tg-digest:${chat}:${msgId}`;
+
+function renderDigest(projects, tasks, ids, total) {
+  const rows = [], lines = [];
+  ids.forEach((id, i) => {
+    const n = i + 1, t = tasks.find((x) => x.id === id);
+    if (!t || t.status === "deleted") { lines.push(`${n}. 🗑 ${t ? t.title : "удалена"}`); return; }
+    const tag = `[${labelOf(projects, t.project)}] `;
+    if (t.status === "done") lines.push(`${n}. ✅ ${t.title}`);
+    else if (t.status === "parked") lines.push(`${n}. ⏸ ${t.title}`);
+    else if (!isLate(t)) lines.push(`${n}. ⏩ ${t.title} · до ${dm(t.due)}`);
+    else {
+      lines.push(`${n}. ${tag}${t.title} · −${daysLate(t.due)} дн${t.moved ? ` · переносил ${t.moved}×` : ""}`);
+      rows.push([["✅", "d"], ["⏩ +2д", "s"], ["⏸", "p"], ["🗑", "x"]].map(([txt, op]) => ({ text: `${txt} ${n}`, callback_data: `r:${op}:${t.id}` })));
+    }
+  });
+  const head = `Разбор хвоста: просрочено ${total}. Самые старые — ✅ сделано, ⏩ перенести на 2 рабочих дня, ⏸ отложить, 🗑 удалить:`;
+  return { text: head + "\n\n" + lines.join("\n") + (rows.length ? "" : "\n\nРазобрано 👍"), reply_markup: { inline_keyboard: rows } };
+}
+
+async function sendDigest(env, chat, limit, force) {
+  const day = await env.OKK_KV.get("dash:tg-digest-day");
+  if (!force && day === today()) return { sent: false, reason: "уже отправлен сегодня" };
+  const tasks = await readJson(env, K.tasks, []);
+  const late = tasks.filter(isLate).sort((a, b) => a.due.localeCompare(b.due));
+  if (!late.length) return { sent: false, overdue: 0 };
+  const projects = await loadProjects(env);
+  const ids = late.slice(0, limit).map((t) => t.id);
+  const r = await tg(env, "sendMessage", { chat_id: chat, disable_web_page_preview: true, ...renderDigest(projects, tasks, ids, late.length) });
+  if (!r || !r.ok) return { sent: false, telegram: r };
+  await env.OKK_KV.put(digestKey(chat, r.result.message_id), JSON.stringify({ ids, total: late.length }), { expirationTtl: 14 * 864e2 });
+  await env.OKK_KV.put("dash:tg-digest-day", today());
+  return { sent: true, overdue: late.length, shown: ids.length };
+}
+
 // нажатие кнопки под задачей
 async function handleButton(env, cq) {
   const answer = (text) => tg(env, "answerCallbackQuery", { callback_query_id: cq.id, text: text || "" });
-  const m = /^([dpxomj]):(?:([^:]+):)?(.+)$/.exec(String(cq.data || ""));
+  const m = /^([dpxomjr]):(?:([^:]+):)?(.+)$/.exec(String(cq.data || ""));
   if (!m) return answer();
-  const [, op, proj, id] = m;
+  const [, op0, proj, id] = m;
   const tasks = await readJson(env, K.tasks, []);
   const projects = await loadProjects(env);
   const t = tasks.find((x) => x.id === id);
   if (!t) return answer("Задача не найдена — возможно, уже удалена в дашборде");
+  if (op0 === "r") {
+    // кнопка из утреннего разбора: делаем действие и перерисовываем весь разбор
+    const op = proj;
+    let note = "";
+    if (op === "d") { await setStatus(env, tasks, t, "done"); note = "Закрыл"; }
+    else if (op === "p") { await setStatus(env, tasks, t, "parked"); note = "Отложил"; }
+    else if (op === "x") { await setStatus(env, tasks, t, "deleted"); note = "Удалил"; }
+    else if (op === "s") {
+      t.due = workdays(today(), 2); t.moved = (t.moved || 0) + 1;
+      await writeJson(env, K.tasks, tasks);
+      await pushInbox(env, { action: "due", taskId: t.id, due: t.due, moved: t.moved });
+      note = "Перенёс на " + dm(t.due);
+    }
+    const msg = cq.message;
+    const dg = msg && await readJson(env, digestKey(msg.chat.id, msg.message_id), null);
+    if (dg) await tg(env, "editMessageText", { chat_id: msg.chat.id, message_id: msg.message_id, disable_web_page_preview: true, ...renderDigest(projects, tasks, dg.ids, dg.total) });
+    return answer(note ? note + ": " + t.title.slice(0, 60) : "");
+  }
+  const op = op0;
   const fromLine = t.source === "telegram-forward" ? (/переслано от (.+?), \d/.exec(t.why || "") || [])[1] : null;
   let menu = false, note = "";
   if (op === "d") { await setStatus(env, tasks, t, "done"); note = "Закрыл"; }
@@ -281,6 +341,14 @@ export async function onRequestPost({ request, env }) {
       body: JSON.stringify({ url: hook, secret_token: secret, allowed_updates: ["message", "callback_query"], drop_pending_updates: true }),
     });
     return json({ ok: r.ok, hook, telegram: await r.json().catch(() => null) });
+  }
+
+  // утренний разбор хвоста — зовёт sync.mjs --digest: {"chat_id": …, "limit": 10, "force": false}
+  if (url.searchParams.get("digest")) {
+    if (!hasIngestToken(request, env)) return bad("нет доступа", 401);
+    const body = await request.json().catch(() => ({}));
+    if (!body.chat_id) return bad("нужен chat_id");
+    return json({ ok: true, ...(await sendDigest(env, body.chat_id, Math.min(+body.limit || 10, 15), !!body.force)) });
   }
 
   // вебхук Telegram
