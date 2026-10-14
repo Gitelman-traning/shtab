@@ -167,10 +167,25 @@ def shtab(method, path, body=None, params=None):
 
 # ---------- модель ----------
 
+# прайс ProxyAPI, ₽ за 1 млн токенов (вход, выход), с НДС — proxyapi.ru/pricing/list, сверено 14.10.2026; 5.5 — как у 5 (в прайсе не нашли)
+PRICES = [("haiku", 295, 1474), ("sonnet", 600, 3030), ("opus", 1516, 7579), ("fable", 1580, 7900)]
+
+
+def price(model):
+    for key, pin, pout in PRICES:
+        if key in (model or ""):
+            return pin, pout
+    return 600, 3030
+
+
 def claude(system, user, search_uses=0, max_tokens=4000, model=None):
     """Anthropic Messages через ProxyAPI. search_uses>0 включает серверный веб-поиск. → (text, sources, usage)"""
     body = {"model": model or MODEL, "max_tokens": max_tokens, "system": system, "thinking": {"type": "disabled"},
             "messages": [{"role": "user", "content": user}]}
+    if re.search(r"5-5|fable", body["model"]):   # 14.10.2026: модели 5.5 не принимают disabled — только adaptive + уровень усилия
+        body["thinking"] = {"type": "adaptive"}
+        body["output_config"] = {"effort": os.environ.get("PREP_EFFORT", "medium")}
+        body["max_tokens"] = max(max_tokens, 12000)    # обдумывание тратит те же токены ответа
     if search_uses:
         body["tools"] = [{"type": "web_search_20250305", "name": "web_search", "max_uses": search_uses}]
     last = ""
@@ -199,6 +214,8 @@ def claude(system, user, search_uses=0, max_tokens=4000, model=None):
         u = j.get("usage") or {}
         usage = {"in": u.get("input_tokens", 0), "out": u.get("output_tokens", 0),
                  "search": ((u.get("server_tool_use") or {}).get("web_search_requests", 0))}
+        pin, pout = price(body["model"])
+        usage["rub"] = (usage["in"] * pin + usage["out"] * pout) / 1e6
         if j.get("stop_reason") == "max_tokens":
             log("  ВНИМАНИЕ: ответ модели обрезан по лимиту %d токенов" % max_tokens)
         return "".join(text).strip(), sources, usage
@@ -208,11 +225,11 @@ def claude(system, user, search_uses=0, max_tokens=4000, model=None):
 def add_usage(total, u, cheap=False):
     for k in ("in", "out", "search"):
         total[k] = total.get(k, 0) + (u.get(k) or 0)
-    # оценка в рублях: Sonnet 600/3030 ₽ за 1M, Haiku 200/1010 ₽ за 1M (ProxyAPI, ориентир)
+    # рубли считает claude() по прайсу модели (PRICES); запасная оценка — для старых записей без rub
     if "rub" in u:      # уже посчитано (смесь моделей)
         total["rub"] = total.get("rub", 0) + u["rub"]
     else:
-        total["rub"] = total.get("rub", 0) + ((u.get("in") or 0) * (200 if cheap else 600) + (u.get("out") or 0) * (1010 if cheap else 3030)) / 1e6
+        total["rub"] = total.get("rub", 0) + ((u.get("in") or 0) * (295 if cheap else 600) + (u.get("out") or 0) * (1474 if cheap else 3030)) / 1e6
 
 
 # ---------- контекст сделки ----------
@@ -541,7 +558,7 @@ def cost(u, cheap=False):
     """Рубли одного шага (та же оценка, что в add_usage)."""
     if "rub" in u:
         return u["rub"]
-    return ((u.get("in") or 0) * (200 if cheap else 600) + (u.get("out") or 0) * (1010 if cheap else 3030)) / 1e6
+    return ((u.get("in") or 0) * (295 if cheap else 600) + (u.get("out") or 0) * (1474 if cheap else 3030)) / 1e6
 
 
 # ---------- шаг 2: подбор участников ----------

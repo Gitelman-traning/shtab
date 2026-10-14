@@ -19,6 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import prep  # noqa: E402
 
 PROMPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "debrief_prompt.md")
+# 14.10.2026: Opus 5.5 заметно точнее Sonnet 5 на разборе (говорящие, обещания обеих сторон, поправки клиента) при ~63 ₽ за встречу
+MODEL = os.environ.get("DEBRIEF_MODEL") or "claude-opus-5-5"
 
 
 def deal_card(deal):
@@ -32,6 +34,8 @@ def deal_card(deal):
     for fid, v in cf.items():
         n = names.get(fid, "")
         if keep.search(n) and not re.search(r"ссылка|код|zoom|форм", n, re.I):
+            if re.fullmatch(r"\d{10}", str(v)):     # даты amo приходят числом секунд
+                v = time.strftime("%d.%m.%Y %H:%M", time.gmtime(int(v) + 3 * 3600)) + " МСК"
             lines.append("- %s: %s" % (n, str(v)[:200]))
     return lead, "\n".join(lines)
 
@@ -51,7 +55,7 @@ def main():
     lead, card = deal_card(a.deal)
     manager = prep.user_name(lead.get("responsible_user_id"))
     user = "%s\n- Менеджер (диагност): %s\n\n# РАСШИФРОВКА ВСТРЕЧИ (Менеджер / Клиент, [мм:сс])\n%s" % (card, manager, text)
-    out, _, u = prep.claude(open(PROMPT, encoding="utf-8").read(), user, max_tokens=4000)
+    out, _, u = prep.claude(open(PROMPT, encoding="utf-8").read(), user, max_tokens=4000, model=MODEL)
     rub = prep.cost(u)
     out = re.sub(r"(?m)^#{1,3}\s*(\d)\.", r"## \1.", out)   # заголовки разделов всегда «## N.» — по ним раскладывает страница
     m = re.search(r"Лояльность:\s*(\d+)", out)
@@ -66,7 +70,7 @@ def main():
     if not a.dry:
         prep.shtab("POST", "/api/ingest", {"collector": "prep", "prep_debrief": [{
             "deal": a.deal, "text": body, "loyalty": loyalty, "client": a.client, "company": a.company, "manager": manager,
-            "meeting_at": a.meeting, "model": prep.MODEL, "cost": "модель ≈ %.0f ₽" % rub}],
+            "meeting_at": a.meeting, "model": MODEL, "cost": "модель ≈ %.0f ₽" % rub}],
             "expenses": [prep.spend_row("разбор встречи", a.deal, dict(u, rub=rub))]})
         prep.log("записано в Штаб")
 
