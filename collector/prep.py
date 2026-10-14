@@ -528,6 +528,15 @@ def research_company(ctx):
     return text, sources, usage
 
 
+def spend_row(what, deal, usage):
+    """Строка расхода для «Бюджет и расходы» Штаба (14.10.2026): токены по оценке + веб-поиски ~1,5 ₽ за запрос."""
+    rub = round((usage.get("rub") or 0) + 1.5 * (usage.get("search") or 0), 1)
+    now = dt.datetime.now(MSK)
+    return {"day": now.strftime("%Y-%m-%d"), "service": "ProxyAPI", "kind": "spend", "amount": rub, "item": "%s · сделка %d" % (what, deal),
+            "note": "токены %d/%d, поисков %d (оценка)" % (usage.get("in") or 0, usage.get("out") or 0, usage.get("search") or 0),
+            "ref": "prep:%s:%d:%s" % (what[:12], deal, now.strftime("%Y%m%d%H%M%S"))}
+
+
 def cost(u, cheap=False):
     """Рубли одного шага (та же оценка, что в add_usage)."""
     if "rub" in u:
@@ -1272,7 +1281,7 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
                 "\n\n".join("## %s\n%s\n%s" % (cases_lines([c]), c.get("why", ""), c.get("growth", "")) for c in picked)))
         log("  записано в %s" % out_path)
     if not dry:
-        shtab("POST", "/api/ingest", {"collector": "prep", "prep": [row]})
+        shtab("POST", "/api/ingest", {"collector": "prep", "prep": [row], "expenses": [spend_row("подготовка к встрече", deal, usage)]})
         log("  в витрине")
     return row
 
