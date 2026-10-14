@@ -53,8 +53,11 @@ def main():
     user = "%s\n- Менеджер (диагност): %s\n\n# РАСШИФРОВКА ВСТРЕЧИ (Менеджер / Клиент, [мм:сс])\n%s" % (card, manager, text)
     out, _, u = prep.claude(open(PROMPT, encoding="utf-8").read(), user, max_tokens=4000)
     rub = prep.cost(u)
+    out = re.sub(r"(?m)^#{1,3}\s*(\d)\.", r"## \1.", out)   # заголовки разделов всегда «## N.» — по ним раскладывает страница
     m = re.search(r"Лояльность:\s*(\d+)", out)
     loyalty = int(m.group(1)) if m else None
+    if loyalty:
+        out = out.replace("Лояльность: X/10", "Лояльность: %d/10" % loyalty)   # модель иногда копирует заголовок шаблона
     prep.log("разбор %d: %d символов, токенов %d/%d, %d сек, ≈ %.0f ₽, лояльность %s" % (
         a.deal, len(out), u.get("in", 0), u.get("out", 0), time.time() - t0, rub, loyalty))
     body = "# Разбор встречи · сделка %d · %s · диагност %s\n\n%s" % (a.deal, " · ".join(x for x in (a.client, a.company) if x) or "клиент", manager, out)
