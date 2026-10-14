@@ -124,6 +124,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 .calc-h{display:flex;flex-direction:column;gap:3px} .calc-on{font-size:11px;color:var(--faint);display:flex;gap:5px;align-items:center;cursor:pointer}
 .calc-ask{font-size:12px;color:var(--dim);font-style:italic}
 .calc-r.off{color:var(--faint)} .calc-fx{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums} .calc-note{font-size:11px;color:var(--faint)}
+.v-vers{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 14px}
 </style>
 </head>
 <body>
@@ -235,6 +236,18 @@ function showDetail(deal){
   document.getElementById("d-amo").href = "https://pavelgitelman.amocrm.ru/leads/detail/" + deal;
   document.getElementById("d-prep").href = "/sales/l2/prep/#deal=" + deal;
   api("deal=" + deal).then(function(res){
+    var vers = (res.ok && res.versions) || [];
+    if (vers.length > 1) {   // версии разбора для сравнения (14.10.2026): кнопки «метка · X/10», по клику — текст версии
+      var bar = '<div class="v-vers" id="v-vers"><span class="hint">Версии:</span>' + vers.map(function(v, i){
+        return '<button type="button" class="btn' + (i === vers.length - 1 ? ' gold' : '') + '" data-ver="' + i + '">' + esc(v.label || v.model || ("версия " + (i + 1))) + (v.loyalty ? ' · ' + v.loyalty + '/10' : '') + '</button>'; }).join("") + '</div>';
+      document.getElementById("v-debrief").innerHTML = bar + '<div id="v-deb-body"></div>';
+      var show = function(i){ var v = vers[i]; document.getElementById("v-deb-body").innerHTML = renderDebrief({ text: v.text, loyalty: v.loyalty, model: (v.label ? v.label + " · " : "") + (v.model || ""), cost: v.cost });
+        [].forEach.call(document.querySelectorAll("#v-vers [data-ver]"), function(b){ b.classList.toggle("gold", Number(b.getAttribute("data-ver")) === i); }); };
+      [].forEach.call(document.querySelectorAll("#v-vers [data-ver]"), function(b){ b.addEventListener("click", function(){ show(Number(b.getAttribute("data-ver"))); }); });
+      show(vers.length - 1);
+      document.getElementById("d-prep").hidden = !(res.row && res.row.status !== "none");
+      return;
+    }
     var html = res.ok ? renderDebrief(res.debrief) : "";
     document.getElementById("v-debrief").innerHTML = html || '<p class="empty">' + esc(res.error || "Разбора по этой сделке нет.") + '</p>';
     document.getElementById("d-prep").hidden = !(res.ok && res.row && res.row.status !== "none");

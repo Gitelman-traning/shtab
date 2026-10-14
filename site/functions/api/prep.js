@@ -109,7 +109,9 @@ export async function onRequestGet(context) {
     try { sources = JSON.parse(row.sources || "[]"); } catch (e) { sources = []; }
     try { cases = JSON.parse(row.cases || "[]"); } catch (e) { cases = []; }
     const fb = await env.DB.prepare("SELECT login, useful, comment, at FROM prep_feedback WHERE deal = ? ORDER BY at DESC").bind(deal).all();
-    return json({ ok: true, row: { ...row, sources, cases }, debrief, feedback: fb.results || [], me: user.login });
+    let versions = [];
+    try { versions = (await env.DB.prepare("SELECT id, label, text, loyalty, model, cost, created_at FROM prep_debrief_ver WHERE deal = ? ORDER BY id").bind(deal).all()).results || []; } catch (e) { versions = []; }
+    return json({ ok: true, row: { ...row, sources, cases }, debrief, versions, feedback: fb.results || [], me: user.login });
   }
   const days = Math.min(Number(u.searchParams.get("days")) || 14, 60);
   const back = Math.min(Number(u.searchParams.get("back")) || 30, 120);   // прошедшие встречи тоже видны — подготовку смотрят и после встречи

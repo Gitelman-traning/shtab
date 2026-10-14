@@ -19,6 +19,14 @@ async function notifyPrepReady(env, origin, rows) {
   }
 }
 
+async function saveDebriefVersion(env, r, stamp) {
+  try {
+    await env.DB.prepare("INSERT INTO prep_debrief_ver (deal, label, text, loyalty, model, cost, created_at) VALUES (?,?,?,?,?,?,?)")
+      .bind(Number(r.deal), String(r.label || r.model || "").slice(0, 80), String(r.text).slice(0, 30000), Number(r.loyalty) || null,
+            String(r.model || "").slice(0, 120), String(r.cost || "").slice(0, 60), stamp).run();
+  } catch (e) { /* таблицы версий может ещё не быть */ }
+}
+
 const CHUNK = 80;   // D1 принимает пачки запросов; держим их небольшими
 
 export async function onRequestPost({ request, env }) {
@@ -33,7 +41,7 @@ export async function onRequestPost({ request, env }) {
   const plans = Array.isArray(body.plans) ? body.plans : [];
   const collector = String(body.collector || "unknown").slice(0, 60);
   const has = (k) => Array.isArray(body[k]) && body[k].length;
-  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("prep_debrief") && !has("expenses")) return bad("пустая пачка");
+  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("prep_debrief") && !has("prep_debrief_versions") && !has("expenses")) return bad("пустая пачка");
 
   const stamp = now();
   const stmt = env.DB.prepare(
@@ -171,7 +179,11 @@ export async function onRequestPost({ request, env }) {
       "meeting_at = excluded.meeting_at, model = excluded.model, cost = excluded.cost, updated_at = excluded.updated_at")
       .bind(Number(r.deal), v(r.text, 30000), Number(r.loyalty) || null, v(r.client, 80), v(r.company, 120), v(r.manager, 80), v(r.meeting_at, 20), v(r.model, 120), v(r.cost, 60), stamp, stamp).run();
     written++;
+    if (r.version !== false) await saveDebriefVersion(env, r, stamp);   // каждая выгрузка — ещё и версия для сравнения
   }
+  // версии разбора без смены текущего (сравнение моделей, ручные эталоны)
+  const dver = Array.isArray(body.prep_debrief_versions) ? body.prep_debrief_versions : [];
+  for (const r of dver.slice(0, 30)) { if (r && Number(r.deal) && r.text) { await saveDebriefVersion(env, r, stamp); written++; } }
   // база «было → стало»: результат проверки роста участника (prep.py growth), ночная пересборка базы его не трогает
   const growth = Array.isArray(body.prep_growth) ? body.prep_growth : [];
   if (growth.length) {
