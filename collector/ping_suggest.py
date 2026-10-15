@@ -48,20 +48,17 @@ def due_day(when, meeting, today):
     return d
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--deal", type=int, required=True)
-    ap.add_argument("--dry", action="store_true")
-    ap.add_argument("--silent", action="store_true")
-    a = ap.parse_args()
-    res = prep.shtab("GET", "/api/prep", params={"deal": a.deal})
+def suggest(deal, silent=False, dry=False):
+    """Предложить пинги по разбору встречи сделки deal → Штаб (в день пинга — Telegram менеджеру). → список предложений."""
+    res = prep.shtab("GET", "/api/prep", params={"deal": deal})
     deb = res.get("debrief") or {}
     if not deb.get("text"):
-        sys.exit("по сделке %d нет разбора встречи" % a.deal)
-    lead = prep.amo("/leads/%d" % a.deal)
+        prep.log("по сделке %d нет разбора встречи" % deal)
+        return []
+    lead = prep.amo("/leads/%d" % deal)
     if lead.get("status_id") in CLOSED:
-        prep.log("сделка %d закрыта (статус %s) — пингов не предлагаем" % (a.deal, lead.get("status_id")))
-        return
+        prep.log("сделка %d закрыта (статус %s) — пингов не предлагаем" % (deal, lead.get("status_id")))
+        return []
     today = dt.datetime.now(prep.MSK).date()
     try:
         meeting = dt.date.fromisoformat((deb.get("meeting_at") or "")[:10])
@@ -75,19 +72,29 @@ def main():
     pings = (json.loads(m.group(0)) if m else {}).get("pings") or []
     rows = []
     for p in pings[:3]:
-        rows.append({"deal": a.deal, "manager": deb.get("manager") or "", "client": deb.get("client") or "", "company": deb.get("company") or "",
+        rows.append({"deal": deal, "manager": deb.get("manager") or "", "client": deb.get("client") or "", "company": deb.get("company") or "",
                      "due_day": due_day(p.get("when"), meeting, today).isoformat(), "reason": p.get("reason") or "",
                      "loyalty": deb.get("loyalty"), "text": (p.get("text") or "").replace("—", "-"), "script": (p.get("script") or "").replace("—", "-"),
                      "model": MODEL})
-    prep.log("пинги %d: предложено %d, токенов %d/%d, ≈ %.0f ₽" % (a.deal, len(rows), u.get("in", 0), u.get("out", 0), prep.cost(u)))
+    prep.log("пинги %d: предложено %d, токенов %d/%d, ≈ %.0f ₽" % (deal, len(rows), u.get("in", 0), u.get("out", 0), prep.cost(u)))
     for r in rows:
         prep.log("  %s · %s" % (r["due_day"], r["reason"][:120]))
-    if a.dry:
+    if dry:
         print(json.dumps(rows, ensure_ascii=False, indent=1))
-        return
+        return rows
     if rows:
-        print(prep.shtab("POST", "/api/pings", {"action": "suggest", "silent": a.silent, "rows": rows}))
-    prep.shtab("POST", "/api/ingest", {"collector": "prep", "expenses": [prep.spend_row("пинги", a.deal, u)]})
+        print(prep.shtab("POST", "/api/pings", {"action": "suggest", "silent": silent, "rows": rows}))
+    prep.shtab("POST", "/api/ingest", {"collector": "prep", "expenses": [prep.spend_row("пинги", deal, u)]})
+    return rows
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--deal", type=int, required=True)
+    ap.add_argument("--dry", action="store_true")
+    ap.add_argument("--silent", action="store_true")
+    a = ap.parse_args()
+    suggest(a.deal, a.silent, a.dry)
 
 
 if __name__ == "__main__":
