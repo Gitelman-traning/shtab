@@ -3,11 +3,14 @@ name: Debrief + pings (second line)
 # Цепочка после встречи (решение Никиты 15.10.2026): сделки, по которым была подготовка → копия на Второй линии → как только
 # в ней появилась запись Zoom: распознавание с разметкой «менеджер/клиент» (Apify + Deepgram) → разбор на Opus 5.5 → пинги
 # (бот клиенту не пишет — предлагает менеджеру текст и сценарий кружочка, в день пинга — Telegram). Уже разобранные пропускаются.
-#   по расписанию раз в 30 минут днём; вручную — одна сделка (deal) или сухой прогон (dry).
+#   по расписанию раз в 30 минут днём; вручную — одна сделка (deal) или сухой прогон (dry);
+#   repository_dispatch «debrief_deal» — кнопка «Встреча проведена» в Штабе: ждём запись по этой сделке и сразу разбираем.
 
 on:
   schedule:
     - cron: '15,45 6-19 * * *'   # МСК 09:15–22:45
+  repository_dispatch:
+    types: [debrief_deal]
   workflow_dispatch:
     inputs:
       deal:
@@ -23,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: debrief
+  group: debrief-${{ github.event.client_payload.deal || 'auto' }}
   cancel-in-progress: false
 
 jobs:
@@ -38,8 +41,15 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install requests
-      - run: python collector/debrief.py ${{ inputs.deal && format('one --deal {0}', inputs.deal) || 'auto' }} ${{ inputs.dry == '1' && '--dry' || '' }}
+      - run: |
+          if [ "$EVENT" = "repository_dispatch" ]; then python collector/debrief.py held --deal "$HELD_DEAL"
+          elif [ -n "$ONE_DEAL" ]; then python collector/debrief.py one --deal "$ONE_DEAL" $DRY
+          else python collector/debrief.py auto $DRY; fi
         env:
+          EVENT: ${{ github.event_name }}
+          HELD_DEAL: ${{ github.event.client_payload.deal }}
+          ONE_DEAL: ${{ inputs.deal }}
+          DRY: ${{ inputs.dry == '1' && '--dry' || '' }}
           AMO_TOKEN: ${{ secrets.AMO_TOKEN }}
           AMO_TOKEN_REPORTS: ${{ secrets.AMO_TOKEN_REPORTS }}
           SHTAB_URL: ${{ secrets.SHTAB_URL }}

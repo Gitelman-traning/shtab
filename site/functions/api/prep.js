@@ -7,6 +7,7 @@
 // GET  /api/prep?mode=collector     — для сборщика (токен): {queued, known, no_manager, done_today, cases, styles}
 // GET  /api/prep?mode=transcripts&deals=1,2,3 — для сборщика (токен): расшифровки встреч из KV (t:<deal>), которые есть
 // POST /api/prep {action:"recalc", deal}                       — поставить в очередь (сборщик подхватит в ближайший прогон)
+// POST /api/prep {action:"debrief_start", deal}                — «Встреча проведена»: разбор сразу, как появится запись
 // POST /api/prep {action:"feedback", deal, useful, comment}    — «полезно / не полезно»
 // POST /api/prep {action:"manager", deal, manager}             — диагност вручную
 import { json, bad, canRead, level, now, audit, hasIngestToken } from "./_lib.js";
@@ -177,6 +178,28 @@ export async function onRequestPost({ request, env }) {
       started = !!(r && r.status === 204);
       if (!started) await audit(env, user.login, "prep.dispatch_fail", String(deal), r ? String(r.status) : "сеть");
     }
+    return json({ ok: true, started });
+  }
+  if (b.action === "debrief_start") {   // 15.10.2026: кнопка «Встреча проведена» — сразу ждём запись и разбираем (без расписания)
+    const upd = await env.DB.prepare("UPDATE debrief_queue SET status = 'running', note = ?, updated_at = ? WHERE deal = ?")
+      .bind("встреча проведена — ищу запись Zoom", stamp, deal).run();
+    if (!(upd.meta && upd.meta.changes)) {
+      const p = await env.DB.prepare("SELECT client, company, manager, meet_at FROM prep WHERE deal = ?").bind(deal).first();
+      await env.DB.prepare("INSERT INTO debrief_queue (deal, status, note, client, company, manager, meet_at, updated_at) VALUES (?, 'running', ?, ?, ?, ?, ?, ?)")
+        .bind(deal, "встреча проведена — ищу запись Zoom", (p && p.client) || "", (p && p.company) || "", (p && p.manager) || "", (p && p.meet_at) || "", stamp).run();
+    }
+    await audit(env, user.login, "debrief.start", String(deal), "");
+    let started = false;
+    if (env.GH_DISPATCH_TOKEN) {
+      const r = await fetch("https://api.github.com/repos/Gitelman-traning/shtab/dispatches", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + env.GH_DISPATCH_TOKEN, "Accept": "application/vnd.github+json", "User-Agent": "shtab-prep" },
+        body: JSON.stringify({ event_type: "debrief_deal", client_payload: { deal: String(deal) } }),
+      }).catch(() => null);
+      started = !!(r && r.status === 204);
+    }
+    if (!started) await env.DB.prepare("UPDATE debrief_queue SET status = 'wait', note = ? WHERE deal = ?")
+      .bind("запустить сразу не вышло — подхвачу в ближайшую проверку (раз в 30 минут)", deal).run();
     return json({ ok: true, started });
   }
   if (b.action === "feedback") {

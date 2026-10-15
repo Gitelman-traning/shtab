@@ -5,6 +5,7 @@
 
   python collector/debrief.py auto [--dry]                         — цепочка (решение Никиты 15.10.2026): сделки, по которым была
         подготовка → копия на Второй линии → появилась запись Zoom → распознавание с разметкой говорящих → разбор на Opus → пинги
+  python collector/debrief.py held --deal ID [--dry]                — кнопка «Встреча проведена» в Штабе: ждём запись и сразу разбираем
   python collector/debrief.py one --deal ID [--transcript diar.txt] [--dry] [--out debrief.md] [--client …] [--company …] [--meeting …]
         — одна встреча: с готовой расшифровкой или по записи Zoom из сделки
 
@@ -142,69 +143,118 @@ def post_status(rows, dry):
             prep.log("статус не записан: %s" % str(e)[:120])
 
 
+def process(base, l2id, z, dry, retry_note):
+    """Запись есть → расшифровка (общая, /api/transcript) → разбор → пинги. → статус для Штаба.
+    Не скачалась / не распозналась → status "retry" (Zoom ещё готовит запись или временный сбой)."""
+    post_status([dict(base, status="running", note="беру расшифровку записи")], dry)
+    prep.log("сделка %d (Вторая линия %d): есть запись — разбираю" % (base["deal"], l2id))
+    try:
+        text, minutes, fresh = recording.zoom_to_text(*z, deal=l2id)
+    except Exception as e:
+        prep.log("  запись не получилась: %s" % str(e)[:160])
+        return dict(base, status="retry", note=retry_note)
+    if minutes < 5:
+        prep.log("  запись %d мин — слишком короткая, пропускаю" % minutes)
+        return dict(base, status="error", note="запись %d мин — слишком короткая, разбор не делаю" % minutes)
+    post_status([dict(base, status="running", note="разбираю встречу (%d мин записи)" % minutes)], dry)
+    try:
+        run(l2id, text, base["client"], base["company"], (base.get("meet_at") or "")[:10], dry, None,
+            minutes * DEEPGRAM_RUB_MIN if fresh else 0.0, minutes)
+        if not dry:
+            ping_suggest.suggest(l2id)
+        return dict(base, status="ready", note="")
+    except Exception as e:
+        prep.log("  разбор не получился: %s" % str(e)[:160])
+        return dict(base, status="error", note="разбор не получился — повторю через 30 минут")
+
+
+def recording_deal(deal):
+    """(сделка с записью, (ссылка, код) | None, номер копии на Второй линии | None): запись ищем в копии на Второй линии, затем в самой сделке."""
+    l2 = l2_copy(deal)
+    if l2 and zoom_of(l2):
+        return l2["id"], zoom_of(l2), l2["id"]
+    own = prep.amo("/leads/%d" % deal)
+    if zoom_of(own):
+        return deal, zoom_of(own), (l2 or {}).get("id")
+    return None, None, (l2 or {}).get("id")
+
+
 def auto(dry):
     """Сделки с подготовкой → копия на Второй линии с записью Zoom → разбор → пинги. Уже разобранные пропускаем.
     По каждой сделке пишем в Штаб, на чём она сейчас (15.10.2026: «через сколько появится разбор» видно на странице)."""
     preps = prep.shtab("GET", "/api/prep", params={"days": 21, "back": 30}).get("rows") or []
-    done = {int(r["deal"]) for r in (prep.shtab("GET", "/api/prep", params={"mode": "debriefs"}).get("rows") or [])}
+    deb = prep.shtab("GET", "/api/prep", params={"mode": "debriefs"})
+    done = {int(r["deal"]) for r in (deb.get("rows") or [])}
+    # по кнопке «Встреча проведена» сделку ведёт отдельный прогон (held) — пока он идёт, не трогаем
+    fresh_run = (dt.datetime.utcnow() - dt.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M")
+    busy = {int(r["deal"]) for r in (deb.get("pending") or []) if r.get("status") == "running" and (r.get("updated_at") or "") > fresh_run}
     now = dt.datetime.now(prep.MSK).strftime("%Y-%m-%d %H:%M")
     n, st = 0, []
     for p in preps:
         if p.get("status") != "ready" or (p.get("meet_at") or p.get("updated_at") or "")[:10] < SINCE:
             continue
         deal, meet = int(p["deal"]), p.get("meet_at") or ""
+        if deal in busy:
+            continue
         base = {"deal": deal, "client": p.get("client") or "", "company": p.get("company") or "", "manager": p.get("manager") or "", "meet_at": meet}
         if deal in done:
             st.append(dict(base, status="ready", note=""))
             continue
         if meet and meet > now:
-            st.append(dict(base, status="plan", note="встреча впереди — разбор после записи"))
+            st.append(dict(base, status="plan", note="встреча впереди — после неё нажмите «Встреча проведена»"))
             continue
         if n >= DAILY:
             st.append(dict(base, status="wait", note="в очереди — разберу в следующий запуск"))
             continue
-        l2 = l2_copy(deal)
-        if not l2:
-            st.append(dict(base, status="wait", note="ждём копию сделки на Второй линии"))
-            continue
-        base["l2"] = l2["id"]
-        if l2["id"] in done:
+        rec, z, l2id = recording_deal(deal)
+        if l2id:
+            base["l2"] = l2id
+        if (l2id and l2id in done) or (rec and rec in done):
             st.append(dict(base, status="ready", note=""))
             continue
-        z = zoom_of(l2)
         if not z:
-            st.append(dict(base, status="wait", note="ждём ссылку на запись Zoom в сделке"))
+            st.append(dict(base, status="wait", note="ждём ссылку на запись Zoom в сделке" if l2id else "ждём копию сделки на Второй линии"))
             continue
-        post_status(st + [dict(base, status="running", note="беру расшифровку записи")], dry)
+        post_status(st, dry)
         st = []
-        prep.log("сделка %d (Вторая линия %d): есть запись — разбираю" % (deal, l2["id"]))
-        try:
-            text, minutes, fresh = recording.zoom_to_text(*z, deal=l2["id"])
-        except Exception as e:
-            prep.log("  запись не получилась: %s — попробую в следующий запуск" % str(e)[:160])
-            st.append(dict(base, status="error", note="запись не скачалась или не распозналась — повторю через 30 минут"))
-            continue
-        if minutes < 5:
-            prep.log("  запись %d мин — слишком короткая, пропускаю" % minutes)
-            st.append(dict(base, status="error", note="запись %d мин — слишком короткая, разбор не делаю" % minutes))
-            continue
-        post_status([dict(base, status="running", note="разбираю встречу (%d мин записи)" % minutes)], dry)
-        try:
-            run(l2["id"], text, base["client"], base["company"], meet[:10], dry, None, minutes * DEEPGRAM_RUB_MIN if fresh else 0.0, minutes)
-            if not dry:
-                ping_suggest.suggest(l2["id"])
-            st.append(dict(base, status="ready", note=""))
-        except Exception as e:
-            prep.log("  разбор не получился: %s" % str(e)[:160])
-            st.append(dict(base, status="error", note="разбор не получился — повторю через 30 минут"))
+        r = process(base, rec, z, dry, "запись не скачалась или не распозналась — повторю через 30 минут")
+        if r["status"] == "retry":
+            r["status"] = "error"
+        st.append(r)
         n += 1
     post_status(st, dry)
     prep.log("разборов за запуск: %d" % n)
 
 
+def held(deal, dry, wait_min=100, every=300):
+    """Кнопка «Встреча проведена» (15.10.2026): ждём ссылку на запись и саму запись (раз в 5 минут, до ~100 минут) → разбор → пинги."""
+    p = prep.shtab("GET", "/api/prep", params={"deal": deal}).get("row") or {}
+    base = {"deal": deal, "client": p.get("client") or "", "company": p.get("company") or "", "manager": p.get("manager") or "", "meet_at": p.get("meet_at") or ""}
+    until = time.time() + wait_min * 60
+    while True:
+        rec, z, l2id = recording_deal(deal)
+        if l2id:
+            base["l2"] = l2id
+        if z:
+            r = process(base, rec, z, dry, "запись в Zoom ещё готовится — проверяю раз в 5 минут")
+            if r["status"] != "retry":
+                post_status([r], dry)
+                prep.log("сделка %d: %s %s" % (deal, r["status"], r["note"]))
+                return
+            note = r["note"]
+        else:
+            note = "ждём ссылку на запись Zoom в сделке — проверяю раз в 5 минут"
+        if time.time() + every > until:
+            post_status([dict(base, status="wait", note="за 2 часа запись не появилась — дальше проверка раз в 30 минут")], dry)
+            prep.log("сделка %d: запись не дождались" % deal)
+            return
+        post_status([dict(base, status="running", note=note)], dry)
+        time.sleep(every)
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["auto", "one"])
+    ap.add_argument("cmd", choices=["auto", "one", "held"])
     ap.add_argument("--deal", type=int)
     ap.add_argument("--transcript")
     ap.add_argument("--dry", action="store_true")
@@ -215,6 +265,10 @@ def main():
     a = ap.parse_args()
     if a.cmd == "auto":
         auto(a.dry)
+    elif a.cmd == "held":
+        if not a.deal:
+            sys.exit("нужен --deal")
+        held(a.deal, a.dry)
     else:
         if not a.deal:
             sys.exit("нужен --deal")
