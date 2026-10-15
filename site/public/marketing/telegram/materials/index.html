@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Телеграм-канал · Материалы и опросы</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tabs button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--dim);border-radius:9px;padding:7px 13px;cursor:pointer}
+.tabs button[aria-pressed=true]{color:var(--ink);border-color:var(--gold-b);font-weight:600}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,560px);gap:18px;align-items:start}
+@media (max-width:1100px){.grid{grid-template-columns:1fr}}
+.f label{display:block;font-size:12px;font-weight:600;color:var(--dim);margin:12px 0 5px}.f label:first-child{margin-top:0}
+.f input[type=text],.f textarea,.f select{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.f textarea{min-height:90px;resize:vertical}
+.hint{font-size:12px;color:var(--dim);margin-top:4px}.hint.bad{color:var(--bad);font-weight:600}
+.btn{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:9px;padding:8px 14px;cursor:pointer;background:linear-gradient(135deg,var(--gold-a),var(--gold-b));color:#151616}
+.btn.ghost{background:var(--card);border:1px solid var(--line);color:var(--ink);font-weight:600;padding:5px 10px;font-size:12px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.brow,.qrow{display:grid;grid-template-columns:1fr 130px 1fr 32px;gap:6px;margin-bottom:6px}
+.qblk{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+.msg{padding:10px 13px;border-radius:10px;margin:0 0 14px;font-size:13px}.msg.ok{background:var(--ok-bg);color:var(--ok)}.msg.bad{background:var(--bad-bg);color:var(--bad)}
+.wrap{overflow-x:auto}td{vertical-align:top}td.k{white-space:nowrap}
+.pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:7px;background:var(--soft);color:var(--dim)}
+.prev{background:var(--soft);border-radius:12px;padding:12px;font-size:13.5px;white-space:pre-wrap;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · Телеграм-канал · <b>Материалы и опросы</b></div><h1>Материалы и опросы</h1><p class="sub">Материал — то, что человек получает по своей ссылке: текст, файл и кнопки. Можно выдавать сразу, после номера или после опроса. Каждый, кто пришёл за материалом, попадает в его список — по спискам потом делаются рассылки.</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div id="msgs"></div>
+  <div class="tabs" id="tabs">
+    <button type="button" data-t="m" aria-pressed="true">Материалы</button>
+    <button type="button" data-t="p" aria-pressed="false">Опросы</button>
+    <button type="button" data-t="l" aria-pressed="false">Списки</button>
+  </div>
+
+  <section id="t-m">
+    <div class="grid">
+      <div class="card"><h2>Материалы <small>ссылка — для выбранного бота</small></h2>
+        <label class="hint">Бот для ссылок: <select id="botsel"></select></label>
+        <div class="wrap" id="mlist"><p class="empty">загрузка…</p></div></div>
+      <div class="card"><h2 id="mf-title">Новый материал</h2>
+        <form class="f" id="mf" autocomplete="off">
+          <label>Ключ <span class="hint">латиница, цифры, _ — войдёт в ссылку, потом не меняется</span></label><input type="text" name="key" placeholder="guide_team">
+          <label>Название (для себя)</label><input type="text" name="title" placeholder="Гайд «Команда»">
+          <label>Текст сообщения <span class="hint" id="tlen"></span></label><textarea name="text" placeholder="Можно &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, &lt;a href=&quot;…&quot;&gt;ссылку&lt;/a&gt;"></textarea>
+          <label>Файл <span class="hint" id="fname">не загружен</span></label><input type="file" id="file"><div class="hint">До 25 МБ. Загружается после сохранения материала.</div>
+          <label>Кнопки под сообщением</label><div id="btns"></div><button type="button" class="btn ghost" id="addbtn">+ кнопка</button>
+          <label>Когда выдавать</label><select name="condition"><option value="none">сразу</option><option value="phone">после номера</option><option value="poll">после опроса</option></select>
+          <div id="pollwrap" hidden><label>Опрос</label><select name="poll_key"></select></div>
+          <div id="askwrap" hidden><label>Текст просьбы (необязательно)</label><input type="text" name="ask_text" placeholder="Оставьте номер — и гайд ваш"></div>
+          <label>Список <span class="hint">по умолчанию file_&lt;ключ&gt;</span></label><input type="text" name="list_key" placeholder="file_guide_team">
+          <label><input type="checkbox" name="active" checked> активен (ссылка работает)</label>
+          <div class="acts"><button class="btn" type="submit">Сохранить</button><button class="btn ghost" type="button" id="mnew">Новый</button></div>
+        </form>
+        <div id="mlink"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="t-p" hidden>
+    <div class="grid">
+      <div class="card"><h2>Опросы</h2><div class="wrap" id="plist"><p class="empty">загрузка…</p></div></div>
+      <div class="card"><h2 id="pf-title">Новый опрос</h2>
+        <form class="f" id="pf" autocomplete="off">
+          <label>Ключ</label><input type="text" name="key" placeholder="qual_team">
+          <label>Название</label><input type="text" name="title" placeholder="Квалификация: команда и роль">
+          <label>Вопросы</label><div id="qs"></div><button type="button" class="btn ghost" id="addq">+ вопрос</button>
+          <label>Текст после последнего ответа (если опрос без материала)</label><input type="text" name="done_text" placeholder="Спасибо за ответы!">
+          <div class="acts"><button class="btn" type="submit">Сохранить</button><button class="btn ghost" type="button" id="pnew">Новый</button></div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section id="t-l" hidden>
+    <div class="card"><h2>Списки <small>кто за каким материалом пришёл</small></h2><div class="wrap" id="llist"><p class="empty">загрузка…</p></div>
+      <p class="note">Людей из списка можно отфильтровать и выгрузить на странице «Боты и база». Рассылки по спискам — следующим шагом.</p></div>
+  </section>
+  <footer>Данные — ядро ботов (tg-bots-core). Менять может тот, у кого правка раздела «Телеграм-канал»; каждое сохранение пишется в журнал.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var A = "/api/tgbots-admin/", polls = [], bots = [];
+var FIELDS = [["", "не сохранять в карточку"], ["q_team", "команда"], ["q_position", "роль / должность"], ["q_turnover", "оборот"], ["q_niche", "ниша"]];
+function get(p){ return fetch(A + p, { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
+function post(p, body){ return fetch(A + p, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(function(r){ return r.json(); }); }
+function say(ok, t){ document.getElementById("msgs").innerHTML = '<div class="msg ' + (ok ? "ok" : "bad") + '">' + esc(t) + '</div>'; window.scrollTo(0, 0); }
+function d(ms){ if (!ms) return ""; var t = new Date(ms); return dmy(t) + "." + String(t.getFullYear()).slice(2); }
+var COND = { none: "сразу", phone: "после номера", poll: "после опроса" };
+
+document.querySelectorAll("#tabs button").forEach(function(b){ b.onclick = function(){
+  document.querySelectorAll("#tabs button").forEach(function(x){ x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+  ["m", "p", "l"].forEach(function(t){ document.getElementById("t-" + t).hidden = t !== b.dataset.t; });
+  if (b.dataset.t === "l") loadLists();
+}; });
+
+/* ---------- материалы ---------- */
+var mf = document.getElementById("mf"), editing = null;
+function btnRow(b){
+  var div = document.createElement("div"); div.className = "brow";
+  var type = b && b.url ? "url" : b && b.material ? "material" : b && b.poll ? "poll" : "url";
+  div.innerHTML = '<input type="text" placeholder="Текст кнопки" value="' + esc(b ? b.text : "") + '">'
+    + '<select><option value="url">ссылка</option><option value="material">материал</option><option value="poll">опрос</option></select>'
+    + '<input type="text" placeholder="https://… или ключ" value="' + esc(b ? (b.url || b.material || b.poll || "") : "") + '">'
+    + '<button type="button" class="btn ghost" title="убрать">×</button>';
+  div.querySelector("select").value = type;
+  div.querySelector("button").onclick = function(){ div.remove(); };
+  document.getElementById("btns").appendChild(div);
+}
+document.getElementById("addbtn").onclick = function(){ btnRow(null); };
+function readButtons(){
+  var rows = [];
+  document.querySelectorAll("#btns .brow").forEach(function(r){
+    var i = r.querySelectorAll("input"), t = i[0].value.trim(), v = i[1].value.trim(), k = r.querySelector("select").value;
+    if (!t || !v) return; var b = { text: t }; b[k] = v; rows.push([b]);
+  });
+  return rows.length ? rows : null;
+}
+function syncCond(){ var c = mf.condition.value; document.getElementById("pollwrap").hidden = c !== "poll"; document.getElementById("askwrap").hidden = c === "none"; }
+mf.condition.onchange = syncCond;
+mf.text.oninput = function(){ var n = mf.text.value.length, el = document.getElementById("tlen"); el.textContent = n + " / 1024"; el.className = "hint" + (n > 1024 ? " bad" : ""); };
+function fillPolls(){
+  mf.poll_key.innerHTML = polls.map(function(p){ return '<option value="' + esc(p.key) + '">' + esc(p.title || p.key) + '</option>'; }).join("") || '<option value="">сначала создайте опрос</option>';
+}
+function link(key){ var b = document.getElementById("botsel").value; return b ? "https://t.me/" + b + "?start=file_" + key : "(бот ещё не подключён к движку)"; }
+function editMaterial(m){
+  editing = m ? m.key : null;
+  document.getElementById("mf-title").textContent = m ? "Материал «" + m.title + "»" : "Новый материал";
+  mf.reset(); document.getElementById("btns").innerHTML = "";
+  mf.key.readOnly = !!m;
+  if (m) {
+    mf.key.value = m.key; mf.title.value = m.title || ""; mf.text.value = m.text || ""; mf.condition.value = m.condition || "none";
+    mf.poll_key.value = m.poll_key || ""; mf.ask_text.value = m.ask_text || ""; mf.list_key.value = m.list_key || ""; mf.active.checked = !!m.active;
+    try { (JSON.parse(m.buttons || "[]") || []).forEach(function(row){ (Array.isArray(row) ? row : [row]).forEach(btnRow); }); } catch (e) {}
+    document.getElementById("fname").textContent = m.file_name ? m.file_name : "не загружен";
+    document.getElementById("mlink").innerHTML = '<p class="note">Ссылка: <span class="mono">' + esc(link(m.key)) + '</span></p>';
+  } else { document.getElementById("fname").textContent = "не загружен"; document.getElementById("mlink").innerHTML = ""; }
+  mf.text.oninput(); syncCond();
+}
+document.getElementById("mnew").onclick = function(){ editMaterial(null); };
+mf.onsubmit = function(e){
+  e.preventDefault();
+  var body = { key: mf.key.value.trim(), title: mf.title.value.trim(), text: mf.text.value, buttons: readButtons(), condition: mf.condition.value,
+    poll_key: mf.condition.value === "poll" ? mf.poll_key.value : null, ask_text: mf.ask_text.value.trim() || null, list_key: mf.list_key.value.trim() || null, active: mf.active.checked };
+  post("materials", body).then(function(j){
+    if (!j.ok) return say(false, j.error || "не сохранилось");
+    var f = document.getElementById("file").files[0];
+    if (!f) { say(true, "Сохранено"); return loadMaterials(body.key); }
+    fetch(A + "material-file?key=" + encodeURIComponent(body.key), { method: "POST", credentials: "same-origin", headers: { "content-type": f.type || "application/octet-stream", "x-file-name": encodeURIComponent(f.name) }, body: f })
+      .then(function(r){ return r.json(); }).then(function(x){ say(!!x.ok, x.ok ? "Сохранено, файл загружен: " + x.file : (x.error || "файл не загрузился")); loadMaterials(body.key); });
+  });
+};
+function loadMaterials(open){
+  get("materials").then(function(j){
+    if (!j.rows) { document.getElementById("mlist").innerHTML = '<p class="empty">' + esc(j.error || "нет доступа") + '</p>'; return; }
+    document.getElementById("mlist").innerHTML = j.rows.length ? '<table><thead><tr><th>Материал</th><th>Выдача</th><th class="num">Получили</th><th></th></tr></thead><tbody>'
+      + j.rows.map(function(m){ return '<tr><td><b>' + esc(m.title) + '</b>' + (m.active ? '' : ' <span class="pill">выключен</span>') + '<div class="mono">' + esc(link(m.key)) + '</div>' + (m.file_name ? '<div class="note">📎 ' + esc(m.file_name) + '</div>' : '') + '</td><td class="k">' + esc(COND[m.condition] || m.condition) + '</td><td class="num">' + (m.got || 0) + '</td><td><button class="btn ghost" data-k="' + esc(m.key) + '">изменить</button></td></tr>'; }).join("")
+      + '</tbody></table>' : '<p class="empty">материалов пока нет</p>';
+    document.querySelectorAll("#mlist button[data-k]").forEach(function(b){ b.onclick = function(){ editMaterial(j.rows.find(function(m){ return m.key === b.dataset.k; })); }; });
+    if (open) { var m = j.rows.find(function(x){ return x.key === open; }); if (m) editMaterial(m); }
+  });
+}
+
+/* ---------- опросы ---------- */
+var pf = document.getElementById("pf");
+function qBlock(q){
+  var div = document.createElement("div"); div.className = "qblk";
+  div.innerHTML = '<input type="text" placeholder="Вопрос" value="' + esc(q ? q.text : "") + '"><textarea placeholder="Варианты — каждый с новой строки (до 60 знаков)" style="min-height:70px;margin-top:6px">' + esc(q ? q.options.join("\n") : "") + '</textarea>'
+    + '<div style="display:flex;gap:8px;margin-top:6px;align-items:center"><select>' + FIELDS.map(function(f){ return '<option value="' + f[0] + '">' + f[1] + '</option>'; }).join("") + '</select><button type="button" class="btn ghost">убрать вопрос</button></div>';
+  div.querySelector("select").value = (q && q.field) || "";
+  div.querySelector("button").onclick = function(){ div.remove(); };
+  document.getElementById("qs").appendChild(div);
+}
+document.getElementById("addq").onclick = function(){ qBlock(null); };
+function editPoll(p){
+  pf.reset(); document.getElementById("qs").innerHTML = ""; pf.key.readOnly = !!p;
+  document.getElementById("pf-title").textContent = p ? "Опрос «" + (p.title || p.key) + "»" : "Новый опрос";
+  if (p) { pf.key.value = p.key; pf.title.value = p.title || ""; pf.done_text.value = p.done_text || ""; JSON.parse(p.questions).forEach(qBlock); } else qBlock(null);
+}
+document.getElementById("pnew").onclick = function(){ editPoll(null); };
+pf.onsubmit = function(e){
+  e.preventDefault();
+  var qs = [];
+  document.querySelectorAll("#qs .qblk").forEach(function(b, i){
+    var t = b.querySelector("input").value.trim(), o = b.querySelector("textarea").value.split("\n").map(function(s){ return s.trim(); }).filter(Boolean), f = b.querySelector("select").value;
+    if (t) qs.push({ id: String(i + 1), text: t, options: o, field: f || undefined });
+  });
+  post("polls", { key: pf.key.value.trim(), title: pf.title.value.trim(), questions: qs, done_text: pf.done_text.value.trim() || null })
+    .then(function(j){ say(!!j.ok, j.ok ? "Опрос сохранён" : (j.error || "не сохранилось")); if (j.ok) loadPolls(); });
+};
+function loadPolls(){
+  return get("polls").then(function(j){
+    polls = j.rows || []; fillPolls();
+    document.getElementById("plist").innerHTML = polls.length ? '<table><thead><tr><th>Опрос</th><th class="num">Вопросов</th><th></th></tr></thead><tbody>'
+      + polls.map(function(p){ return '<tr><td><b>' + esc(p.title || p.key) + '</b><div class="mono">' + esc(p.key) + '</div></td><td class="num">' + JSON.parse(p.questions).length + '</td><td><button class="btn ghost" data-k="' + esc(p.key) + '">изменить</button></td></tr>'; }).join("")
+      + '</tbody></table>' : '<p class="empty">опросов пока нет</p>';
+    document.querySelectorAll("#plist button[data-k]").forEach(function(b){ b.onclick = function(){ editPoll(polls.find(function(p){ return p.key === b.dataset.k; })); }; });
+  });
+}
+
+/* ---------- списки ---------- */
+function loadLists(){
+  get("lists").then(function(j){
+    var rows = j.rows || [];
+    document.getElementById("llist").innerHTML = rows.length ? '<table><thead><tr><th>Список</th><th class="num">Людей</th><th>Последний</th></tr></thead><tbody>'
+      + rows.map(function(l){ return '<tr><td class="mono">' + esc(l.key) + '</td><td class="num">' + l.people + '</td><td>' + d(l.last_at) + '</td></tr>'; }).join("") + '</tbody></table>' : '<p class="empty">списков пока нет — появятся, когда люди начнут приходить за материалами</p>';
+  });
+}
+
+get("bots").then(function(j){
+  bots = (j.rows || []).filter(function(b){ return b.connected; });
+  document.getElementById("botsel").innerHTML = bots.length ? bots.map(function(b){ return '<option value="' + esc(b.key) + '">' + esc(b.title || b.key) + '</option>'; }).join("") : '<option value="">нет подключённых ботов</option>';
+  document.getElementById("stamp").textContent = bots.length + " бот(ов) на движке";
+  document.getElementById("botsel").onchange = function(){ loadMaterials(); };
+  loadPolls().then(function(){ loadMaterials(); editMaterial(null); editPoll(null); });
+});
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>
