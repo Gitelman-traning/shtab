@@ -90,7 +90,9 @@ export async function onRequestGet(context) {
   if (!user || level(user, "sales.l2") < 1) return bad("нет доступа", 401);
   if (mode === "debriefs") {   // раздел «Разбор встречи» (13.10.2026)
     const r = await env.DB.prepare("SELECT deal, loyalty, client, company, manager, meeting_at, model, updated_at FROM prep_debrief ORDER BY meeting_at DESC LIMIT 500").all();
-    return json({ ok: true, rows: r.results || [] });
+    let pending = [];   // цепочка (15.10.2026): по каким сделкам разбор ещё не готов и почему
+    try { pending = (await env.DB.prepare("SELECT deal, l2, status, note, client, company, manager, meet_at, updated_at FROM debrief_queue WHERE status != 'ready' ORDER BY meet_at DESC LIMIT 200").all()).results || []; } catch (e) { pending = []; }
+    return json({ ok: true, rows: r.results || [], pending });
   }
   if (mode === "managers") {
     const users = await amoUsers(env);

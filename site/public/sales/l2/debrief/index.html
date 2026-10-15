@@ -124,6 +124,8 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 .calc-h{display:flex;flex-direction:column;gap:3px} .calc-on{font-size:11px;color:var(--faint);display:flex;gap:5px;align-items:center;cursor:pointer}
 .calc-ask{font-size:12px;color:var(--dim);font-style:italic}
 .calc-r.off{color:var(--faint)} .calc-fx{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums} .calc-note{font-size:11px;color:var(--faint)}
+.st.run{background:var(--gold-soft);color:var(--gold)} .st.run::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:1px;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.25}}
 .v-vers{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 14px}
 </style>
 </head>
@@ -144,8 +146,9 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 <main id="list">
   <div class="card">
     <div class="bar-row"><select id="f-mgr"><option value="">Все диагносты</option></select><span class="spacer" style="flex:1"></span></div>
-    <p class="hint" style="margin:10px 0 0">Пока разборы готовятся по запросу (идёт настройка на встречах Евгения Кротова). Лояльность ставит модель по словам клиента; 9–10 — близок к покупке, 7–8 — интерес есть, 5–6 — не сформировано, ниже 5 — нет основания продолжать.</p>
+    <p class="hint" style="margin:10px 0 0">Разбор делается сам по встречам, к которым была подготовка: когда в сделке на Второй линии появляется ссылка на запись Zoom, в течение 30 минут (проверка с 9:15 до 22:45 МСК) запись распознаётся и разбирается — ещё 5–10 минут. Лояльность ставит модель по словам клиента; 9–10 — близок к покупке, 7–8 — интерес есть, 5–6 — не сформировано, ниже 5 — нет основания продолжать.</p>
   </div>
+  <div class="card wide" id="pend-card" hidden><h2>В работе <small id="pend-sub"></small></h2><div id="pend"></div></div>
   <div class="card wide"><h2>Разборы <small id="list-sub"></small></h2><div id="rows"><p class="empty">Загружаю…</p></div></div>
 </main>
 <main id="detail" hidden>
@@ -204,11 +207,13 @@ function renderDebrief(d){
     + (tail ? '<div class="v-note">' + md(tail) + '</div>' : '');
 }
 
-var ROWS = [];
+var ROWS = [], PEND = [];
+var PST = { plan: ["", "встреча впереди"], wait: ["queued", "ждём"], running: ["run", "в процессе"], error: ["error", "ошибка"] };
 function dateLabel(s){ if (!s) return "<span class='sub'>дата не указана</span>"; var d = s.slice(0,10).split("-"); return d[2] + "." + d[1] + "." + d[0] + (s.length > 10 ? " <span class='sub'>" + esc(s.slice(11)) + " МСК</span>" : ""); }
 function loyChip(L){ if (!L) return '<span class="st">—</span>'; var c = L >= 9 ? "ready" : L >= 7 ? "queued" : "error"; return '<span class="st ' + c + '" style="font-size:12px">' + L + '/10</span>'; }
 function renderList(){
   var mgr = document.getElementById("f-mgr").value;
+  renderPend(mgr);
   var rows = ROWS.filter(function(r){ return !mgr || r.manager === mgr; });
   document.getElementById("list-sub").textContent = rows.length ? rows.length + " из " + ROWS.length : "";
   if (!rows.length) { document.getElementById("rows").innerHTML = '<p class="empty">Разборов пока нет.</p>'; return; }
@@ -225,10 +230,25 @@ function loadList(){
     var last = ROWS.map(function(r){ return r.updated_at || ""; }).sort().pop();
     document.getElementById("stamp").textContent = last ? "обновлено " + last.slice(0, 16).replace("T", " ") + " UTC" : "";
     var sel = document.getElementById("f-mgr"), cur = sel.value, m = {};
-    ROWS.forEach(function(r){ if (r.manager) m[r.manager] = 1; });
+    ROWS.concat(res.pending || []).forEach(function(r){ if (r.manager) m[r.manager] = 1; });
     sel.innerHTML = '<option value="">Все диагносты</option>' + Object.keys(m).sort().map(function(x){ return '<option' + (x === cur ? " selected" : "") + '>' + esc(x) + '</option>'; }).join("");
+    PEND = res.pending || [];
     renderList();
   });
+}
+// блок «В работе» (15.10.2026): по каким встречам разбор ещё не готов и на чём он сейчас
+function renderPend(mgr){
+  var rows = PEND.filter(function(r){ return !mgr || r.manager === mgr; });
+  document.getElementById("pend-card").hidden = !rows.length;
+  if (!rows.length) return;
+  var last = rows.map(function(r){ return r.updated_at || ""; }).sort().pop();
+  document.getElementById("pend-sub").textContent = rows.length + (last ? " · проверено " + new Date(last).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" }) + " МСК" : "");
+  document.getElementById("pend").innerHTML = '<table><thead><tr><th>Встреча</th><th>Клиент</th><th>Диагност</th><th>Статус</th><th></th></tr></thead><tbody>'
+    + rows.map(function(r){
+      var s = PST[r.status] || ["", r.status];
+      return '<tr><td>' + dateLabel(r.meet_at) + '</td><td>' + esc(r.client || "—") + (r.company ? '<span class="sub">' + esc(r.company) + '</span>' : '') + '</td><td>' + esc(r.manager || "—") + '</td><td><span class="st ' + s[0] + '">' + esc(s[1]) + '</span>' + (r.note ? '<span class="sub">' + esc(r.note) + '</span>' : '') + '</td>'
+        + '<td class="num"><a class="btn ghost" href="/sales/l2/prep/#deal=' + r.deal + '">подготовка</a> <a class="btn ghost" href="https://pavelgitelman.amocrm.ru/leads/detail/' + (r.l2 || r.deal) + '" target="_blank" rel="noopener">amo ↗</a></td></tr>';
+    }).join("") + '</tbody></table>';
 }
 document.getElementById("f-mgr").addEventListener("change", renderList);
 function showDetail(deal){
@@ -260,6 +280,7 @@ function route(){
 }
 window.addEventListener("hashchange", route);
 route();
+setInterval(function(){ if (!document.hidden && !document.getElementById("list").hidden) loadList(); }, 60000);   // статусы «В работе» меняются сами
 </script>
 <script src="/nav.js"></script>
 </body>

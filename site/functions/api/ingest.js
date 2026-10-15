@@ -41,7 +41,7 @@ export async function onRequestPost({ request, env }) {
   const plans = Array.isArray(body.plans) ? body.plans : [];
   const collector = String(body.collector || "unknown").slice(0, 60);
   const has = (k) => Array.isArray(body[k]) && body[k].length;
-  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("prep_debrief") && !has("prep_debrief_versions") && !has("expenses")) return bad("пустая пачка");
+  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("prep_debrief") && !has("prep_debrief_versions") && !has("debrief_status") && !has("expenses")) return bad("пустая пачка");
 
   const stamp = now();
   const stmt = env.DB.prepare(
@@ -180,6 +180,17 @@ export async function onRequestPost({ request, env }) {
       .bind(Number(r.deal), v(r.text, 30000), Number(r.loyalty) || null, v(r.client, 80), v(r.company, 120), v(r.manager, 80), v(r.meeting_at, 20), v(r.model, 120), v(r.cost, 60), stamp, stamp).run();
     written++;
     if (r.version !== false) await saveDebriefVersion(env, r, stamp);   // каждая выгрузка — ещё и версия для сравнения
+  }
+  // состояние цепочки разбора (15.10.2026): по сделке с подготовкой — что сейчас с разбором (раздел «Разбор встречи», блок «В работе»)
+  const dst = Array.isArray(body.debrief_status) ? body.debrief_status : [];
+  if (dst.length) {
+    const v = (x, n) => String(x || "").slice(0, n);
+    const q = env.DB.prepare("INSERT INTO debrief_queue (deal, l2, status, note, client, company, manager, meet_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?) " +
+      "ON CONFLICT(deal) DO UPDATE SET l2 = COALESCE(excluded.l2, debrief_queue.l2), status = excluded.status, note = excluded.note, client = excluded.client, " +
+      "company = excluded.company, manager = excluded.manager, meet_at = excluded.meet_at, updated_at = excluded.updated_at");
+    const batch = dst.slice(0, 200).filter((r) => r && Number(r.deal))
+      .map((r) => q.bind(Number(r.deal), Number(r.l2) || null, v(r.status, 20), v(r.note, 300), v(r.client, 80), v(r.company, 120), v(r.manager, 80), v(r.meet_at, 20), stamp));
+    try { for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); } } catch (e) { /* таблицы может ещё не быть */ }
   }
   // версии разбора без смены текущего (сравнение моделей, ручные эталоны)
   const dver = Array.isArray(body.prep_debrief_versions) ? body.prep_debrief_versions : [];

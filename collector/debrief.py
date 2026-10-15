@@ -133,33 +133,72 @@ def one(a):
         ping_suggest.suggest(a.deal)
 
 
+def post_status(rows, dry):
+    """Состояние цепочки по сделкам → Штаб (раздел «Разбор встречи», блок «В работе»): plan / wait / running / error / ready."""
+    if rows and not dry:
+        try:
+            prep.shtab("POST", "/api/ingest", {"collector": "prep", "debrief_status": rows})
+        except Exception as e:
+            prep.log("статус не записан: %s" % str(e)[:120])
+
+
 def auto(dry):
-    """Сделки с подготовкой → копия на Второй линии с записью Zoom → разбор → пинги. Уже разобранные пропускаем."""
+    """Сделки с подготовкой → копия на Второй линии с записью Zoom → разбор → пинги. Уже разобранные пропускаем.
+    По каждой сделке пишем в Штаб, на чём она сейчас (15.10.2026: «через сколько появится разбор» видно на странице)."""
     preps = prep.shtab("GET", "/api/prep", params={"days": 21, "back": 30}).get("rows") or []
     done = {int(r["deal"]) for r in (prep.shtab("GET", "/api/prep", params={"mode": "debriefs"}).get("rows") or [])}
-    n = 0
+    now = dt.datetime.now(prep.MSK).strftime("%Y-%m-%d %H:%M")
+    n, st = 0, []
     for p in preps:
-        if p.get("status") != "ready" or n >= DAILY or (p.get("meet_at") or p.get("updated_at") or "")[:10] < SINCE:
+        if p.get("status") != "ready" or (p.get("meet_at") or p.get("updated_at") or "")[:10] < SINCE:
             continue
-        l2 = l2_copy(int(p["deal"]))
-        if not l2 or l2["id"] in done or int(p["deal"]) in done:
+        deal, meet = int(p["deal"]), p.get("meet_at") or ""
+        base = {"deal": deal, "client": p.get("client") or "", "company": p.get("company") or "", "manager": p.get("manager") or "", "meet_at": meet}
+        if deal in done:
+            st.append(dict(base, status="ready", note=""))
+            continue
+        if meet and meet > now:
+            st.append(dict(base, status="plan", note="встреча впереди — разбор после записи"))
+            continue
+        if n >= DAILY:
+            st.append(dict(base, status="wait", note="в очереди — разберу в следующий запуск"))
+            continue
+        l2 = l2_copy(deal)
+        if not l2:
+            st.append(dict(base, status="wait", note="ждём копию сделки на Второй линии"))
+            continue
+        base["l2"] = l2["id"]
+        if l2["id"] in done:
+            st.append(dict(base, status="ready", note=""))
             continue
         z = zoom_of(l2)
         if not z:
+            st.append(dict(base, status="wait", note="ждём ссылку на запись Zoom в сделке"))
             continue
-        prep.log("сделка %d (Вторая линия %d): есть запись — разбираю" % (int(p["deal"]), l2["id"]))
+        post_status(st + [dict(base, status="running", note="распознаю запись (говорящие)")], dry)
+        st = []
+        prep.log("сделка %d (Вторая линия %d): есть запись — разбираю" % (deal, l2["id"]))
         try:
             text, minutes = recording.zoom_to_text(*z)
         except Exception as e:
             prep.log("  запись не получилась: %s — попробую в следующий запуск" % str(e)[:160])
+            st.append(dict(base, status="error", note="запись не скачалась или не распозналась — повторю через 30 минут"))
             continue
         if minutes < 5:
             prep.log("  запись %d мин — слишком короткая, пропускаю" % minutes)
+            st.append(dict(base, status="error", note="запись %d мин — слишком короткая, разбор не делаю" % minutes))
             continue
-        run(l2["id"], text, p.get("client") or "", p.get("company") or "", (p.get("meet_at") or "")[:10], dry, None, minutes * DEEPGRAM_RUB_MIN, minutes)
-        if not dry:
-            ping_suggest.suggest(l2["id"])
+        post_status([dict(base, status="running", note="разбираю встречу (%d мин записи)" % minutes)], dry)
+        try:
+            run(l2["id"], text, base["client"], base["company"], meet[:10], dry, None, minutes * DEEPGRAM_RUB_MIN, minutes)
+            if not dry:
+                ping_suggest.suggest(l2["id"])
+            st.append(dict(base, status="ready", note=""))
+        except Exception as e:
+            prep.log("  разбор не получился: %s" % str(e)[:160])
+            st.append(dict(base, status="error", note="разбор не получился — повторю через 30 минут"))
         n += 1
+    post_status(st, dry)
     prep.log("разборов за запуск: %d" % n)
 
 
