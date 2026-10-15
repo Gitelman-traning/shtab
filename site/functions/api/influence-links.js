@@ -4,7 +4,7 @@
 // Заказчик (Мари, Настя, Маша) заполняет одну заявку на блогера:
 //   WhatsApp    — wa.me/<номер>?text=«Я от …, тренинг Команда». Стикер в сторис
 //                 Instagram принимает не длиннее 245 знаков (кириллица ×6). Выдаётся сразу.
-//   TG-бот      — t.me/gitelmanteam_bot?start=git_influence_<имя латиницей><ДДММ>
+//   TG-бот      — t.me/<бот>?start=git_influence_<имя латиницей><ДДММ>; бот на выбор (BOTS), по умолчанию запасной
 //                 (метка для Salebot только латиницей). Выдаётся сразу. Обязательный выбор
 //                 «кружок Паши в боте»: нужен → заявка ждёт, пока администратор добавит его в Salebot.
 //   TG-входящее — ссылка Telegram Business с готовой фразой. Создать её может только
@@ -33,7 +33,15 @@ const PHRASES_SHEET_ID = "1WmDh6tu0tSKipmylQlgamgjzNkYqAsKf5xewvf0gicw";
 const PHRASES_TAB = "Реестер фраз входящих сообщений"; // так называется лист (с опечаткой)
 const TAB = "Заявки";
 const LIMIT = 245;
-const BOT = "gitelmanteam_bot";
+// Боты для ссылок. По умолчанию — запасной бот (наш, tg-reserve-bot): у Salebot
+// с 14.10.2026 сломана связь с amo, сделки не создаются. Имя блогера генератор
+// сам передаёт запасному боту (приветствие «{Имя} участник тренинга»).
+const BOTS = [
+  { key: "Pavel_Gitelman_Traning2_bot", title: "Запасной бот (работает, сделки в amo)", reserve: true },
+  { key: "gitelmanteam_bot", title: "Salebot — gitelmanteam_bot (сделки сейчас НЕ создаются)" },
+];
+const BOT = BOTS[0].key;
+const RESERVE_BOT_URL = "https://tg-reserve-bot.gitelmanteam.workers.dev";
 const BOT_PREFIX = "git_influence_";
 const PHONES = [{ value: "77010439135", label: "+7 701 043-91-35 — основной WhatsApp" }];
 // Рабочие таблицы Никиты, которые генератор заполняет сам:
@@ -82,7 +90,7 @@ export function botSlug(tag) {
   const lat = [...first].map((ch) => TRANSLIT[ch] !== undefined ? TRANSLIT[ch] : ch).join("").replace(/[^a-z0-9]/g, "");
   return lat ? `${lat}${m[1]}${m[2]}` : "";
 }
-const botLink = (slug) => `https://t.me/${BOT}?start=${BOT_PREFIX}${slug}`;
+const botLink = (slug, key = BOT) => `https://t.me/${key}?start=${BOT_PREFIX}${slug}`;
 const waLink = (phone, text) => `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 const normPhrase = (s) => String(s || "").toLowerCase().replace(/[«»"'“”]/g, "").replace(/\s+/g, " ").trim();
 const fmtMsk = (d) => new Date(d).toLocaleString("ru-RU", { timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -263,7 +271,7 @@ export async function onRequestGet({ request, env }) {
   return json({
     ok: true,
     me: { name: user.name || user.login, login: user.login, admin: isAdmin(user), canCreate: user.login !== "shared" && !!sa },
-    config: { customers: sa ? await customers(sa) : CUSTOMERS, limit: LIMIT, bot: BOT, prefix: BOT_PREFIX, phones: PHONES, platforms: PLATFORMS, waTemplates: WA_TEMPLATES, tgTemplates: TGIN_TEMPLATES, telegram: !!(env.TG_BOT_TOKEN && adminChat(env)) },
+    config: { customers: sa ? await customers(sa) : CUSTOMERS, limit: LIMIT, bot: BOT, bots: BOTS, prefix: BOT_PREFIX, phones: PHONES, platforms: PLATFORMS, waTemplates: WA_TEMPLATES, tgTemplates: TGIN_TEMPLATES, telegram: !!(env.TG_BOT_TOKEN && adminChat(env)) },
     sheetUrl: `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`, tab: TAB,
     sheetError, extError, serviceAccount: sa ? sa.client_email : "",
     rows: rows.slice(-60).reverse(),
@@ -295,7 +303,7 @@ export async function onRequestPost({ request, env }) {
     const who = [name, platform].filter(Boolean).join(", ");
     if (!types.length) return bad("Выберите хотя бы один тип ссылки");
 
-    let waText = "", wa = "", waLen = "", bot = "", phrase = "", circle = "";
+    let waText = "", wa = "", waLen = "", bot = "", phrase = "", circle = "", botDef = null;
     if (types.includes("wa")) {
       const phone = String(b.phone || "").replace(/\D/g, "");
       if (!PHONES.some((p) => p.value === phone)) return bad("Выберите номер WhatsApp из списка");
@@ -308,7 +316,8 @@ export async function onRequestPost({ request, env }) {
     if (types.includes("bot")) {
       const s = botSlug(tag);
       if (!s) return bad("Не удалось собрать метку для бота из тега");
-      bot = botLink(s);
+      botDef = BOTS.find((x) => x.key === b.botKey) || BOTS[0];
+      bot = botLink(s, botDef.key);
       if (b.circle === "yes") {
         const note = String(b.circleNote || "").trim().slice(0, 200);
         if (!note) return bad("Укажите, где взять кружок для бота");
@@ -349,6 +358,17 @@ export async function onRequestPost({ request, env }) {
                        ["Лист1 и справочник", () => appendList1(sa, tag, customer)]);
     if (bot) steps.push(["Лист1 и справочник (бот)", () => appendList1(sa, botSlug(tag), customer)]);
     if (phrase) steps.push(["реестр фраз (TG-входящее)", () => appendPhrase(sa, phrase, tag)]);
+    // Запасной бот: передаём имя блогера для приветствия.
+    let reserveNote = "";
+    if (bot && botDef && botDef.reserve) {
+      try {
+        const r = await fetch(RESERVE_BOT_URL + "/admin/blogger", { method: "POST",
+          headers: { "x-setup-key": env.RESERVE_BOT_SETUP_KEY || "", "content-type": "application/json" },
+          body: JSON.stringify({ key: botSlug(tag), name }) });
+        const j = await r.json().catch(() => ({}));
+        reserveNote = j.ok ? "Имя в приветствии бота: " + j.name : "⚠️ Имя блогера в бот не передано: " + (j.error || "HTTP " + r.status);
+      } catch (e) { reserveNote = "⚠️ Имя блогера в бот не передано: " + e.message; }
+    }
     const wt = await workTables(env, sa, steps);
     const after = (await readRows(sa)).map(view).filter((r) => r.tag === tag && r.types === types.join(",")).pop();
     if (after) await updateCells(sa, after.row, { "Рабочие таблицы": wt.failed.length ? "ошибка: " + wt.failed.join("; ") : "записано: " + wt.done.join("; ") });
@@ -359,7 +379,9 @@ export async function onRequestPost({ request, env }) {
       const ADMIN = "@KaganovichNT";
       const parts = [];
       if (phrase) parts.push(ADMIN + " ссылку на входящее в тг\n\nТег: " + tag + "\n\nСообщение:\n" + phrase);
-      if (circle.startsWith("нужен")) parts.push(ADMIN + " кружок Паши в бота\n\nТег: " + tag + "\nБот: " + bot + "\nГде взять кружок: " + circle.slice(7));
+      if (circle.startsWith("нужен")) parts.push(ADMIN + " кружок Паши в бота\n\nТег: " + tag + "\nБот: " + bot + "\nГде взять кружок: " + circle.slice(7)
+        + (botDef && botDef.reserve ? "\n\nКак привязать: перешлите кружок в @" + botDef.key + " и ответьте меткой " + botSlug(tag) : ""));
+      if (reserveNote) parts.push(reserveNote);
       if (wa) parts.push("Выдано: WhatsApp\n\nТег: " + tag + "\n\nСообщение:\n" + waText + "\n\n" + wa + " (" + waLen + " зн.)");
       if (bot && !circle.startsWith("нужен")) parts.push("Выдано: TG-бот\n\nТег: " + tag + "\n" + bot);
       const footer = "Блогер: " + who + "\nЗаказчик: " + customer + (user.name && user.name !== customer ? " (оформил " + user.name + ")" : "")
