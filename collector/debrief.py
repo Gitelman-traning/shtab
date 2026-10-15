@@ -126,8 +126,8 @@ def one(a):
         z = zoom_of(prep.amo("/leads/%d" % a.deal))
         if not z:
             sys.exit("в сделке %d нет ссылки на запись Zoom" % a.deal)
-        text, minutes = recording.zoom_to_text(*z)
-        extra = minutes * DEEPGRAM_RUB_MIN
+        text, minutes, fresh = recording.zoom_to_text(*z, deal=a.deal)
+        extra = minutes * DEEPGRAM_RUB_MIN if fresh else 0.0
     run(a.deal, text, a.client, a.company, a.meeting, a.dry, a.out, extra, minutes)
     if not a.dry:
         ping_suggest.suggest(a.deal)
@@ -175,11 +175,11 @@ def auto(dry):
         if not z:
             st.append(dict(base, status="wait", note="ждём ссылку на запись Zoom в сделке"))
             continue
-        post_status(st + [dict(base, status="running", note="распознаю запись (говорящие)")], dry)
+        post_status(st + [dict(base, status="running", note="беру расшифровку записи")], dry)
         st = []
         prep.log("сделка %d (Вторая линия %d): есть запись — разбираю" % (deal, l2["id"]))
         try:
-            text, minutes = recording.zoom_to_text(*z)
+            text, minutes, fresh = recording.zoom_to_text(*z, deal=l2["id"])
         except Exception as e:
             prep.log("  запись не получилась: %s — попробую в следующий запуск" % str(e)[:160])
             st.append(dict(base, status="error", note="запись не скачалась или не распозналась — повторю через 30 минут"))
@@ -190,7 +190,7 @@ def auto(dry):
             continue
         post_status([dict(base, status="running", note="разбираю встречу (%d мин записи)" % minutes)], dry)
         try:
-            run(l2["id"], text, base["client"], base["company"], meet[:10], dry, None, minutes * DEEPGRAM_RUB_MIN, minutes)
+            run(l2["id"], text, base["client"], base["company"], meet[:10], dry, None, minutes * DEEPGRAM_RUB_MIN if fresh else 0.0, minutes)
             if not dry:
                 ping_suggest.suggest(l2["id"])
             st.append(dict(base, status="ready", note=""))
