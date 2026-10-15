@@ -25,7 +25,21 @@ permissions:
   contents: read
 
 jobs:
+  # 15.10.2026 (решение Никиты): по расписанию — только рассылка предложений раздела «Пинги» (повод из разбора встречи);
+  # старая логика «давно не было касания» (prepare → plan → deliver) — только ручным запуском
+  notify:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          curl -sf -X POST -H "Authorization: Bearer $SHTAB_TOKEN" -H "Content-Type: application/json"             -d '{"action":"notify_due"}' "$SHTAB_URL/api/pings"
+        env:
+          SHTAB_URL: ${{ secrets.SHTAB_URL }}
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
+
   prepare:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
