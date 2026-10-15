@@ -144,7 +144,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
   <div class="card">
     <div class="bar-row">
       <select id="f-mgr"><option value="">Все диагносты</option></select>
-      <select id="f-st"><option value="">Все статусы</option><option value="ready">готово</option><option value="queued">в очереди</option><option value="error">ошибка</option></select>
+      <select id="f-st"><option value="">Все статусы</option><option value="ready">готово</option><option value="queued">запущено</option><option value="error">ошибка</option></select>
       <span class="spacer" style="flex:1"></span>
       <input type="number" id="add-deal" placeholder="id сделки amo" style="width:150px">
       <button class="btn gold" id="add-btn" type="button">Подготовить</button>
@@ -173,7 +173,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 var H = { "Content-Type": "application/json" };
 function api(q){ return fetch("/api/prep" + (q ? "?" + q : ""), { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
 function post(body){ return fetch("/api/prep", { method: "POST", headers: H, credentials: "same-origin", body: JSON.stringify(body) }).then(function(r){ return r.json(); }); }
-var ST = { ready: "готово", queued: "в очереди", error: "ошибка", none: "нет подготовки" };
+var ST = { ready: "готово", queued: "запущено", error: "ошибка", none: "нет подготовки" };
 var ROWS = [];
 
 // ---------- markdown → html (заголовки, списки, жирный, ссылки) ----------
@@ -628,7 +628,7 @@ function showDetail(deal){
     if (r.status === "none") { document.getElementById("d-cheat").hidden = true; }
     document.getElementById("d-sections").innerHTML = rest.length ? rest.map(function(s, i){
       return '<details class="sec"' + (i < 1 ? " open" : "") + '><summary><span class="n">' + (s.n || "") + '</span>' + esc(s.title || "Вступление") + '</summary><div class="md">' + md(s.body.join("\n")) + '</div></details>';
-    }).join("") : '<p class="empty">' + (r.status === "queued" ? "Подготовка ещё считается — страница обновится сама." : "Текста подготовки нет.") + '</p>';
+    }).join("") : '<p class="empty">' + (r.status === "queued" ? "Подготовка запущена и считается 1–2 минуты — страница обновится сама." : "Текста подготовки нет.") + '</p>';
     document.getElementById("d-cases").innerHTML = (r.cases || []).length ? r.cases.map(function(c){
       var line = [c.niche || c.sphere, c.turn ? c.turn + " млн ₽" : "", c.staff ? c.staff + " чел" : "", [c.city, c.country].filter(Boolean).join(", "), c.paid_at ? "тренинг " + c.paid_at.slice(0, 7) : ""].filter(Boolean).join(" · ");
       var link = c.deal < 9000000000 ? '<a class="btn ghost" style="margin-top:6px" href="https://pavelgitelman.amocrm.ru/leads/detail/' + c.deal + '" target="_blank" rel="noopener">сделка участника ↗</a>' : '<span class="hint" style="display:block;margin-top:6px">из таблицы «Участники тренинга НИШИ»' + (c.name ? ' · ' + esc(c.name) : '') + '</span>';
