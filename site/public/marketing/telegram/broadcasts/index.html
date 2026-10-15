@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Телеграм-канал · Рассылки</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.grid{display:grid;grid-template-columns:minmax(0,600px) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:1100px){.grid{grid-template-columns:1fr}}
+.f label{display:block;font-size:12px;font-weight:600;color:var(--dim);margin:12px 0 5px}
+.f input,.f textarea,.f select{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.f textarea{min-height:110px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 12px}
+@media (max-width:560px){.two,.three{grid-template-columns:1fr}}
+.blk{border-left:3px solid var(--gold-b);padding:2px 0 2px 14px;margin-top:18px}.blk h3{margin:0;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--dim)}
+.hint{font-size:12px;color:var(--dim);margin-top:4px}
+.cnt{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--soft);font-size:13px}.cnt b{font-size:18px}
+.btn{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:9px;padding:8px 14px;cursor:pointer;background:linear-gradient(135deg,var(--gold-a),var(--gold-b));color:#151616}
+.btn.ghost{background:var(--card);border:1px solid var(--line);color:var(--ink);font-weight:600}
+.btn.warn{background:var(--bad-bg);color:var(--bad)}
+.acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.brow{display:grid;grid-template-columns:1fr 120px 1fr 32px;gap:6px;margin-bottom:6px}
+.msg{padding:10px 13px;border-radius:10px;margin:0 0 14px;font-size:13px}.msg.ok{background:var(--ok-bg);color:var(--ok)}.msg.bad{background:var(--bad-bg);color:var(--bad)}.msg.mid{background:var(--mid-bg);color:var(--mid)}
+.wrap{overflow-x:auto}td{vertical-align:top}
+.st{display:inline-block;font-size:11px;padding:1px 7px;border-radius:7px;background:var(--soft);color:var(--dim)}
+.st.sending,.st.scheduled{background:var(--mid-bg);color:var(--mid)}.st.done{background:var(--ok-bg);color:var(--ok)}.st.stopped{background:var(--bad-bg);color:var(--bad)}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:4px;min-width:80px}.bar i{display:block;height:100%;background:var(--gold-b)}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · Телеграм-канал · <b>Рассылки</b></div><h1>Рассылки</h1><p class="sub">Сегмент из базы ботов → сообщение или готовый материал → расписание (даты, часы, темп) → тест себе → запуск с подтверждением числом получателей. Отписавшиеся исключаются всегда. Отчёт о каждой рассылке приходит Никите в Telegram.</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div id="msgs"></div>
+  <div class="msg mid" id="guard"></div>
+  <div class="grid">
+    <div class="card">
+      <h2 id="ftitle">Новая рассылка</h2>
+      <form class="f" id="f" autocomplete="off">
+        <label>Название (для себя)</label><input name="title" placeholder="Дожим без номера — шапка, октябрь">
+
+        <div class="blk"><h3>Кому</h3>
+          <label>Бот</label><select name="bot" id="bot"></select>
+          <div class="two">
+            <div><label>Список</label><select name="list" id="list"><option value="">любой</option></select></div>
+            <div><label>Номер</label><select name="phone"><option value="">все</option><option value="no">не оставили</option><option value="yes">оставили</option></select></div>
+          </div>
+          <div class="three">
+            <div><label>utm_source</label><input name="source" placeholder="instagram"></div>
+            <div><label>utm_medium</label><input name="medium" placeholder="shapka"></div>
+            <div><label>Метка содержит</label><input name="tag" placeholder="bonya"></div>
+          </div>
+          <div class="three">
+            <div><label>Квалификация</label><select name="q"><option value="">все</option><option value="yes">есть ответы</option><option value="no">нет</option></select></div>
+            <div><label>Пришёл с</label><input name="from" type="date"></div>
+            <div><label>по</label><input name="to" type="date"></div>
+          </div>
+          <div class="cnt" id="cnt">выберите бота</div>
+        </div>
+
+        <div class="blk"><h3>Что</h3>
+          <label>Готовый материал (вместо текста)</label><select name="material" id="material"><option value="">— свой текст —</option></select>
+          <div id="textbox"><label>Текст <span class="hint">можно &lt;b&gt;, &lt;i&gt;, &lt;a href="…"&gt;</span></label><textarea name="text"></textarea>
+          <label>Кнопки</label><div id="btns"></div><button type="button" class="btn ghost" id="addbtn">+ кнопка</button></div>
+        </div>
+
+        <div class="blk"><h3>Когда и как быстро</h3>
+          <div class="two"><div><label>Даты: с</label><input name="date_from" type="date"></div><div><label>по</label><input name="date_to" type="date"></div></div>
+          <div class="two"><div><label>Часы (МСК): с</label><input name="hours_from" type="number" min="0" max="23" value="10"></div><div><label>до</label><input name="hours_to" type="number" min="1" max="24" value="20"></div></div>
+          <div class="two"><div><label>Не больше в час</label><input name="per_hour" type="number" min="1" value="300"></div><div><label>Не больше в день</label><input name="per_day" type="number" min="1" value="2000"></div></div>
+          <div class="hint" id="eta"></div>
+        </div>
+
+        <div class="acts">
+          <button class="btn ghost" type="submit">Сохранить черновик</button>
+          <button class="btn ghost" type="button" id="test" disabled>Тест себе в Telegram</button>
+          <button class="btn" type="button" id="start" disabled>Запустить…</button>
+          <button class="btn ghost" type="button" id="new">Новая</button>
+        </div>
+        <p class="hint">Тест приходит вам от выбранного бота — бот должен быть у вас запущен. Запуск — только после теста и с подтверждением числом получателей.</p>
+      </form>
+    </div>
+    <div class="card"><h2>Рассылки</h2><div class="wrap" id="list-b"><p class="empty">загрузка…</p></div></div>
+  </div>
+  <footer>Данные и отправка — ядро ботов (tg-bots-core). Менять и запускать может тот, у кого правка раздела «Телеграм-канал»; всё пишется в журнал.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var A = "/api/tgbots-admin/", f = document.getElementById("f"), cur = null, allowed = [];
+var ST = { draft: "черновик", tested: "тест отправлен", scheduled: "запланирована", sending: "идёт", done: "завершена", stopped: "остановлена" };
+function get(p){ return fetch(A + p, { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
+function post(p, b){ return fetch(A + p, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then(function(r){ return r.json(); }); }
+function say(kind, t){ document.getElementById("msgs").innerHTML = '<div class="msg ' + kind + '">' + esc(t) + '</div>'; window.scrollTo(0, 0); }
+function n(x){ return (x || 0).toLocaleString("ru-RU"); }
+function dt(ms){ if (!ms) return ""; var d = new Date(ms); return dmy(d) + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+function isoDay(ms){ return ms ? iso(new Date(ms)) : ""; }
+
+function btnRow(b){
+  var div = document.createElement("div"); div.className = "brow";
+  var type = b && b.material ? "material" : "url";
+  div.innerHTML = '<input placeholder="Текст кнопки" value="' + esc(b ? b.text : "") + '"><select><option value="url">ссылка</option><option value="material">материал</option></select><input placeholder="https://… или ключ материала" value="' + esc(b ? (b.url || b.material || "") : "") + '"><button type="button" class="btn ghost">×</button>';
+  div.querySelector("select").value = type; div.querySelector("button").onclick = function(){ div.remove(); };
+  document.getElementById("btns").appendChild(div);
+}
+document.getElementById("addbtn").onclick = function(){ btnRow(null); };
+function buttons(){ var rows = []; document.querySelectorAll("#btns .brow").forEach(function(r){ var i = r.querySelectorAll("input"), t = i[0].value.trim(), v = i[1].value.trim(), k = r.querySelector("select").value; if (t && v) { var o = { text: t }; o[k] = v; rows.push([o]); } }); return rows; }
+function segment(){ var s = {}; ["bot", "list", "phone", "source", "medium", "tag", "q", "from", "to"].forEach(function(k){ var v = f[k].value.trim(); if (v) s[k] = v; }); return s; }
+function body(){
+  return { id: cur ? cur.id : undefined, title: f.title.value.trim(), segment: segment(),
+    content: f.material.value ? { material: f.material.value } : { text: f.text.value, buttons: buttons() },
+    date_from: f.date_from.value, date_to: f.date_to.value, hours_from: Number(f.hours_from.value), hours_to: Number(f.hours_to.value),
+    per_hour: Number(f.per_hour.value), per_day: Number(f.per_day.value) };
+}
+var countTimer = null, lastCount = null;
+function recount(){
+  clearTimeout(countTimer);
+  countTimer = setTimeout(function(){
+    if (!f.bot.value) { document.getElementById("cnt").textContent = "выберите бота"; return; }
+    post("broadcasts/count", { segment: segment() }).then(function(j){
+      if (j.total == null) { document.getElementById("cnt").textContent = j.error || "не посчиталось"; return; }
+      lastCount = j.total;
+      document.getElementById("cnt").innerHTML = 'Получателей: <b>' + n(j.total) + '</b> <span class="hint">(без отписавшихся)</span>' + (j.sample && j.sample.length ? '<div class="hint">например: ' + j.sample.map(function(p){ return esc(p.name || p.username || "—"); }).join(", ") + '</div>' : '');
+      eta();
+    });
+  }, 400);
+}
+function eta(){
+  if (lastCount == null) return;
+  var ph = Number(f.per_hour.value) || 1, pd = Number(f.per_day.value) || 1, hrs = Math.max(1, Number(f.hours_to.value) - Number(f.hours_from.value));
+  var perDay = Math.min(pd, ph * hrs), days = Math.ceil(lastCount / perDay);
+  document.getElementById("eta").textContent = "≈ " + n(perDay) + " в день → займёт " + days + " дн.";
+}
+f.addEventListener("input", function(e){ if (["title", "text", "date_from", "date_to"].indexOf(e.target.name) < 0) recount(); eta(); });
+f.material.onchange = function(){ document.getElementById("textbox").hidden = !!f.material.value; };
+function setState(b){
+  document.getElementById("test").disabled = !b || ["draft", "tested"].indexOf(b.status) < 0;
+  document.getElementById("start").disabled = !b || b.status !== "tested";
+}
+function edit(b){
+  cur = b || null; f.reset(); document.getElementById("btns").innerHTML = ""; lastCount = null;
+  document.getElementById("ftitle").textContent = b ? "Рассылка «" + b.title + "» · " + (ST[b.status] || b.status) : "Новая рассылка";
+  if (b) {
+    var s = JSON.parse(b.segment || "{}"), c = JSON.parse(b.content || "{}");
+    f.title.value = b.title; Object.keys(s).forEach(function(k){ if (f[k]) f[k].value = s[k]; });
+    f.material.value = c.material || ""; f.text.value = c.text || "";
+    (c.buttons || []).forEach(function(row){ (Array.isArray(row) ? row : [row]).forEach(btnRow); });
+    f.date_from.value = isoDay(b.window_from); f.date_to.value = isoDay(b.window_to);
+    f.hours_from.value = b.hours_from; f.hours_to.value = b.hours_to; f.per_hour.value = b.per_hour; f.per_day.value = b.per_day;
+  }
+  f.material.onchange(); setState(b); recount();
+}
+document.getElementById("new").onclick = function(){ edit(null); };
+f.onsubmit = function(e){ e.preventDefault(); post("broadcasts", body()).then(function(j){ if (!j.ok) return say("bad", j.error || "не сохранилось"); say("ok", "Черновик сохранён. Дальше — тест себе."); load(j.id); }); };
+document.getElementById("test").onclick = function(){ post("broadcasts/test", { id: cur.id }).then(function(j){ say(j.ok ? "ok" : "bad", j.ok ? "Тест отправлен вам в Telegram — проверьте, как выглядит. После этого можно запускать." : (j.error || "тест не ушёл")); if (j.ok) load(cur.id); }); };
+document.getElementById("start").onclick = function(){
+  var v = prompt("Запуск рассылки «" + cur.title + "».\nВведите число получателей, чтобы подтвердить:");
+  if (v == null) return;
+  post("broadcasts/start", { id: cur.id, confirm: Number(v) }).then(function(j){ say(j.ok ? "ok" : "bad", j.ok ? "Запущено: " + n(j.total) + " получателей, уходит порциями в рамках расписания." : (j.error || "не запустилась")); load(cur.id); });
+};
+function load(open){
+  get("broadcasts").then(function(j){
+    allowed = j.allowed || [];
+    document.getElementById("guard").textContent = "Запуск сейчас разрешён только от: " + (allowed.join(", ") || "—") + ". Клиентам пока ничего не рассылаем — боевые боты включает Никита.";
+    var rows = j.rows || [];
+    document.getElementById("list-b").innerHTML = rows.length ? '<table><thead><tr><th>Рассылка</th><th>Статус</th><th class="num">Отправлено</th><th></th></tr></thead><tbody>' + rows.map(function(b){
+      var pct = b.total ? Math.round(100 * b.sent / b.total) : 0;
+      return '<tr><td><b>' + esc(b.title) + '</b><div class="hint">@' + esc(b.bot) + ' · ' + dt(b.created_at) + (b.created_by ? ' · ' + esc(b.created_by) : '') + '</div></td><td><span class="st ' + esc(b.status) + '">' + esc(ST[b.status] || b.status) + '</span></td><td class="num">' + n(b.sent) + (b.total ? ' / ' + n(b.total) : '') + (b.failed ? '<div class="hint">не доставлено ' + n(b.failed) + '</div>' : '') + '<div class="bar"><i style="width:' + pct + '%"></i></div></td><td><button class="btn ghost" data-open="' + b.id + '">открыть</button>' + (["scheduled", "sending"].indexOf(b.status) >= 0 ? ' <button class="btn warn" data-stop="' + b.id + '">стоп</button>' : '') + '</td></tr>'; }).join("") + '</tbody></table>' : '<p class="empty">рассылок пока нет</p>';
+    document.querySelectorAll("[data-open]").forEach(function(x){ x.onclick = function(){ edit(rows.find(function(b){ return b.id === Number(x.dataset.open); })); }; });
+    document.querySelectorAll("[data-stop]").forEach(function(x){ x.onclick = function(){ if (confirm("Остановить рассылку? Неотправленные не уйдут.")) post("broadcasts/stop", { id: Number(x.dataset.stop) }).then(function(){ load(); }); }; });
+    if (open) edit(rows.find(function(b){ return b.id === open; }));
+  });
+}
+Promise.all([get("bots"), get("lists"), get("materials")]).then(function(r){
+  var bots = (r[0].rows || []).filter(function(b){ return b.connected; });
+  f.bot.innerHTML = '<option value="">— выберите —</option>' + bots.map(function(b){ return '<option value="' + esc(b.key) + '">' + esc(b.title || b.key) + ' (@' + esc(b.key) + ')</option>'; }).join("");
+  f.list.innerHTML = '<option value="">любой</option>' + (r[1].rows || []).map(function(l){ return '<option value="' + esc(l.key) + '">' + esc(l.title || l.key) + ' · ' + n(l.people) + '</option>'; }).join("");
+  f.material.innerHTML = '<option value="">— свой текст —</option>' + (r[2].rows || []).filter(function(m){ return m.active; }).map(function(m){ return '<option value="' + esc(m.key) + '">' + esc(m.title) + '</option>'; }).join("");
+  document.getElementById("stamp").textContent = bots.length + " бот(ов) с токеном";
+  load(); edit(null);
+});
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>

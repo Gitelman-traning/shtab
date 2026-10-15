@@ -13,7 +13,7 @@
 .bot .nm{font-size:13px;font-weight:600;word-break:break-all}.bot .v{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
 .bot .row{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}.bot .row b{color:var(--ink);font-variant-numeric:tabular-nums}
 .st{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:7px;margin-left:6px;vertical-align:1px}
-.st.ours{background:var(--ok-bg);color:var(--ok)}.st.salebot{background:var(--mid-bg);color:var(--mid)}
+.st.ours,.st.reserve{background:var(--ok-bg);color:var(--ok)}.st.salebot{background:var(--mid-bg);color:var(--mid)}
 .flt{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
 .flt label{display:block;font-size:11.5px;font-weight:600;color:var(--dim);margin-bottom:4px}
 .flt input,.flt select{width:100%;font:inherit;font-size:13px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:9px;padding:7px 9px}
@@ -110,7 +110,7 @@ function loadSummary(){
     document.getElementById("bots").innerHTML = j.bots.map(function(b){
       var reach = (b.total || 0) - (b.blocked || 0);
       return '<div class="bot' + (state.bot === b.key ? " on" : "") + '" data-bot="' + esc(b.key) + '"><span class="nm">' + esc(b.title || b.key)
-        + '<span class="st ' + esc(b.status) + '">' + (b.status === "ours" ? "наш" : b.status === "salebot" ? "Salebot" : esc(b.status)) + '</span></span>'
+        + '<span class="st ' + esc(b.status) + '">' + ({ ours: "движок", reserve: "бот замены", salebot: "Salebot", lovable: "Lovable" }[b.status] || esc(b.status)) + '</span></span>'
         + '<span class="v">' + n(b.total) + '</span>'
         + '<span class="row"><span>оставили номер</span><b>' + n(b.phones) + ' · ' + pc(b.phones, b.total) + '</b></span>'
         + '<span class="row"><span>можно написать</span><b>' + n(reach) + '</b></span>'

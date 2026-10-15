@@ -228,7 +228,7 @@ function loadLists(){
 }
 
 get("bots").then(function(j){
-  bots = (j.rows || []).filter(function(b){ return b.connected; });
+  bots = (j.rows || []).filter(function(b){ return b.connected && b.status === "ours"; });   // ссылки на материалы работают только у ботов на движке
   document.getElementById("botsel").innerHTML = bots.length ? bots.map(function(b){ return '<option value="' + esc(b.key) + '">' + esc(b.title || b.key) + '</option>'; }).join("") : '<option value="">нет подключённых ботов</option>';
   document.getElementById("stamp").textContent = bots.length + " бот(ов) на движке";
   document.getElementById("botsel").onchange = function(){ loadMaterials(); };

@@ -2,13 +2,15 @@
 // материалы по ссылке, файлы, опросы, списки. Пересылает в служебное API ядра
 // tg-bots-core (/api/admin/*). Смотреть — доступ к разделу, менять — правка
 // раздела marketing.telegram. Кто менял — уходит в ядро (X-Shtab-User) и в журнал.
+// Рассылки: черновик, счёт сегмента, тест себе (Telegram ID из users.tg_id), запуск, стоп.
 
 import { bad, canRead, canView, canEdit, audit } from "../_lib.js";
 
 const SECTION = "marketing.telegram";
 const CORE = "https://tg-bots-core.gitelmanteam.workers.dev";
-const WRITE = new Set(["materials", "material-file", "polls", "delete"]);
-const READ = new Set(["materials", "polls", "lists", "bots"]);
+const WRITE = new Set(["materials", "material-file", "polls", "delete",
+  "broadcasts", "broadcasts/count", "broadcasts/test", "broadcasts/start", "broadcasts/stop"]);
+const READ = new Set(["materials", "polls", "lists", "bots", "broadcasts"]);
 
 async function forward(request, env, path, user) {
   const url = new URL(request.url);
@@ -16,6 +18,11 @@ async function forward(request, env, path, user) {
     Authorization: `Bearer ${env.TG_CORE_API_TOKEN}`,
     "X-Shtab-User": user.login || "?",
   };
+  // Тест рассылки уходит проверяющему в Telegram — его ID из входа в Штаб.
+  if (path === "broadcasts/test" && user.login) {
+    const u = await env.DB.prepare("SELECT tg_id FROM users WHERE login = ?").bind(user.login).first().catch(() => null);
+    if (u && u.tg_id) headers["X-Shtab-User-Tg"] = String(u.tg_id);
+  }
   for (const h of ["content-type", "x-file-name"]) {
     const v = request.headers.get(h);
     if (v) headers[h] = v;
