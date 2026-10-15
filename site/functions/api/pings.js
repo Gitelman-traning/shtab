@@ -1,7 +1,7 @@
 // GET  /api/pings?manager=krotov[&days=120] — журнал подготовленных пингов (сборщик — токеном; люди — с правом на Вторую линию).
 // GET  /api/pings?mode=suggest[&days=60]   — предложения пингов (15.10.2026): повод из разбора встречи, текст и сценарий кружочка.
 // POST /api/pings {action:"decide", id, status: text|video|skip|new} — менеджер отметил, что сделал с предложением.
-// POST /api/pings {action:"suggest", rows:[{deal, manager, client, company, due_day, reason, loyalty, text, script, model}]} — сборщик (токен):
+// POST /api/pings {action:"suggest", silent?, rows:[{deal, manager, client, company, due_day, reason, loyalty, text, script, model}]} — сборщик (токен):
 //      добавить предложения; что уже пора — сразу в Telegram менеджеру.
 // POST /api/pings {action:"notify_due"} — сборщик (токен), утром: разослать в Telegram предложения, у которых наступил день.
 import { json, bad, canRead, level, now, audit, hasIngestToken, tgSend } from "./_lib.js";
@@ -70,8 +70,9 @@ export async function onRequestPost({ request, env }) {
       let added = 0;
       for (const r of (Array.isArray(b.rows) ? b.rows : []).slice(0, 50)) {
         if (!r || !Number(r.deal) || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.due_day || "")) || !(r.text || r.script)) continue;
-        await env.DB.prepare("INSERT INTO ping_suggest (deal, manager, client, company, due_day, reason, loyalty, text, script, model, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
-          .bind(Number(r.deal), v(r.manager, 80), v(r.client, 80), v(r.company, 120), r.due_day, v(r.reason, 600), Number(r.loyalty) || null, v(r.text, 3000), v(r.script, 3000), v(r.model, 80), now()).run();
+        await env.DB.prepare("INSERT INTO ping_suggest (deal, manager, client, company, due_day, reason, loyalty, text, script, model, created_at, notified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+          .bind(Number(r.deal), v(r.manager, 80), v(r.client, 80), v(r.company, 120), r.due_day, v(r.reason, 600), Number(r.loyalty) || null, v(r.text, 3000), v(r.script, 3000), v(r.model, 80), now(),
+                b.silent ? "без уведомления" : "").run();   // silent — тест: только на странице, в Telegram не шлём
         added++;
       }
       const notified = await notifyDue(env, origin);
