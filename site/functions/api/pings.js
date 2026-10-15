@@ -41,17 +41,7 @@ async function notifyDue(env, origin) {
     const m = String(r.manager || "").toLowerCase();
     const hits = m ? users.filter((x) => { const w = String(x.name || "").toLowerCase().split(/\s+/).filter((y) => y.length >= 3); return w.length && w.every((y) => m.includes(y)); }) : [];
     const text = "Пинг на сегодня: " + (r.client || "клиент") + (r.company ? " · " + r.company : "") + (r.loyalty ? " · лояльность " + r.loyalty + "/10" : "") +
-      "
-Повод: " + r.reason + "
-
-Текст:
-" + r.text + "
-
-Или кружочек, что сказать:
-" + r.script +
-      "
-
-Отметить: " + origin + "/sales/l2/pings/#id=" + r.id;
+      [ "", "Повод: " + r.reason, "", "Текст:", r.text, "", "Или кружочек, что сказать:", r.script, "", "Отметить: " + origin + "/sales/l2/pings/#id=" + r.id ].join(String.fromCharCode(10));
     const sent = new Set();
     if (hits.length === 1) { await tgSend(env, hits[0].tg_id, text); sent.add(String(hits[0].tg_id)); }
     if (env.PREP_TG_CC && !sent.has(String(env.PREP_TG_CC))) await tgSend(env, env.PREP_TG_CC, (hits.length === 1 ? "" : "(менеджер " + r.manager + " в Штабе не найден) ") + text);
