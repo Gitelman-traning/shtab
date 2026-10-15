@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Телеграм-канал · Боты и база</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.bots{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.bot{background:var(--card);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:5px;cursor:pointer;border:2px solid transparent}
+.bot.on{border-color:var(--gold-b)}
+.bot .nm{font-size:13px;font-weight:600;word-break:break-all}.bot .v{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+.bot .row{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}.bot .row b{color:var(--ink);font-variant-numeric:tabular-nums}
+.st{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:7px;margin-left:6px;vertical-align:1px}
+.st.ours{background:var(--ok-bg);color:var(--ok)}.st.salebot{background:var(--mid-bg);color:var(--mid)}
+.flt{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.flt label{display:block;font-size:11.5px;font-weight:600;color:var(--dim);margin-bottom:4px}
+.flt input,.flt select{width:100%;font:inherit;font-size:13px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:9px;padding:7px 9px}
+.acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 12px}
+.btn{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:9px;padding:8px 14px;cursor:pointer;background:linear-gradient(135deg,var(--gold-a),var(--gold-b));color:#151616;text-decoration:none}
+.btn.ghost{background:var(--card);border:1px solid var(--line);color:var(--ink);font-weight:600}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.tabs button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--card);color:var(--dim);border-radius:8px;padding:5px 10px;cursor:pointer}
+.tabs button[aria-pressed=true]{color:var(--ink);border-color:var(--gold-b);font-weight:600}
+.wrap{overflow-x:auto}td.num,th.num{text-align:right}td{white-space:nowrap}td.lbl{white-space:normal;word-break:break-all;max-width:320px}
+.pager{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:12.5px;color:var(--dim)}
+.msg{padding:11px 14px;border-radius:10px;margin:0 0 14px;font-size:13px}.msg.bad{background:var(--bad-bg);color:var(--bad)}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · Телеграм-канал · <b>Боты и база</b></div><h1>Боты и база</h1><p class="sub">Все, кто заходил в наши Telegram-боты: из Salebot (перенесено 15.10) и из запасного бота (обновляется раз в минуту). Метки и UTM — то, по чему собираются лиды. Отсюда будут строиться сегменты для рассылок.</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div id="msgs"></div>
+  <div class="bots" id="bots"><p class="empty">загрузка…</p></div>
+  <p class="note">Нажмите на бота, чтобы смотреть только его. «Можно написать» — без отписки от бота: этим людям бот может прислать сообщение, когда его переведём на нашу систему.</p>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Фильтры <small id="flt-sub"></small></h2>
+    <form class="flt" id="flt" autocomplete="off">
+      <div><label>Номер</label><select name="phone"><option value="">все</option><option value="yes">оставили</option><option value="no">не оставили</option></select></div>
+      <div><label>Отписка</label><select name="blocked"><option value="">все</option><option value="no">можно написать</option><option value="yes">отписались</option></select></div>
+      <div><label>Квалификация</label><select name="q"><option value="">все</option><option value="yes">есть ответы</option><option value="no">нет</option></select></div>
+      <div><label>utm_source</label><input name="source" placeholder="instagram"></div>
+      <div><label>utm_medium</label><input name="medium" placeholder="shapka"></div>
+      <div><label>Метка содержит</label><input name="tag" placeholder="bonya"></div>
+      <div><label>Первый заход с</label><input name="from" type="date"></div>
+      <div><label>по</label><input name="to" type="date"></div>
+      <div><label>Поиск</label><input name="search" placeholder="имя, @username, ID, номер"></div>
+    </form>
+    <div class="acts"><button class="btn" id="apply" type="button">Показать</button><button class="btn ghost" id="reset" type="button">Сбросить</button><a class="btn ghost" id="export" href="#">⬇ Выгрузить CSV</a></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Сбор лидов по меткам <small>зашли → оставили номер</small></h2>
+    <div class="tabs" id="gtabs">
+      <button type="button" data-g="sm" aria-pressed="true">source / medium</button>
+      <button type="button" data-g="tag" aria-pressed="false">метка</button>
+      <button type="button" data-g="source" aria-pressed="false">utm_source</button>
+      <button type="button" data-g="medium" aria-pressed="false">utm_medium</button>
+      <button type="button" data-g="campaign" aria-pressed="false">utm_campaign</button>
+    </div>
+    <div class="wrap" id="tags"><p class="empty">загрузка…</p></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Люди <small id="people-sub"></small></h2>
+    <div class="wrap" id="people"><p class="empty">загрузка…</p></div>
+    <div class="pager" id="pager"></div>
+  </div>
+  <footer>Данные — ядро ботов (tg-bots-core). Списки и выгрузка содержат телефоны: доступны только по именному входу, каждая выгрузка пишется в журнал.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var state = { bot: "", group: "sm", page: 1 };
+function q(extra){
+  var p = new URLSearchParams(), f = document.getElementById("flt");
+  if (state.bot) p.set("bot", state.bot);
+  Array.prototype.forEach.call(f.elements, function(el){ if (el.name && el.value) p.set(el.name, el.value.trim()); });
+  Object.keys(extra || {}).forEach(function(k){ p.set(k, extra[k]); });
+  return p;
+}
+function call(op, extra){
+  var p = q(extra); p.set("op", op);
+  return fetch("/api/tgbots?" + p, { credentials: "same-origin" }).then(function(r){ return r.json(); });
+}
+function n(x){ return (x || 0).toLocaleString("ru-RU"); }
+function pc(a, b){ return b ? Math.round(100 * a / b) + "%" : "—"; }
+function d(ms){ if (!ms) return ""; var t = new Date(ms); return dmy(t) + "." + String(t.getFullYear()).slice(2); }
+function err(m){ document.getElementById("msgs").innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; }
+
+function loadSummary(){
+  call("summary").then(function(j){
+    if (!j.ok) { err(j.error || "нет доступа"); document.getElementById("bots").innerHTML = ""; return; }
+    document.getElementById("stamp").textContent = "в базе " + n(j.total);
+    document.getElementById("bots").innerHTML = j.bots.map(function(b){
+      var reach = (b.total || 0) - (b.blocked || 0);
+      return '<div class="bot' + (state.bot === b.key ? " on" : "") + '" data-bot="' + esc(b.key) + '"><span class="nm">' + esc(b.title || b.key)
+        + '<span class="st ' + esc(b.status) + '">' + (b.status === "ours" ? "наш" : b.status === "salebot" ? "Salebot" : esc(b.status)) + '</span></span>'
+        + '<span class="v">' + n(b.total) + '</span>'
+        + '<span class="row"><span>оставили номер</span><b>' + n(b.phones) + ' · ' + pc(b.phones, b.total) + '</b></span>'
+        + '<span class="row"><span>можно написать</span><b>' + n(reach) + '</b></span>'
+        + '<span class="row"><span>квалификация</span><b>' + n(b.qualified) + '</b></span></div>';
+    }).join("");
+    document.querySelectorAll(".bot").forEach(function(el){ el.onclick = function(){ state.bot = state.bot === el.dataset.bot ? "" : el.dataset.bot; state.page = 1; loadSummary(); loadAll(); }; });
+  });
+}
+function loadTags(){
+  document.getElementById("tags").innerHTML = '<p class="empty">загрузка…</p>';
+  call("tags", { group: state.group }).then(function(j){
+    if (!j.ok) { document.getElementById("tags").innerHTML = '<p class="empty">' + esc(j.error || "нет данных") + '</p>'; return; }
+    if (!j.rows.length) { document.getElementById("tags").innerHTML = '<p class="empty">нет данных</p>'; return; }
+    document.getElementById("tags").innerHTML = '<table><thead><tr><th>Значение</th><th class="num">Зашли</th><th class="num">Номер</th><th class="num">Конверсия</th><th class="num">Отписались</th><th class="num">Квал.</th><th>Период</th></tr></thead><tbody>'
+      + j.rows.map(function(r){ var lbl = (r.label == null || r.label === "" || r.label === " / ") ? "не задано" : r.label;
+        return '<tr><td class="lbl">' + esc(lbl) + '</td><td class="num">' + n(r.total) + '</td><td class="num">' + n(r.phones) + '</td><td class="num">' + pc(r.phones, r.total) + '</td><td class="num">' + n(r.blocked) + '</td><td class="num">' + n(r.qualified) + '</td><td>' + d(r.first_at) + ' — ' + d(r.last_at) + '</td></tr>'; }).join("")
+      + '</tbody></table>';
+  });
+}
+function loadPeople(){
+  document.getElementById("people").innerHTML = '<p class="empty">загрузка…</p>';
+  call("people", { page: state.page, size: 50 }).then(function(j){
+    if (!j.ok) { document.getElementById("people").innerHTML = '<p class="empty">' + esc(j.error || "нет доступа") + '</p>'; document.getElementById("pager").innerHTML = ""; document.getElementById("people-sub").textContent = ""; return; }
+    document.getElementById("people-sub").textContent = "найдено " + n(j.total);
+    document.getElementById("flt-sub").textContent = state.bot ? "бот " + state.bot : "все боты";
+    document.getElementById("people").innerHTML = j.rows.length ? '<table><thead><tr><th>Первый заход</th><th>Имя</th><th>Бот</th><th>Метка</th><th>source / medium</th><th>Номер</th><th>Сделка</th><th>Квалификация</th><th>Статус</th></tr></thead><tbody>'
+      + j.rows.map(function(r){
+        return '<tr><td>' + d(r.first_at) + '</td><td>' + esc(r.name || "") + (r.username ? ' <span class="note">' + esc(r.username) + '</span>' : '') + '</td><td>' + esc(r.bot) + '</td><td class="lbl">' + esc(r.tag || "") + '</td><td>' + esc((r.utm_source || "") + (r.utm_medium ? " / " + r.utm_medium : "")) + '</td><td>' + (r.phone ? "+" + esc(r.phone) : "") + '</td><td>'
+          + (r.amo_lead_id ? '<a href="https://pavelgitelman.amocrm.ru/leads/detail/' + r.amo_lead_id + '" target="_blank" rel="noopener">' + r.amo_lead_id + '</a>' : '') + '</td><td>' + esc([r.q_position, r.q_team].filter(Boolean).join(", ")) + '</td><td>' + (r.blocked_at ? "отписался" : r.phone ? "номер" : "без номера") + '</td></tr>'; }).join("")
+      + '</tbody></table>' : '<p class="empty">никого</p>';
+    var pages = Math.max(1, Math.ceil(j.total / j.size));
+    document.getElementById("pager").innerHTML = '<button class="btn ghost" id="prev" type="button"' + (state.page <= 1 ? " disabled" : "") + '>←</button> стр. ' + state.page + ' из ' + n(pages) + ' <button class="btn ghost" id="next" type="button"' + (state.page >= pages ? " disabled" : "") + '>→</button>';
+    document.getElementById("prev").onclick = function(){ if (state.page > 1) { state.page--; loadPeople(); } };
+    document.getElementById("next").onclick = function(){ if (state.page < pages) { state.page++; loadPeople(); } };
+  });
+}
+function loadAll(){ loadTags(); loadPeople(); var p = q(); p.set("op", "export"); document.getElementById("export").href = "/api/tgbots?" + p; }
+
+document.getElementById("apply").onclick = function(){ state.page = 1; loadAll(); };
+document.getElementById("flt").onsubmit = function(e){ e.preventDefault(); state.page = 1; loadAll(); };
+document.getElementById("reset").onclick = function(){ document.getElementById("flt").reset(); state.bot = ""; state.page = 1; loadSummary(); loadAll(); };
+document.querySelectorAll("#gtabs button").forEach(function(b){ b.onclick = function(){ state.group = b.dataset.g; document.querySelectorAll("#gtabs button").forEach(function(x){ x.setAttribute("aria-pressed", x === b ? "true" : "false"); }); loadTags(); }; });
+loadSummary(); loadAll();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>

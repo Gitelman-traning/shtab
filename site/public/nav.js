@@ -44,7 +44,9 @@
     { id: "mkt", name: "Маркетинг", icon: I.mkt, href: "/marketing/", sec: "marketing", children: [
       { name: "Сводка по источникам", href: "/marketing/", sec: "marketing" },
       { name: "Instagram SMM", href: "/marketing/instagram/", sec: "marketing.instagram" },
-      { name: "Телеграм-канал", href: "/marketing/telegram/", sec: "marketing.telegram" },
+      { name: "Телеграм-канал", href: "/marketing/telegram/", sec: "marketing.telegram", children: [
+        { name: "Боты и база", href: "/marketing/telegram/bots/", sec: "marketing.telegram" }
+      ] },
       { name: "Инфлюенс", href: "/marketing/influence/", sec: "marketing.influence", children: [
         { name: "Менеджеры", href: "/marketing/influence/managers/", sec: "marketing.influence" },
         { name: "Генератор ссылок", href: "/marketing/influence/links/", sec: "marketing.influence" }
