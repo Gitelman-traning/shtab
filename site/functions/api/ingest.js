@@ -12,7 +12,7 @@ async function notifyPrepReady(env, origin, rows) {
     const when = r.meet_at ? ", встреча " + String(r.meet_at).replace(/^(\d+)-(\d+)-(\d+)/, "$3.$2.$1") + " МСК" : "";
     const text = "Подготовка к встрече готова: " + who + when + ".\nОткрыть: " + origin + "/sales/l2/prep/#deal=" + r.deal;
     const m = String(r.manager || "").toLowerCase();
-    const hits = m ? users.filter((u) => { const w = String(u.name || "").split("|")[0].toLowerCase().split(/[^a-zа-яё]+/i).filter((x) => x.length >= 3);   // «Евгений Кротов|GitelmanTeam» — имя до «|» return w.length && w.every((x) => m.includes(x)); }) : [];
+    const hits = m ? users.filter((u) => { const w = String(u.name || "").split("|")[0].toLowerCase().split(/[^a-zа-яё]+/i).filter((x) => x.length >= 3); /* имя до «|»: «Евгений Кротов|GitelmanTeam» */ return w.length && w.every((x) => m.includes(x)); }) : [];
     const sent = new Set();
     if (hits.length === 1) { await tgSend(env, hits[0].tg_id, text); sent.add(String(hits[0].tg_id)); }
     if (env.PREP_TG_CC && !sent.has(String(env.PREP_TG_CC))) await tgSend(env, env.PREP_TG_CC, (r.manager ? "Диагност " + r.manager + (hits.length === 1 ? "" : " (в Штабе не найден, уведомление не ушло)") + ". " : "Диагност не определён. ") + text);

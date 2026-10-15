@@ -39,7 +39,7 @@ async function notifyDue(env, origin) {
   const users = (await env.DB.prepare("SELECT login, name, tg_id FROM users WHERE active = 1 AND tg_id IS NOT NULL AND tg_id != ''").all()).results || [];
   for (const r of due) {
     const m = String(r.manager || "").toLowerCase();
-    const hits = m ? users.filter((x) => { const w = String(x.name || "").split("|")[0].toLowerCase().split(/[^a-zа-яё]+/i).filter((y) => y.length >= 3);   // «Евгений Кротов|GitelmanTeam» — имя до «|» return w.length && w.every((y) => m.includes(y)); }) : [];
+    const hits = m ? users.filter((x) => { const w = String(x.name || "").split("|")[0].toLowerCase().split(/[^a-zа-яё]+/i).filter((y) => y.length >= 3); /* имя до «|»: «Евгений Кротов|GitelmanTeam» */ return w.length && w.every((y) => m.includes(y)); }) : [];
     const text = "Пинг на сегодня: " + (r.client || "клиент") + (r.company ? " · " + r.company : "") + (r.loyalty ? " · лояльность " + r.loyalty + "/10" : "") +
       [ "", "Повод: " + r.reason, "", "Текст:", r.text, "", "Или кружочек, что сказать:", r.script, "", "Отметить: " + origin + "/sales/l2/pings/#id=" + r.id ].join(String.fromCharCode(10));
     const sent = new Set();
