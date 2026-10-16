@@ -9,8 +9,9 @@ import { bad, canRead, canView, canEdit, audit } from "../_lib.js";
 const SECTION = "marketing.telegram";
 const CORE = "https://tg-bots-core.gitelmanteam.workers.dev";
 const WRITE = new Set(["materials", "material-file", "polls", "delete",
-  "broadcasts", "broadcasts/count", "broadcasts/test", "broadcasts/start", "broadcasts/stop"]);
-const READ = new Set(["materials", "polls", "lists", "bots", "broadcasts"]);
+  "broadcasts", "broadcasts/count", "broadcasts/test", "broadcasts/start", "broadcasts/stop",
+  "templates", "templates/preview", "launches", "launch-circle"]);
+const READ = new Set(["materials", "polls", "lists", "bots", "broadcasts", "templates", "launches"]);
 
 async function forward(request, env, path, user) {
   const url = new URL(request.url);
@@ -19,7 +20,7 @@ async function forward(request, env, path, user) {
     "X-Shtab-User": user.login || "?",
   };
   // Тест рассылки уходит проверяющему в Telegram — его ID из входа в Штаб.
-  if (path === "broadcasts/test" && user.login) {
+  if ((path === "broadcasts/test" || path === "templates/preview") && user.login) {
     const u = await env.DB.prepare("SELECT tg_id FROM users WHERE login = ?").bind(user.login).first().catch(() => null);
     if (u && u.tg_id) headers["X-Shtab-User-Tg"] = String(u.tg_id);
   }

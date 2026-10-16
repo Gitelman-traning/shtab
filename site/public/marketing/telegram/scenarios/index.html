@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Телеграм-канал · Сценарии</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tabs button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--dim);border-radius:9px;padding:7px 13px;cursor:pointer}
+.tabs button[aria-pressed=true]{color:var(--ink);border-color:var(--gold-b);font-weight:600}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:18px;align-items:start}
+@media (max-width:1100px){.grid{grid-template-columns:1fr}}
+.f label{display:block;font-size:12px;font-weight:600;color:var(--dim);margin:12px 0 5px}
+.f input,.f textarea,.f select{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.f textarea{min-height:100px;resize:vertical}
+.hint{font-size:12px;color:var(--dim);margin-top:4px}
+.rem{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px}
+.rem .top{display:grid;grid-template-columns:110px 1fr 32px;gap:8px;align-items:center}
+.btn{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:9px;padding:8px 14px;cursor:pointer;background:linear-gradient(135deg,var(--gold-a),var(--gold-b));color:#151616}
+.btn.ghost{background:var(--card);border:1px solid var(--line);color:var(--ink);font-weight:600;padding:6px 11px;font-size:12px}
+.acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.msg{padding:10px 13px;border-radius:10px;margin:0 0 14px;font-size:13px}.msg.ok{background:var(--ok-bg);color:var(--ok)}.msg.bad{background:var(--bad-bg);color:var(--bad)}
+/* превью «как в Telegram» */
+.chat{background:#0e1621;border-radius:16px;padding:14px;max-height:78vh;overflow:auto}
+.when{color:#7f91a4;font-size:11.5px;text-align:center;margin:12px 0 6px}
+.bub{background:#182533;color:#e9edf1;border-radius:14px 14px 14px 4px;padding:9px 12px;font-size:13.5px;line-height:1.4;white-space:pre-wrap;max-width:92%;margin:4px 0}
+.bub img{display:block;max-width:100%;border-radius:10px;margin-bottom:6px}
+.circle{width:150px;height:150px;border-radius:50%;background:#2b3a4a;display:flex;align-items:center;justify-content:center;color:#9fb1c2;font-size:12px;margin:6px 0;text-align:center}
+.kb{margin-top:8px;background:#17212b;border-radius:10px;padding:8px;text-align:center;color:#6ab3f3;font-weight:600;font-size:13px}
+.wrap{overflow-x:auto}td{vertical-align:middle}
+.pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:7px;background:var(--soft);color:var(--dim)}.pill.ok{background:var(--ok-bg);color:var(--ok)}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · Телеграм-канал · <b>Сценарии</b></div><h1>Сценарии ботов</h1><p class="sub">Что бот пишет человеку, который пришёл по ссылке: приветствие с кнопкой «отправить номер», напоминания, если номера нет, и благодарность после номера. «Номер» — для шапки, YouTube, канала; «Блогер» — для ссылок блогеров, с именем блогера и его кружком.</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div id="msgs"></div>
+  <div class="tabs" id="tabs">
+    <button type="button" data-t="number" aria-pressed="true">Номер</button>
+    <button type="button" data-t="blogger" aria-pressed="false">Блогер</button>
+    <button type="button" data-t="launches" aria-pressed="false">Блогеры: имя и кружок</button>
+  </div>
+
+  <section id="s-edit">
+    <div class="grid">
+      <div class="card"><h2 id="etitle">Сценарий</h2>
+        <form class="f" id="f" autocomplete="off">
+          <label>Приветствие <span class="hint" id="hname"></span></label><textarea name="greet"></textarea>
+          <div id="noname"><label>Приветствие, если имени блогера нет</label><textarea name="greet_no_name"></textarea></div>
+          <label>Текст кнопки «отправить номер»</label><input name="button" maxlength="40">
+          <label><input type="checkbox" name="send_circle" style="width:auto"> после приветствия — кружок блогера</label>
+          <label>Напоминания, если номера нет <span class="hint">по порядку, отсчёт от захода</span></label>
+          <div id="rems"></div><button type="button" class="btn ghost" id="addrem">+ напоминание</button>
+          <label>Если человек пишет текстом, а не номером</label><textarea name="ask_again" style="min-height:60px"></textarea>
+          <label>После номера</label><textarea name="thanks" style="min-height:60px"></textarea>
+          <div class="acts"><button class="btn" type="submit">Сохранить</button><button class="btn ghost" type="button" id="send">Прислать себе в Telegram</button></div>
+          <p class="hint">«Прислать себе» — вся цепочка придёт вам от тестового бота @Pavel_Gitelman_Traning3_bot (его нужно один раз запустить). Изменения действуют для новых заходов сразу после сохранения.</p>
+        </form>
+      </div>
+      <div><div class="card"><h2>Превью <small>как увидит клиент</small></h2>
+        <label class="hint" id="pvwho" style="display:block;margin-bottom:8px"></label>
+        <div class="chat" id="pv"></div></div></div>
+    </div>
+  </section>
+
+  <section id="s-launches" hidden>
+    <div class="grid">
+      <div class="card"><h2>Блогеры <small>метка → имя в приветствии и кружок</small></h2><div class="wrap" id="llist"><p class="empty">загрузка…</p></div>
+        <p class="note">Ссылки блогерам выдаёт генератор (Маркетинг → Инфлюенс → Генератор ссылок) — он же сам заводит блогера здесь. Сюда — поправить имя или загрузить кружок.</p></div>
+      <div class="card"><h2 id="ltitle">Блогер</h2>
+        <form class="f" id="lf" autocomplete="off">
+          <label>Метка <span class="hint">git_influence_… — как в ссылке</span></label><input name="tag" placeholder="git_influence_bonya0508">
+          <label>Имя в приветствии</label><input name="title" placeholder="Виктория Боня">
+          <label>Заказчик</label><input name="customer" placeholder="Маша Кишко">
+          <label>Кружок <span class="hint" id="lcircle">не загружен</span></label><input type="file" id="cfile" accept="video/*"><div class="hint">Видео-кружок (mp4, до 12 МБ). Проще всего: сохранить кружок из Telegram и загрузить сюда.</div>
+          <div class="acts"><button class="btn" type="submit">Сохранить</button><button class="btn ghost" type="button" id="lnew">Новый</button><button class="btn ghost" type="button" id="lsend">Прислать себе</button></div>
+        </form>
+      </div>
+    </div>
+  </section>
+  <footer>Данные — ядро ботов (tg-bots-core). Менять может тот, у кого правка раздела «Телеграм-канал»; всё пишется в журнал.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var A = "/api/tgbots-admin/", f = document.getElementById("f"), cur = "number", tpls = {}, materials = [], launches = [], hint = {};
+function get(p){ return fetch(A + p, { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
+function post(p, b){ return fetch(A + p, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then(function(r){ return r.json(); }); }
+function say(ok, t){ document.getElementById("msgs").innerHTML = '<div class="msg ' + (ok ? "ok" : "bad") + '">' + esc(t) + '</div>'; window.scrollTo(0, 0); }
+function render(t, name){ t = t || ""; if (!name) return t.replace(/\{блогер\} участник тренинга\.\s*/g, "").replace(/\{блогер\}\s*/g, ""); return t.replace(/\{блогер\}/g, name); }
+
+function remRow(r){
+  var div = document.createElement("div"); div.className = "rem";
+  div.innerHTML = '<div class="top"><input type="number" min="1" placeholder="мин" value="' + esc(r ? r.after_min : "") + '"><select><option value="text">текст</option>' + materials.map(function(m){ return '<option value="m:' + esc(m.key) + '">материал: ' + esc(m.title) + '</option>'; }).join("") + '</select><button type="button" class="btn ghost" title="убрать">×</button></div><textarea placeholder="Текст напоминания" style="margin-top:8px;min-height:80px">' + esc(r && r.text ? r.text : "") + '</textarea>';
+  var sel = div.querySelector("select"), ta = div.querySelector("textarea");
+  sel.value = r && r.material ? "m:" + r.material : "text";
+  function sync(){ ta.hidden = sel.value !== "text"; }
+  sel.onchange = function(){ sync(); preview(); }; sync();
+  div.querySelector("button").onclick = function(){ div.remove(); preview(); };
+  div.addEventListener("input", preview);
+  document.getElementById("rems").appendChild(div);
+}
+document.getElementById("addrem").onclick = function(){ remRow({ after_min: 60 }); preview(); };
+function readVars(){
+  var v = Object.assign({}, tpls[cur] || {});
+  ["greet", "greet_no_name", "button", "ask_again", "thanks"].forEach(function(k){ if (f[k]) v[k] = f[k].value; });
+  v.send_circle = f.send_circle.checked;
+  v.reminders = [];
+  document.querySelectorAll("#rems .rem").forEach(function(d){
+    var mins = Number(d.querySelector("input").value), sel = d.querySelector("select").value, txt = d.querySelector("textarea").value.trim();
+    if (!mins) return;
+    v.reminders.push(sel === "text" ? { after_min: mins, text: txt } : { after_min: mins, material: sel.slice(2) });
+  });
+  return v;
+}
+function bubble(text, extra){ return '<div class="bub">' + (extra || "") + esc(text) + '</div>'; }
+function preview(){
+  var v = readVars(), name = cur === "blogger" ? (launches[0] && launches[0].title) || "Имя Блогера" : "";
+  document.getElementById("pvwho").textContent = cur === "blogger" ? "Имя блогера в превью: " + name : "";
+  var kb = '<div class="kb">' + esc(v.button || "") + '</div>', h = "";
+  h += '<div class="when">сразу после захода</div>' + bubble(render(name ? v.greet : (v.greet_no_name || v.greet), name));
+  if (v.send_circle) h += '<div class="circle">кружок<br>блогера</div>';
+  v.reminders.forEach(function(r){
+    h += '<div class="when">через ' + r.after_min + ' мин без номера</div>';
+    if (r.material) { var m = materials.find(function(x){ return x.key === r.material; }); h += m ? bubble(render(m.text || m.title, name), m.file_type === "photo" ? "🖼 картинка\n" : m.file_type === "video_note" ? "⏺ кружок\n" : m.file_r2 ? "📎 " + esc(m.file_name || "файл") + "\n" : "") : bubble("материал " + r.material + " не найден"); }
+    else h += bubble(render(r.text, name));
+  });
+  if (v.ask_again) h += '<div class="when">если пишет текстом</div>' + bubble(render(v.ask_again, name));
+  h += kb + '<div class="when">после номера</div>' + bubble(v.thanks || "");
+  document.getElementById("pv").innerHTML = h;
+}
+f.addEventListener("input", preview);
+function load(key){
+  cur = key; var v = tpls[key] || {};
+  document.getElementById("etitle").textContent = key === "blogger" ? "Сценарий «Блогер»" : "Сценарий «Номер»";
+  document.getElementById("hname").textContent = key === "blogger" ? "{блогер} — подставится имя" : "";
+  document.getElementById("noname").hidden = key !== "blogger";
+  ["greet", "greet_no_name", "button", "ask_again", "thanks"].forEach(function(k){ if (f[k]) f[k].value = v[k] || ""; });
+  f.send_circle.checked = !!v.send_circle;
+  document.getElementById("rems").innerHTML = ""; (v.reminders || []).forEach(remRow);
+  preview();
+}
+f.onsubmit = function(e){ e.preventDefault(); post("templates", { key: cur, vars: readVars() }).then(function(j){ say(!!j.ok, j.ok ? "Сохранено — действует для новых заходов." : (j.error || "не сохранилось")); if (j.ok) { tpls[cur] = readVars(); } }); };
+document.getElementById("send").onclick = function(){ post("templates/preview", { key: cur }).then(function(j){ say(!!j.ok, j.ok ? "Отправлено вам в Telegram от тестового бота." : (j.error || "не отправилось")); }); };
+
+/* блогеры */
+var lf = document.getElementById("lf");
+function loadLaunches(){
+  return get("launches").then(function(j){
+    launches = (j.rows || []).filter(function(l){ return l.template === "blogger"; });
+    document.getElementById("llist").innerHTML = launches.length ? '<table><thead><tr><th>Метка</th><th>Имя</th><th>Кружок</th><th></th></tr></thead><tbody>' + launches.map(function(l){ var v = JSON.parse(l.vars || "{}"); return '<tr><td class="k">' + esc(l.tag) + '</td><td>' + esc(l.title || "—") + '</td><td>' + (v.circle_r2 ? '<span class="pill ok">есть</span>' : '<span class="pill">нет</span>') + '</td><td><button class="btn ghost" data-t="' + esc(l.tag) + '">изменить</button></td></tr>'; }).join("") + '</tbody></table>' : '<p class="empty">блогеров пока нет</p>';
+    document.querySelectorAll("#llist button[data-t]").forEach(function(b){ b.onclick = function(){ editLaunch(launches.find(function(l){ return l.tag === b.dataset.t; })); }; });
+  });
+}
+function editLaunch(l){
+  lf.reset(); lf.tag.readOnly = !!l;
+  document.getElementById("ltitle").textContent = l ? "Блогер " + (l.title || l.tag) : "Новый блогер";
+  if (l) { lf.tag.value = l.tag; lf.title.value = l.title || ""; lf.customer.value = l.customer || ""; }
+  document.getElementById("lcircle").textContent = l && JSON.parse(l.vars || "{}").circle_r2 ? "загружен — новый заменит" : "не загружен";
+}
+document.getElementById("lnew").onclick = function(){ editLaunch(null); };
+lf.onsubmit = function(e){
+  e.preventDefault();
+  var tag = lf.tag.value.trim();
+  post("launches", { tag: tag, title: lf.title.value.trim(), customer: lf.customer.value.trim() || null, template: "blogger" }).then(function(j){
+    if (!j.ok) return say(false, j.error || "не сохранилось");
+    var file = document.getElementById("cfile").files[0];
+    if (!file) { say(true, "Сохранено"); return loadLaunches(); }
+    fetch(A + "launch-circle?tag=" + encodeURIComponent(tag), { method: "POST", credentials: "same-origin", headers: { "content-type": file.type || "video/mp4" }, body: file })
+      .then(function(r){ return r.json(); }).then(function(x){ say(!!x.ok, x.ok ? "Сохранено, кружок загружен" : (x.error || "кружок не загрузился")); loadLaunches(); });
+  });
+};
+document.getElementById("lsend").onclick = function(){ var tag = lf.tag.value.trim(); if (!tag) return say(false, "сначала выберите блогера"); post("templates/preview", { key: "blogger", tag: tag }).then(function(j){ say(!!j.ok, j.ok ? "Отправлено вам в Telegram от тестового бота." : (j.error || "не отправилось")); }); };
+
+document.querySelectorAll("#tabs button").forEach(function(b){ b.onclick = function(){
+  document.querySelectorAll("#tabs button").forEach(function(x){ x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+  var isL = b.dataset.t === "launches"; document.getElementById("s-edit").hidden = isL; document.getElementById("s-launches").hidden = !isL;
+  if (!isL) load(b.dataset.t);
+}; });
+
+Promise.all([get("templates"), get("materials"), loadLaunches()]).then(function(r){
+  (r[0].rows || []).forEach(function(t){ tpls[t.key] = JSON.parse(t.vars || "{}"); });
+  materials = (r[1].rows || []).filter(function(m){ return m.active; });
+  document.getElementById("stamp").textContent = Object.keys(tpls).length + " сценария";
+  load("number"); editLaunch(null);
+});
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>

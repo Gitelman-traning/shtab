@@ -47,6 +47,7 @@
       { name: "Instagram SMM", href: "/marketing/instagram/", sec: "marketing.instagram" },
       { name: "Телеграм-канал", href: "/marketing/telegram/", sec: "marketing.telegram", children: [
         { name: "Боты и база", href: "/marketing/telegram/bots/", sec: "marketing.telegram" },
+        { name: "Сценарии", href: "/marketing/telegram/scenarios/", sec: "marketing.telegram" },
         { name: "Материалы и опросы", href: "/marketing/telegram/materials/", sec: "marketing.telegram" },
         { name: "Рассылки", href: "/marketing/telegram/broadcasts/", sec: "marketing.telegram" }
       ] },
