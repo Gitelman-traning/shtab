@@ -10,7 +10,7 @@ const SECTION = "marketing.telegram";
 const CORE = "https://tg-bots-core.gitelmanteam.workers.dev";
 const WRITE = new Set(["materials", "material-file", "polls", "delete",
   "broadcasts", "broadcasts/count", "broadcasts/test", "broadcasts/start", "broadcasts/stop",
-  "templates", "templates/preview", "launches", "launch-circle"]);
+  "templates", "templates/preview", "launches", "launch-circle", "launch-circle-request"]);
 const READ = new Set(["materials", "polls", "lists", "bots", "broadcasts", "templates", "launches"]);
 
 async function forward(request, env, path, user) {
@@ -20,7 +20,7 @@ async function forward(request, env, path, user) {
     "X-Shtab-User": user.login || "?",
   };
   // Тест рассылки уходит проверяющему в Telegram — его ID из входа в Штаб.
-  if ((path === "broadcasts/test" || path === "templates/preview") && user.login) {
+  if ((path === "broadcasts/test" || path === "templates/preview" || path === "launch-circle-request") && user.login) {
     const u = await env.DB.prepare("SELECT tg_id FROM users WHERE login = ?").bind(user.login).first().catch(() => null);
     if (u && u.tg_id) headers["X-Shtab-User-Tg"] = String(u.tg_id);
   }

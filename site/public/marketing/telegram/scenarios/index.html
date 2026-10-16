@@ -86,7 +86,10 @@
           <label>Метка <span class="hint">git_influence_… — как в ссылке</span></label><input name="tag" placeholder="git_influence_bonya0508">
           <label>Имя в приветствии</label><input name="title" placeholder="Виктория Боня">
           <label>Заказчик</label><input name="customer" placeholder="Маша Кишко">
-          <label>Кружок <span class="hint" id="lcircle">не загружен</span></label><input type="file" id="cfile" accept="video/*"><div class="hint">Видео-кружок (mp4, до 12 МБ). Проще всего: сохранить кружок из Telegram и загрузить сюда.</div>
+          <label>Кружок <span class="hint" id="lcircle">не загружен</span></label>
+          <button type="button" class="btn ghost" id="crec">🎥 Записать кружок в Telegram</button>
+          <div class="hint">Тестовый бот @Pavel_Gitelman_Traning3_bot напишет вам «пришлите кружок» — запишите его прямо там или перешлите готовый от блогера. Сначала сохраните блогера.</div>
+          <details style="margin-top:8px"><summary class="hint" style="cursor:pointer">или загрузить файлом</summary><input type="file" id="cfile" accept="video/*" style="margin-top:6px"><div class="hint">mp4 до 12 МБ, квадратное видео.</div></details>
           <div class="acts"><button class="btn" type="submit">Сохранить</button><button class="btn ghost" type="button" id="lnew">Новый</button><button class="btn ghost" type="button" id="lsend">Прислать себе</button></div>
         </form>
       </div>
@@ -179,11 +182,16 @@ lf.onsubmit = function(e){
   var tag = lf.tag.value.trim();
   post("launches", { tag: tag, title: lf.title.value.trim(), customer: lf.customer.value.trim() || null, template: "blogger" }).then(function(j){
     if (!j.ok) return say(false, j.error || "не сохранилось");
+    lf.tag.readOnly = true;
     var file = document.getElementById("cfile").files[0];
     if (!file) { say(true, "Сохранено"); return loadLaunches(); }
     fetch(A + "launch-circle?tag=" + encodeURIComponent(tag), { method: "POST", credentials: "same-origin", headers: { "content-type": file.type || "video/mp4" }, body: file })
       .then(function(r){ return r.json(); }).then(function(x){ say(!!x.ok, x.ok ? "Сохранено, кружок загружен" : (x.error || "кружок не загрузился")); loadLaunches(); });
   });
+};
+document.getElementById("crec").onclick = function(){
+  var tag = lf.tag.value.trim(); if (!tag || !lf.tag.readOnly) return say(false, "сначала сохраните блогера и выберите его в списке");
+  post("launch-circle-request", { tag: tag }).then(function(j){ say(!!j.ok, j.ok ? "Бот написал вам в Telegram — пришлите ему кружок в течение 30 минут, потом обновите страницу." : (j.error || "не получилось")); });
 };
 document.getElementById("lsend").onclick = function(){ var tag = lf.tag.value.trim(); if (!tag) return say(false, "сначала выберите блогера"); post("templates/preview", { key: "blogger", tag: tag }).then(function(j){ say(!!j.ok, j.ok ? "Отправлено вам в Telegram от тестового бота." : (j.error || "не отправилось")); }); };
 
