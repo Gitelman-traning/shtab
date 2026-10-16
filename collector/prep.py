@@ -94,6 +94,46 @@ def amo(path, params=None):
     raise RuntimeError("amo не ответил: %s (%s)" % (path, last))
 
 
+# вводные подготовки (16.10.2026): поля сделки, которые диагност может дописать из Штаба (форма «не хватает вводных»)
+FILL_F = {"company": (1442745, str), "site": (1444259, str), "turn": (1442933, float), "staff": (1426297, int)}
+
+
+def amo_fill(deal, fill):
+    """Дописать в сделку amo вводные из Штаба: {company, site, turn, staff} — только непустые. Пишет токен CrmOps (правило: запись в amo — им)."""
+    vals = []
+    for k, (fid, kind) in FILL_F.items():
+        v = str((fill or {}).get(k) or "").strip()
+        if not v:
+            continue
+        if kind is not str:
+            try:
+                v = kind(float(re.sub(r"[^\d.,]", "", v).replace(",", ".")))
+            except ValueError:
+                continue
+        vals.append({"field_id": fid, "values": [{"value": v}]})
+    if not vals:
+        return 0
+    tok = (os.environ.get("AMO_TOKEN_CRMOPS") or os.environ.get("AMO_TOKEN") or AMO_TOKEN).strip()
+    r = requests.patch(AMO + "/leads/%d" % deal, headers={"Authorization": "Bearer " + tok}, json={"custom_fields_values": vals}, timeout=60)
+    if r.status_code >= 400:
+        raise RuntimeError("amo не принял вводные: %s %s" % (r.status_code, r.text[:160]))
+    log("сделка %d: вводные записаны в amo (%d полей)" % (deal, len(vals)))
+    return len(vals)
+
+
+class MissingInputs(RuntimeError):
+    """Не хватает вводных в карточке (нет компании и сайта): несёт контекст, чтобы Штаб показал форму."""
+    def __init__(self, msg, ctx):
+        super().__init__(msg)
+        self.ctx = ctx
+
+
+def inputs_of(ctx):
+    """Что есть в карточке: {company, site, turn, staff} — по пустым Штаб предложит дописать."""
+    return {"company": ctx.get("company") or "", "site": site_url(ctx) or ctx["card"].get("Сайт / соцсети") or ctx["card"].get("Сайт") or "",
+            "turn": ctx.get("turn") or "", "staff": ctx.get("staff") or ""}
+
+
 def cf_map(entity):
     """custom_fields_values → {field_id: 'значение, значение'} без пустых и «-»"""
     out = {}
@@ -1208,7 +1248,7 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
     log("сделка %d: контекст собран (%d полей, %d заметок), диагност %s" % (deal, len(ctx["card"]), len(ctx["notes"]), ctx["manager"]))
     # решение Никиты 13.10.2026: без названия компании или сайта в карточке подготовку не считаем — поиск «по нише» находит чужие фирмы
     if not facts_path and not identified(ctx, site_url(ctx)):
-        raise RuntimeError("в карточке amo нет названия компании и сайта — заполните поле «Компания» или «Сайт» и нажмите «Пересчитать»")
+        raise MissingInputs("в карточке amo нет названия компании и сайта — впишите их в форме ниже, Штаб запишет в сделку и запустит подготовку", ctx)
     if facts_path:
         facts, sources = open(facts_path, encoding="utf-8").read(), []
         log("  досье взято из файла %s (%d символов)" % (facts_path, len(facts)))
@@ -1290,7 +1330,7 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
            "geo": ", ".join(x for x in (ctx["city"], ctx["country"]) if x), "quiz_url": ctx["quiz_url"],
            "status": "ready", "facts": facts_full, "sources": sources, "cases": picked, "brief": brief,
            "model": MODEL, "tokens_in": usage["in"], "tokens_out": usage["out"], "searches": usage["search"],
-           "amo_url": AMO_UI % deal, "error": ""}
+           "amo_url": AMO_UI % deal, "error": "", "inputs": inputs_of(ctx)}
     if out_path:
         with open(out_path, "w", encoding="utf-8") as f:
             f.write("# Подготовка к встрече · сделка %d · %s · диагност %s\n\n%s\n\n---\n\n# Досье\n\n%s\n\n---\n\n# Участники\n\n%s\n" % (
@@ -1366,8 +1406,11 @@ def cmd_run(deal, dry, out_path, cases_path, facts_path=None, picked_path=None):
     global STYLES
     STYLES = styles
     done, failed = 0, 0
+    fill = json.loads(os.environ.get("PREP_FILL") or "null") if deal else None   # форма «не хватает вводных» в Штабе
     for d in ids:
         try:
+            if fill and not dry:
+                amo_fill(d, fill)
             process(d, cases, prompt, dry, out_path if deal else None, facts_path if deal else None, picked_path if deal else None)
             done += 1
         except Exception as e:
@@ -1375,7 +1418,12 @@ def cmd_run(deal, dry, out_path, cases_path, facts_path=None, picked_path=None):
             log("сделка %d: ОШИБКА %s" % (d, str(e)[:200]))
             if not dry and URL and STOKEN:
                 try:
-                    shtab("POST", "/api/ingest", {"collector": "prep", "prep": [{"deal": d, "status": "error", "error": str(e)[:300], "amo_url": AMO_UI % d}]})
+                    row = {"deal": d, "status": "error", "error": str(e)[:300], "amo_url": AMO_UI % d}
+                    c = getattr(e, "ctx", None)
+                    if c:   # не хватает вводных: что есть в карточке → страница покажет форму по пустым полям
+                        row.update({"inputs": inputs_of(c), "meet_at": c["meet_at"], "manager": c["manager"], "client": c["card"].get("Имя", ""),
+                                    "niche": c["niche"], "turn": c["turn"], "staff": c["staff"], "contact": c["contact"]})
+                    shtab("POST", "/api/ingest", {"collector": "prep", "prep": [row]})
                 except Exception:
                     pass
     log("готово: %d, с ошибкой: %d" % (done, failed))

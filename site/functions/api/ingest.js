@@ -117,18 +117,19 @@ export async function onRequestPost({ request, env }) {
   if (prep.length) {
     const s = (v, n = 200) => String(v == null ? "" : v).slice(0, n);
     const st = env.DB.prepare(
-      "INSERT INTO prep (deal, contact, meet_at, manager, client, company, niche, turn, staff, geo, quiz_url, status, facts, sources, cases, brief, model, tokens_in, tokens_out, searches, amo_url, error, created_at, updated_at) " +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
+      "INSERT INTO prep (deal, contact, meet_at, manager, client, company, niche, turn, staff, geo, quiz_url, status, facts, sources, cases, brief, model, tokens_in, tokens_out, searches, amo_url, error, created_at, updated_at, inputs) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
       "ON CONFLICT(deal) DO UPDATE SET contact = COALESCE(excluded.contact, prep.contact), meet_at = CASE WHEN excluded.meet_at != '' THEN excluded.meet_at ELSE prep.meet_at END, manager = CASE WHEN excluded.manager != '' THEN excluded.manager ELSE prep.manager END, client = CASE WHEN excluded.client != '' THEN excluded.client ELSE prep.client END, company = CASE WHEN excluded.company != '' THEN excluded.company ELSE prep.company END, niche = CASE WHEN excluded.niche != '' THEN excluded.niche ELSE prep.niche END, turn = CASE WHEN excluded.turn != '' THEN excluded.turn ELSE prep.turn END, staff = CASE WHEN excluded.staff != '' THEN excluded.staff ELSE prep.staff END, geo = CASE WHEN excluded.geo != '' THEN excluded.geo ELSE prep.geo END, quiz_url = CASE WHEN excluded.quiz_url != '' THEN excluded.quiz_url ELSE prep.quiz_url END, " +
       "status = excluded.status, facts = CASE WHEN excluded.status = 'ready' THEN excluded.facts ELSE prep.facts END, sources = CASE WHEN excluded.status = 'ready' THEN excluded.sources ELSE prep.sources END, " +
       "cases = CASE WHEN excluded.status = 'ready' THEN excluded.cases ELSE prep.cases END, brief = CASE WHEN excluded.status = 'ready' THEN excluded.brief ELSE prep.brief END, " +
-      "model = excluded.model, tokens_in = excluded.tokens_in, tokens_out = excluded.tokens_out, searches = excluded.searches, amo_url = excluded.amo_url, error = excluded.error, updated_at = excluded.updated_at");
+      "model = excluded.model, tokens_in = excluded.tokens_in, tokens_out = excluded.tokens_out, searches = excluded.searches, amo_url = excluded.amo_url, error = excluded.error, updated_at = excluded.updated_at, inputs = CASE WHEN excluded.inputs != '' THEN excluded.inputs ELSE prep.inputs END");
     for (const r of prep.slice(0, 50)) {
       if (!r || !Number(r.deal)) continue;
       const status = ["ready", "error", "queued"].includes(r.status) ? r.status : "ready";
       await st.bind(Number(r.deal), Number(r.contact) || null, s(r.meet_at, 20), s(r.manager, 80), s(r.client, 80), s(r.company), s(r.niche), s(r.turn, 20), s(r.staff, 20), s(r.geo, 120), s(r.quiz_url, 300),
         status, s(r.facts, 60000), JSON.stringify(Array.isArray(r.sources) ? r.sources.slice(0, 60) : []), JSON.stringify(Array.isArray(r.cases) ? r.cases.slice(0, 10) : []), s(r.brief, 80000),
-        s(r.model, 60), Number(r.tokens_in) || 0, Number(r.tokens_out) || 0, Number(r.searches) || 0, s(r.amo_url, 200), s(r.error, 300), stamp, stamp).run();
+        s(r.model, 60), Number(r.tokens_in) || 0, Number(r.tokens_out) || 0, Number(r.searches) || 0, s(r.amo_url, 200), s(r.error, 300), stamp, stamp,
+        r.inputs && typeof r.inputs === "object" ? JSON.stringify(r.inputs).slice(0, 1000) : "").run();
       written++;
       if (status === "ready" && r.brief) readyPrep.push(r);
       if (status === "error" && r.error) errorPrep.push(r);

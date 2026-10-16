@@ -14,6 +14,8 @@ main[hidden]{display:none}
 input[type=text],input[type=number],select,textarea{font-family:inherit;font-size:13px;background:var(--soft);border:1px solid transparent;color:var(--ink);padding:7px 10px;border-radius:9px}
 input:focus,select:focus,textarea:focus{border-color:var(--gold-b);outline:0} textarea{width:100%;min-height:70px;resize:vertical}
 .st{font-size:10.5px;padding:2px 8px;border-radius:7px;background:var(--soft);color:var(--dim);white-space:nowrap}
+.fill-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.fill-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim)} .fill-grid input{width:100%}
 .st.ready{background:var(--ok-bg);color:var(--ok)} .st.queued{background:var(--mid-bg);color:var(--mid)} .st.error{background:var(--bad-bg);color:var(--bad)}
 tr.row{cursor:pointer} tr.row:hover td{background:var(--zebra)} td .sub{display:block;font-size:11.5px;color:var(--faint)}
 .head{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
@@ -158,6 +160,11 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
   <div class="bar-row"><a class="btn ghost" href="#">← К списку</a><span class="spacer" style="flex:1"></span><a class="btn" id="d-amo" target="_blank" rel="noopener">Сделка в amo ↗</a><a class="btn" id="d-quiz" target="_blank" rel="noopener" hidden>Анкета клиента ↗</a><button class="btn" id="d-recalc" type="button">Пересчитать</button></div>
   <div class="card head"><div class="who"><h2 id="d-title">—</h2><div class="meta" id="d-meta"></div></div><div class="meta" id="d-tech"></div></div>
   <div class="card" id="d-err" hidden style="background:var(--bad-bg);color:var(--bad)"></div>
+  <div class="card" id="d-fill" hidden>
+    <h2>Не хватает вводных <small>впишите — Штаб запишет в сделку amo и запустит подготовку</small></h2>
+    <div class="fill-grid" id="fill-fields"></div>
+    <div class="bar-row" style="margin-top:12px"><button type="button" class="btn gold" id="fill-send">Отправить</button><span class="hint" id="fill-msg"></span></div>
+  </div>
   <div class="card" id="v-debrief" hidden></div>
   <nav class="v-toc" id="d-toc" hidden><div class="in"></div></nav>
   <div id="d-v3" hidden></div>
@@ -585,6 +592,36 @@ document.getElementById("add-btn").addEventListener("click", function(){
     loadList(); });
 });
 
+// ---------- не хватает вводных (16.10.2026) ----------
+// пустые из {компания, сайт, оборот, сотрудники} → поля формы; «Отправить» → /api/prep fill → запись в сделку amo и подготовка
+var FILL = [["company", "Название компании", "ООО «Ромашка»", "text"], ["site", "Сайт", "romashka.ru", "text"],
+            ["turn", "Оборот, млн ₽ в год", "120", "number"], ["staff", "Сотрудников", "45", "number"]];
+function fillForm(r){
+  var box = document.getElementById("d-fill"), inp = {};
+  try { inp = JSON.parse(r.inputs || "{}"); } catch (e) { inp = {}; }
+  var known = !!r.inputs, empty = FILL.filter(function(f){ return !String(inp[f[0]] || "").trim(); });
+  var show = r.status !== "none" && r.status !== "queued" && (r.status === "error" ? (!known || empty.length > 0) : (known && empty.length > 0));
+  box.hidden = !show;
+  if (!show) return false;
+  document.getElementById("fill-fields").innerHTML = (known ? empty : FILL).map(function(f){
+    return '<label for="fill-' + f[0] + '">' + esc(f[1]) + '<input type="' + (f[3] === "number" ? "text" : "text") + '" inputmode="' + (f[3] === "number" ? "decimal" : "text") + '" id="fill-' + f[0] + '" placeholder="' + esc(f[2]) + '"></label>';
+  }).join("");
+  document.getElementById("fill-msg").textContent = r.status === "error" ? "Нужно хотя бы название компании или сайт." : "Подготовка уже есть — после отправки пересчитается с новыми вводными.";
+  var btn = document.getElementById("fill-send");
+  btn.disabled = false; btn.textContent = "Отправить";
+  btn.onclick = function(){
+    var body = { action: "fill", deal: r.deal };
+    FILL.forEach(function(f){ var el = document.getElementById("fill-" + f[0]); if (el) body[f[0]] = el.value.trim(); });
+    btn.disabled = true; btn.textContent = "Записываю…";
+    post(body).then(function(res){
+      if (!res.ok) { btn.disabled = false; btn.textContent = "Отправить"; document.getElementById("fill-msg").textContent = res.error || "не получилось"; return; }
+      if (!res.started) alert("Записано в очередь, но автозапуск не сработал — напишите Никите.");
+      showDetail(r.deal);
+    });
+  };
+  return true;
+}
+
 // ---------- карточка ----------
 var CUR = null;
 function showDetail(deal){
@@ -611,7 +648,8 @@ function showDetail(deal){
     var errBox = document.getElementById("d-err");   // 16.10.2026: причина крупно — диагност сразу видит, почему подготовки нет и что сделать
     errBox.hidden = r.status !== "error";
     if (r.status === "error") errBox.innerHTML = '<b style="font-size:15px">Подготовка не запустилась</b><p style="margin:6px 0 0;font-size:14px;color:var(--ink)">' + esc(r.error || "ошибка") + '</p>'
-      + '<p class="hint" style="margin:6px 0 0">Поправьте карточку в amo и нажмите «Пересчитать» — подготовка будет готова через 1–1,5 минуты.</p>';
+      + '<p class="hint" style="margin:6px 0 0">' + (fillForm(r) ? 'Впишите недостающее ниже и нажмите «Отправить» — подготовка будет готова через 1–1,5 минуты.' : 'Поправьте карточку в amo и нажмите «Пересчитать» — подготовка будет готова через 1–1,5 минуты.') + '</p>';
+    if (r.status !== "error") fillForm(r);
     document.getElementById("d-amo").href = r.amo_url || ("https://pavelgitelman.amocrm.ru/leads/detail/" + r.deal);
     var q = document.getElementById("d-quiz"); q.hidden = !r.quiz_url; if (r.quiz_url) q.href = r.quiz_url;
     var calc = null, brief = String(r.brief || "").replace(/```calc\s*([\s\S]*?)```/, function(_, j){ try { calc = JSON.parse(j); } catch (e) { calc = null; } return ""; });

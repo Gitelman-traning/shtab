@@ -107,6 +107,8 @@ jobs:
           SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           PREP_MODEL: ${{ vars.PREP_MODEL }}
+          PREP_FILL: ${{ toJSON(github.event.client_payload.fill) }}   # форма «не хватает вводных» → записать в сделку amo перед подготовкой
+          AMO_TOKEN_CRMOPS: ${{ secrets.AMO_TOKEN_CRMOPS }}
       - uses: actions/upload-artifact@v4
         if: always() && inputs.dry == '1'
         with:

@@ -7,6 +7,7 @@
 // GET  /api/prep?mode=collector     — для сборщика (токен): {queued, known, no_manager, done_today, cases, styles}
 // GET  /api/prep?mode=transcripts&deals=1,2,3 — для сборщика (токен): расшифровки встреч из KV (t:<deal>), которые есть
 // POST /api/prep {action:"recalc", deal}                       — поставить в очередь (сборщик подхватит в ближайший прогон)
+// POST /api/prep {action:"fill", deal, company, site, turn, staff} — дописать вводные в amo и подготовить
 // POST /api/prep {action:"debrief_start", deal}                — «Встреча проведена»: разбор сразу, как появится запись
 // POST /api/prep {action:"feedback", deal, useful, comment}    — «полезно / не полезно»
 // POST /api/prep {action:"manager", deal, manager}             — диагност вручную
@@ -174,6 +175,30 @@ export async function onRequestPost({ request, env }) {
         method: "POST",
         headers: { "Authorization": "Bearer " + env.GH_DISPATCH_TOKEN, "Accept": "application/vnd.github+json", "User-Agent": "shtab-prep" },
         body: JSON.stringify({ event_type: "prep_deal", client_payload: { deal: String(deal) } }),
+      }).catch(() => null);
+      started = !!(r && r.status === 204);
+      if (!started) await audit(env, user.login, "prep.dispatch_fail", String(deal), r ? String(r.status) : "сеть");
+    }
+    return json({ ok: true, started });
+  }
+  if (b.action === "fill") {   // 16.10.2026: «не хватает вводных» — диагност дописал, сборщик пишет в сделку amo и сразу готовит
+    const t = (x, n) => String(x == null ? "" : x).trim().slice(0, n);
+    const fill = { company: t(b.company, 120), site: t(b.site, 200), turn: t(b.turn, 12).replace(/[^\d.,]/g, ""), staff: t(b.staff, 8).replace(/\D/g, "") };
+    if (!fill.company && !fill.site && !fill.turn && !fill.staff) return bad("заполните хотя бы одно поле");
+    const old = await env.DB.prepare("SELECT inputs FROM prep WHERE deal = ?").bind(deal).first();
+    let had = {}; try { had = JSON.parse((old && old.inputs) || "{}"); } catch (e) { had = {}; }
+    if (!fill.company && !fill.site && !had.company && !had.site) return bad("нужно название компании или сайт — без них подготовку не считаем");
+    await env.DB.prepare(
+      "INSERT INTO prep (deal, status, queued_by, amo_url, created_at, updated_at) VALUES (?, 'queued', ?, ?, ?, ?) " +
+      "ON CONFLICT(deal) DO UPDATE SET status = 'queued', queued_by = excluded.queued_by, error = '', updated_at = excluded.updated_at")
+      .bind(deal, user.login, "https://pavelgitelman.amocrm.ru/leads/detail/" + deal, stamp, stamp).run();
+    await audit(env, user.login, "prep.fill", String(deal), Object.keys(fill).filter((k) => fill[k]).join(","));
+    let started = false;
+    if (env.GH_DISPATCH_TOKEN) {
+      const r = await fetch("https://api.github.com/repos/Gitelman-traning/shtab/dispatches", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + env.GH_DISPATCH_TOKEN, "Accept": "application/vnd.github+json", "User-Agent": "shtab-prep" },
+        body: JSON.stringify({ event_type: "prep_deal", client_payload: { deal: String(deal), fill } }),
       }).catch(() => null);
       started = !!(r && r.status === 204);
       if (!started) await audit(env, user.login, "prep.dispatch_fail", String(deal), r ? String(r.status) : "сеть");
