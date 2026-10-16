@@ -157,6 +157,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 <main id="detail" hidden>
   <div class="bar-row"><a class="btn ghost" href="#">← К списку</a><span class="spacer" style="flex:1"></span><a class="btn" id="d-amo" target="_blank" rel="noopener">Сделка в amo ↗</a><a class="btn" id="d-quiz" target="_blank" rel="noopener" hidden>Анкета клиента ↗</a><button class="btn" id="d-recalc" type="button">Пересчитать</button></div>
   <div class="card head"><div class="who"><h2 id="d-title">—</h2><div class="meta" id="d-meta"></div></div><div class="meta" id="d-tech"></div></div>
+  <div class="card" id="d-err" hidden style="background:var(--bad-bg);color:var(--bad)"></div>
   <div class="card" id="v-debrief" hidden></div>
   <nav class="v-toc" id="d-toc" hidden><div class="in"></div></nav>
   <div id="d-v3" hidden></div>
@@ -549,7 +550,7 @@ function renderList(){
   document.getElementById("rows").innerHTML = '<table><thead><tr><th>Встреча</th><th>Клиент</th><th>Бизнес</th><th>Диагност</th><th>Подготовка</th><th></th></tr></thead><tbody>'
     + rows.map(function(r){
       var biz = [r.niche, r.turn ? r.turn + " млн ₽" : "", r.staff ? r.staff + " чел" : "", r.geo].filter(Boolean).join(" · ");
-      var status = '<span class="st ' + r.status + '">' + (ST[r.status] || r.status) + '</span>' + (r.status === "error" && r.error ? '<span class="sub">' + esc(r.error.slice(0, 90)) + '</span>' : "");
+      var status = '<span class="st ' + r.status + '">' + (ST[r.status] || r.status) + '</span>' + (r.status === "error" && r.error ? '<span class="sub" style="color:var(--bad)">' + esc(r.error.slice(0, 200)) + '</span>' : "");
       if (r.debrief != null) status += ' <span class="v-chip ' + (r.debrief >= 9 ? "" : "gold") + '" title="есть разбор встречи">разбор' + (r.debrief ? " " + r.debrief + "/10" : "") + '</span>';
       var mgr = r.manager ? esc(r.manager) : '<span class="st">не определён</span>';
       return '<tr class="row" data-deal="' + r.deal + '"><td>' + dateLabel(r.meet_at) + '</td><td>' + esc(r.client || "—") + (r.company ? '<span class="sub">' + esc(r.company) + '</span>' : '') + '</td><td>' + (esc(biz) || '<span class="sub">поля не заполнены</span>') + '</td><td>' + mgr + '</td><td>' + status + '</td><td class="num"><a class="btn ghost" href="' + esc(r.amo_url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">amo ↗</a></td></tr>';
@@ -607,6 +608,10 @@ function showDetail(deal){
     });
     document.getElementById("d-tech").innerHTML = '<span class="st ' + r.status + '">' + (ST[r.status] || r.status) + '</span>' + (r.status === "error" ? "<br>" + esc(r.error) : "")
       + (r.updated_at ? "<br>обновлено " + esc(r.updated_at.slice(0, 16).replace("T", " ")) + " UTC" : "") + (r.model ? "<br>" + esc(r.model) + " · " + (r.tokens_in + r.tokens_out).toLocaleString("ru") + " токенов · " + r.searches + " поисков" : "");
+    var errBox = document.getElementById("d-err");   // 16.10.2026: причина крупно — диагност сразу видит, почему подготовки нет и что сделать
+    errBox.hidden = r.status !== "error";
+    if (r.status === "error") errBox.innerHTML = '<b style="font-size:15px">Подготовка не запустилась</b><p style="margin:6px 0 0;font-size:14px;color:var(--ink)">' + esc(r.error || "ошибка") + '</p>'
+      + '<p class="hint" style="margin:6px 0 0">Поправьте карточку в amo и нажмите «Пересчитать» — подготовка будет готова через 1–1,5 минуты.</p>';
     document.getElementById("d-amo").href = r.amo_url || ("https://pavelgitelman.amocrm.ru/leads/detail/" + r.deal);
     var q = document.getElementById("d-quiz"); q.hidden = !r.quiz_url; if (r.quiz_url) q.href = r.quiz_url;
     var calc = null, brief = String(r.brief || "").replace(/```calc\s*([\s\S]*?)```/, function(_, j){ try { calc = JSON.parse(j); } catch (e) { calc = null; } return ""; });

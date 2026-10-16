@@ -19,6 +19,17 @@ async function notifyPrepReady(env, origin, rows) {
   }
 }
 
+// подготовка не запустилась (16.10.2026): тому, кто нажал «Подготовить» (prep.queued_by), — причина и что сделать; копия PREP_TG_CC
+async function notifyPrepError(env, origin, rows) {
+  for (const r of rows) {
+    const q = await env.DB.prepare("SELECT p.queued_by AS login, u.tg_id AS tg FROM prep p LEFT JOIN users u ON u.login = p.queued_by AND u.active = 1 WHERE p.deal = ?").bind(Number(r.deal)).first();
+    const text = "Подготовка по сделке " + r.deal + " не запустилась: " + String(r.error || "ошибка") + ".\nОткрыть: " + origin + "/sales/l2/prep/#deal=" + r.deal;
+    const sent = new Set();
+    if (q && q.tg) { await tgSend(env, q.tg, text); sent.add(String(q.tg)); }
+    if (env.PREP_TG_CC && !sent.has(String(env.PREP_TG_CC))) await tgSend(env, env.PREP_TG_CC, (q && q.login ? "Запускал " + q.login + (q.tg ? "" : " (нет Telegram в Штабе)") + ". " : "") + text);
+  }
+}
+
 async function saveDebriefVersion(env, r, stamp) {
   try {
     await env.DB.prepare("INSERT INTO prep_debrief_ver (deal, label, text, loyalty, model, cost, created_at) VALUES (?,?,?,?,?,?,?)")
@@ -102,7 +113,7 @@ export async function onRequestPost({ request, env }) {
   }
   // подготовка к встрече (collector/prep.py): одна строка на сделку, перезаписывается целиком
   const prep = Array.isArray(body.prep) ? body.prep : [];
-  const readyPrep = [];
+  const readyPrep = [], errorPrep = [];
   if (prep.length) {
     const s = (v, n = 200) => String(v == null ? "" : v).slice(0, n);
     const st = env.DB.prepare(
@@ -120,9 +131,13 @@ export async function onRequestPost({ request, env }) {
         s(r.model, 60), Number(r.tokens_in) || 0, Number(r.tokens_out) || 0, Number(r.searches) || 0, s(r.amo_url, 200), s(r.error, 300), stamp, stamp).run();
       written++;
       if (status === "ready" && r.brief) readyPrep.push(r);
+      if (status === "error" && r.error) errorPrep.push(r);
     }
     if (readyPrep.length) {
       try { await notifyPrepReady(env, new URL(request.url).origin, readyPrep); } catch (e) { /* уведомление не должно ронять приём */ }
+    }
+    if (errorPrep.length) {
+      try { await notifyPrepError(env, new URL(request.url).origin, errorPrep); } catch (e) { /* уведомление не должно ронять приём */ }
     }
   }
   // база участников для подбора кейсов (prep.py cases)
