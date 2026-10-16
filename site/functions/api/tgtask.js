@@ -403,9 +403,10 @@ export async function onRequestPost({ request, env }) {
       if (req.status === "active") {
         await env.OKK_KV.put(key, JSON.stringify({ status: "ok", login: req.login }), { expirationTtl: 600 });
         await env.DB.prepare("UPDATE users SET tg_username = ? WHERE login = ?").bind(msg.from.username || "", req.login).run();
-        await tgSend(env, msg.chat.id, "Готово: вернитесь во вкладку Штаба, она откроется сама.");
+        await tgSend(env, msg.chat.id, "Готово: вернитесь во вкладку Штаба, она откроется сама. Если Штаб открыт на другом устройстве или вкладка закрылась — войдите по ссылке (одноразовая, 10 минут): " + url.origin + "/__tglink?go=" + start[1]);
       } else {
-        await env.OKK_KV.put(key, JSON.stringify({ status: "pending" }), { expirationTtl: 600 });
+        // tg — чтобы ждущая вкладка вошла сама, как только администратор подтвердит заявку; ждём до суток
+        await env.OKK_KV.put(key, JSON.stringify({ status: "pending", tg: msg.from.id }), { expirationTtl: 86400 });
         if (req.status === "pending") await tgSend(env, msg.chat.id, "Заявка уже отправлена, ждёт подтверждения администратора. Напишем, когда доступ откроют.");
       }
     } catch (e) { await tgSend(env, msg.chat.id, "Не получилось: " + (e.message || e)); }

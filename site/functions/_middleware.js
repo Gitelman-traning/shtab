@@ -128,18 +128,24 @@ ${STYLE}</head><body>
   Первый раз — заявка, администратор подтверждает доступ.</p>
   <script>
   (function(){
-    var bot=${JSON.stringify(tgBot)}, btn=document.getElementById("tgbtn"), st=document.getElementById("tgst"), code="", timer=0;
-    function fresh(){ return fetch("/__tglink",{method:"POST"}).then(function(r){return r.json()}).then(function(d){ code=d.code||""; if(code) btn.href="https://t.me/"+bot+"?start="+code; }).catch(function(){}); }
+    var bot=${JSON.stringify(tgBot)}, btn=document.getElementById("tgbtn"), st=document.getElementById("tgst"), code="", timer=0, slow=0;
+    // код живёт в sessionStorage: мобильный браузер, пока человек в Telegram, может перезагрузить вкладку — она продолжит ждать тот же код
+    function keep(c){ try{ c?sessionStorage.setItem("tgcode",c):sessionStorage.removeItem("tgcode"); }catch(e){} }
+    function setCode(c){ code=c||""; keep(code); if(code) btn.href="https://t.me/"+bot+"?start="+code; }
+    function fresh(){ return fetch("/__tglink",{method:"POST"}).then(function(r){return r.json()}).then(function(d){ setCode(d.code); }).catch(function(){}); }
+    function start(ms){ clearInterval(timer); timer=setInterval(poll,ms||2500); }
     function poll(){
       if(!code) return;
       fetch("/__tglink?code="+code).then(function(r){return r.json()}).then(function(d){
-        if(d.status==="ok"){ st.textContent="Готово, открываем Штаб…"; location.href="/shtab"; return; }
-        if(d.status==="pending"){ st.textContent="Заявка отправлена. Администратор подтвердит доступ, и бот напишет вам — после этого нажмите кнопку ещё раз."; clearInterval(timer); return; }
-        if(d.status==="expired"){ st.textContent="Код устарел, нажмите кнопку ещё раз."; clearInterval(timer); fresh(); return; }
+        if(d.status==="ok"){ clearInterval(timer); keep(""); st.textContent="Готово, открываем Штаб…"; location.href="/shtab"; return; }
+        // заявка ждёт администратора: продолжаем опрашивать — после подтверждения вкладка войдёт сама
+        if(d.status==="pending"){ st.textContent="Заявка отправлена. Как только администратор подтвердит доступ, эта вкладка откроет Штаб сама — держите её открытой."; if(!slow){ slow=1; start(10000); } return; }
+        if(d.status==="expired"){ clearInterval(timer); timer=0; st.textContent="Код устарел, нажмите кнопку ещё раз."; fresh(); return; }
       }).catch(function(){});
     }
-    fresh();
-    btn.addEventListener("click",function(){ st.textContent="Ждём ответа от Telegram: в боте нажмите «Start»…"; clearInterval(timer); timer=setInterval(poll,2000); });
+    var saved=""; try{ saved=sessionStorage.getItem("tgcode")||""; }catch(e){}
+    if(/^[a-f0-9]{32}$/.test(saved)){ setCode(saved); start(); poll(); } else fresh();
+    btn.addEventListener("click",function(){ st.textContent="Ждём ответа от Telegram: в боте нажмите «Start»…"; slow=0; start(); });
     document.addEventListener("visibilitychange",function(){ if(!document.hidden && timer) poll(); });
   })();
   </script>` : ""}
@@ -242,16 +248,24 @@ export async function onRequest(context) {
       await env.OKK_KV.put("tglogin:" + code, JSON.stringify({ status: "wait" }), { expirationTtl: 600 });
       return jsonResp({ code });
     }
-    const code = String(url.searchParams.get("code") || "");
-    if (!/^[a-f0-9]{32}$/.test(code)) return jsonResp({ status: "expired" });
+    // ?go=<код> — ссылка из сообщения бота «Готово»: впускает тот браузер, где её открыли (Telegram на телефоне, Штаб на компьютере)
+    const go = url.searchParams.has("go");
+    const code = String(url.searchParams.get(go ? "go" : "code") || "");
+    const back = (cookie) => new Response(null, { status: 303, headers: cookie ? { Location: "/shtab", "Set-Cookie": cookie, "Cache-Control": "no-store" } : { Location: "/", "Cache-Control": "no-store" } });
+    if (!/^[a-f0-9]{32}$/.test(code)) return go ? back() : jsonResp({ status: "expired" });
     let st = null;
     try { st = JSON.parse((await env.OKK_KV.get("tglogin:" + code)) || ""); } catch (e) { st = null; }
-    if (!st) return jsonResp({ status: "expired" });
-    if (st.status !== "ok" || !st.login) return jsonResp({ status: st.status || "wait" });
+    if (!st) return go ? back() : jsonResp({ status: "expired" });
+    // заявка ждала подтверждения: если администратор уже открыл доступ этому Telegram-аккаунту — впускаем без повторного «Start»
+    if (st.status === "pending" && st.tg) {
+      const u = await env.DB.prepare("SELECT login FROM users WHERE tg_id = ? AND active = 1 AND role <> 'pending'").bind(Number(st.tg)).first();
+      if (u) st = { status: "ok", login: u.login };
+    }
+    if (st.status !== "ok" || !st.login) return go ? back() : jsonResp({ status: st.status || "wait" });
     await env.OKK_KV.delete("tglogin:" + code);
     const s = await createSession(env, st.login);
     await audit(env, st.login, "login.tg");
-    return jsonResp({ status: "ok" }, 200, { "Set-Cookie": s.cookie });
+    return go ? back(s.cookie) : jsonResp({ status: "ok" }, 200, { "Set-Cookie": s.cookie });
   }
 
   // вход через Telegram: виджет возвращает сюда подписанные данные аккаунта
