@@ -2,3 +2,6 @@ name = "prep-relay"
 main = "worker.js"
 compatibility_date = "2026-08-01"
 workers_dev = true
+
+[triggers]
+crons = ["5,35 6-19 * * *"]   # МСК 09:05–22:35 — запуск цепочки разбора встречи (debrief_auto)

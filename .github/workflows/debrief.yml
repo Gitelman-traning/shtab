@@ -10,7 +10,7 @@ on:
   schedule:
     - cron: '15,45 6-19 * * *'   # МСК 09:15–22:45
   repository_dispatch:
-    types: [debrief_deal]
+    types: [debrief_deal, debrief_auto]   # debrief_auto — часы из воркера prep-relay (расписание GitHub ненадёжно)
   workflow_dispatch:
     inputs:
       deal:
@@ -42,7 +42,7 @@ jobs:
           python-version: '3.12'
       - run: pip install requests
       - run: |
-          if [ "$EVENT" = "repository_dispatch" ]; then python collector/debrief.py held --deal "$HELD_DEAL"
+          if [ "$EVENT" = "repository_dispatch" ] && [ -n "$HELD_DEAL" ]; then python collector/debrief.py held --deal "$HELD_DEAL"
           elif [ -n "$ONE_DEAL" ]; then python collector/debrief.py one --deal "$ONE_DEAL" $DRY
           else python collector/debrief.py auto $DRY; fi
         env:

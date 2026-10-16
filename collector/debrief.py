@@ -191,7 +191,8 @@ def auto(dry):
     now = dt.datetime.now(prep.MSK).strftime("%Y-%m-%d %H:%M")
     n, st = 0, []
     for p in preps:
-        if p.get("status") != "ready" or (p.get("meet_at") or p.get("updated_at") or "")[:10] < SINCE:
+        # 16.10.2026: и встречи, где подготовка не прошла (нет компании/сайта), — диагност её запрашивал, встреча была
+        if p.get("status") not in ("ready", "error") or (p.get("meet_at") or p.get("updated_at") or "")[:10] < SINCE:
             continue
         deal, meet = int(p["deal"]), p.get("meet_at") or ""
         if deal in busy:
