@@ -98,7 +98,7 @@ function adsNote(rows, tot, from, to, pFrom, pTo){
   var c = tot(rows, "ads.cost", from, to), cp = tot(rows, "ads.cost", pFrom, pTo), k = tot(rows, "ads.clicks", from, to);
   if (!rows.length) return '<p class="note">Google Ads: данных в витрине пока нет — сборщик ждёт ключей кабинета.</p>';
   function rub(v){ return Math.round(v).toLocaleString("ru-RU") + " ₽"; }
-  return '<p class="note"><b>Google Ads за те же 28 дней:</b> расход ' + rub(c) + delta(Math.round(c), Math.round(cp)) + ', клики ' + k + (k ? ", цена клика " + rub(c / k) : "") + '.</p>';
+  return '<p class="note"><b>Google Ads за те же 28 дней:</b> расход ' + rub(c) + ' (прошлые 28 дней: ' + rub(cp) + '), клики ' + k + (k ? ", цена клика " + rub(c / k) : "") + '.</p>';
 }
 function live(){
   var box = document.getElementById("live"); if (!box) return;

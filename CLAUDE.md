@@ -19,7 +19,7 @@
     API в `functions/api/hr/` (`_hr.js` — даты, праздники, остаток отпуска), напоминания HR в Telegram — `hr-remind.yml` → `/api/hr/remind`.
 - `site/functions/api/` — API (Cloudflare Functions). `_lib.js` — права, сессии, `sectionOf()` (какой раздел отвечает за адрес).
 - `site/public/nav.js` — единое меню: новый раздел добавляется в дерево `TREE` здесь и в `SECTIONS`/`sectionOf` в `_lib.js`.
-- `collector/` — ночные сборщики (GitHub Actions `shtab-collect.yml`): `collect.py` — из выгрузки amo в Google Sheets, `okna.py` — окна Первой линии прямо из amo, `metrika.py` — Яндекс Метрика.
+- `collector/` — ночные сборщики (GitHub Actions `shtab-collect.yml`): `collect.py` — из выгрузки amo в Google Sheets, `okna.py` — окна Первой линии прямо из amo, `metrika.py` — Яндекс Метрика (счётчики из секрета METRIKA_COUNTERS + DEFAULT_COUNTERS в коде), `gads.py` — Google Ads (секреты GADS_*, без них пропускается).
   `prep.py` + `prep_prompt.md` — подготовка диагноста к встрече (`prep.yml`, каждые 30 минут днём + вебхук amo): сделки на этапе «Встреча подтверждена» → досье с веб-поиском, похожие участники, подготовка → `/sales/l2/prep/`.
 - `schema*.sql` — миграции D1, по порядку номеров; новая миграция = новый файл `schemaN.sql`, старые не править.
 - `metrics.json` — реестр показателей (id, название, раздел, единица, определение).
