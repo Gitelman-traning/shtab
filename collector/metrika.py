@@ -4,6 +4,8 @@
 Переменные окружения: METRIKA_TOKEN (OAuth-токен Яндекса с правом metrika:read),
 METRIKA_COUNTERS — JSON {"site": 12345678, "journal": 87654321} (ключ площадки → номер счётчика).
 К нему добавляются DEFAULT_COUNTERS (номера счётчиков не секрет: они видны в коде страниц); секрет их перекрывает.
+METRIKA_FILTERS — необязательный JSON {"site": "<фильтр Метрики>"} поверх DEFAULT_FILTERS: счётчик лендинга 103426590
+стоит и на журнале, и на чате, поэтому площадку «site» считаем только по входам на сам gitelman.team.
 Точки: web.visits / web.users (dim = площадка), web.src (dim = «площадка|тип источника»),
 web.eng (dim = «площадка|источник подробно», например «site|Google» или «journal|instagram.com»).
 """
@@ -16,6 +18,7 @@ import requests
 
 API = "https://api-metrika.yandex.net/stat/v1/data"
 DEFAULT_COUNTERS = {"potok": 111555446}   # potok.gitelman.team
+DEFAULT_FILTERS = {"site": "ym:s:startURLDomain=='gitelman.team'"}
 SRC_NAMES = {
     "organic": "поиск", "direct": "прямые заходы", "referral": "переходы с сайтов", "social": "соцсети", "ad": "реклама",
     "internal": "внутренние переходы", "recommend": "рекомендательные системы", "messenger": "мессенджеры",
@@ -35,12 +38,15 @@ def _get(token, params, tries=3):
     raise RuntimeError("Метрика не ответила после %d попыток" % tries)
 
 
-def _rows(token, counter, dims, metrics, d1, d2):
+def _rows(token, counter, dims, metrics, d1, d2, filters=""):
     out = []
     offset = 1
     while True:
-        j = _get(token, {"ids": counter, "dimensions": dims, "metrics": metrics, "date1": d1.isoformat(), "date2": d2.isoformat(),
-                         "limit": 10000, "offset": offset, "accuracy": "full"})
+        params = {"ids": counter, "dimensions": dims, "metrics": metrics, "date1": d1.isoformat(), "date2": d2.isoformat(),
+                  "limit": 10000, "offset": offset, "accuracy": "full"}
+        if filters:
+            params["filters"] = filters
+        j = _get(token, params)
         data = j.get("data", [])
         out.extend(data)
         if len(data) < 10000:
@@ -55,30 +61,31 @@ def metrika_points(day_from, day_to, log=print):
         log("Метрика: METRIKA_TOKEN / METRIKA_COUNTERS не заданы — пропуск")
         return []
     counters = dict(DEFAULT_COUNTERS, **json.loads(counters))
+    filters = dict(DEFAULT_FILTERS, **json.loads(os.environ.get("METRIKA_FILTERS", "").strip() or "{}"))
     points = []
     for key, cid in counters.items():
         try:
-            points.extend(_counter_points(token, key, cid, day_from, day_to, log))
+            points.extend(_counter_points(token, key, cid, day_from, day_to, log, filters.get(key, "")))
         except Exception as e:      # один недоступный счётчик не роняет остальные
             log("Метрика %s (%s): ошибка %s" % (key, cid, e))
     return points
 
 
-def _counter_points(token, key, cid, day_from, day_to, log):
+def _counter_points(token, key, cid, day_from, day_to, log, flt=""):
     points = []
     # визиты и посетители по дням
-    for row in _rows(token, cid, "ym:s:date", "ym:s:visits,ym:s:users", day_from, day_to):
+    for row in _rows(token, cid, "ym:s:date", "ym:s:visits,ym:s:users", day_from, day_to, flt):
         d = row["dimensions"][0]["name"]
         v, u = row["metrics"]
         points.append({"metric": "web.visits", "ptype": "day", "period": d, "dim": key, "value": v})
         points.append({"metric": "web.users", "ptype": "day", "period": d, "dim": key, "value": u})
     # тип источника (последний значимый)
-    for row in _rows(token, cid, "ym:s:date,ym:s:lastTrafficSource", "ym:s:visits", day_from, day_to):
+    for row in _rows(token, cid, "ym:s:date,ym:s:lastTrafficSource", "ym:s:visits", day_from, day_to, flt):
         d = row["dimensions"][0]["name"]
         src = row["dimensions"][1].get("id") or row["dimensions"][1].get("name") or "undefined"
         points.append({"metric": "web.src", "ptype": "day", "period": d, "dim": key + "|" + SRC_NAMES.get(src, src), "value": row["metrics"][0]})
     # источник подробно: поисковик, соцсеть, сайт-реферер, рекламная система
-    for row in _rows(token, cid, "ym:s:date,ym:s:lastSourceEngine", "ym:s:visits", day_from, day_to):
+    for row in _rows(token, cid, "ym:s:date,ym:s:lastSourceEngine", "ym:s:visits", day_from, day_to, flt):
         d = row["dimensions"][0]["name"]
         eng = row["dimensions"][1].get("name") or "не определено"
         points.append({"metric": "web.eng", "ptype": "day", "period": d, "dim": key + "|" + eng, "value": row["metrics"][0]})
@@ -90,7 +97,7 @@ def _counter_points(token, key, cid, day_from, day_to, log):
             points.append({"metric": "web.visits", "ptype": "day", "period": d.isoformat(), "dim": key, "value": 0})
             points.append({"metric": "web.users", "ptype": "day", "period": d.isoformat(), "dim": key, "value": 0})
         d += dt.timedelta(days=1)
-    log("Метрика %s (%s): точек %d" % (key, cid, len(points)))
+    log("Метрика %s (%s%s): точек %d" % (key, cid, ", фильтр " + flt if flt else "", len(points)))
     return points
 
 

@@ -155,6 +155,11 @@ def deal_points(values, day_from, day_to):
                     for tg in L.get("lead_tags", []):
                         if tg in row_tags:
                             add("mkt.leads", lead_d, "tag:" + tg)
+                if "utm_source" in c:
+                    # лиды площадок по utm_source: поток ставит utm_source=potok на кнопку диагностики (список в раскладке lead_utm)
+                    utm = cell(r, c["utm_source"]).strip().lower()
+                    if utm and utm in L.get("lead_utm", ["potok"]):
+                        add("mkt.leads", lead_d, "utm:" + utm)
         if first_line:
             # по менеджеру Первой линии: назначено и проведено в той же сделке (колонка «встреча проведена»)
             b1 = parse_date(cell(r, c["booked_date"]))
