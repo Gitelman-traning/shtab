@@ -9,6 +9,8 @@ site/public/sales/l2/*
 !site/public/sales/l2/prep/
 site/public/guide.html
 site/public/mockups*.html
+# данные сводки по сайтам — из приватного shtab-docs при сборке
+site/public/marketing/site/svodka/data/
 # сессия для локальной проверки (tools/local.py)
 site/.session.local
 *.session.local
@@ -16,4 +18,5 @@ site/.session.local
 # временные клоны при сборке в Cloudflare (cf-build.sh)
 .okk/
 .okk-docs/
+.shtab-docs/
 .doppler.json

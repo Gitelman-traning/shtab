@@ -28,7 +28,7 @@ for v in SHEET_ID GOOGLE_SERVICE_ACCOUNT_JSON; do
   fi
 done
 ROOT="$(pwd)"
-rm -rf .okk .okk-docs
+rm -rf .okk .okk-docs .shtab-docs
 git clone --depth 1 https://github.com/Gitelman-traning/okk.git .okk
 if [ -n "${DOCS_TOKEN:-}" ]; then
   git clone --depth 1 "https://x-access-token:${DOCS_TOKEN}@github.com/Gitelman-traning/okk-docs.git" .okk-docs && echo "okk-docs: есть"
@@ -41,5 +41,11 @@ export PYTHONIOENCODING=utf-8
 export OKK_DIR="$ROOT/.okk"
 export MANUAL_SCORES="$ROOT/.okk-docs/manual-scores.json"
 "$PY" build.py
-rm -rf .okk .okk-docs
+# сводка по сайтам (Маркетинг → Сайт): данные с заявками и оплатами живут в приватном shtab-docs/site-svodka
+if [ -n "${DOCS_TOKEN:-}" ] && git clone --depth 1 "https://x-access-token:${DOCS_TOKEN}@github.com/Gitelman-traning/shtab-docs.git" .shtab-docs; then
+  mkdir -p site/public/marketing/site/svodka/data && cp .shtab-docs/site-svodka/*.json site/public/marketing/site/svodka/data/ && echo "сводка по сайтам: $(ls .shtab-docs/site-svodka/*.json | wc -l) файлов"
+else
+  echo "сводка по сайтам: нет доступа к shtab-docs, страница покажет «Сводок пока нет»"
+fi
+rm -rf .okk .okk-docs .shtab-docs
 echo "сборка готова: site/public"

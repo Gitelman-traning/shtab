@@ -59,6 +59,7 @@
       { name: "Реклама FB", href: "/marketing/fb/", sec: "marketing.fb" },
       { name: "Чат на сайте", href: "/marketing/sitechat/", sec: "marketing.sitechat" },
       { name: "Сайт", href: "/marketing/site/", sec: "marketing.site", children: [
+        { name: "Сводка по сайтам", href: "/marketing/site/svodka/", sec: "marketing.site" },
         { name: "Сайт gitelman.team", href: "/marketing/site/main/", sec: "marketing.site" },
         { name: "Журнал", href: "/marketing/site/journal/", sec: "marketing.site" }
       ] }
