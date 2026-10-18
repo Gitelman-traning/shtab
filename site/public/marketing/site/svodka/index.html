@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Маркетинг · Сайт · Сводка по сайтам</title>
+<link rel="stylesheet" href="/ui.css">
+<!-- Сводка метрик трёх сайтов. Данные — в приватном shtab-docs/site-svodka (там заявки и оплаты), cf-build.sh копирует их в data/.
+     Одна сводка = один файл ГГГГ-ММ-ДД.json; новая — новый файл и её дата первой в index.json. Подробно — shtab-docs/site-svodka/README.md. -->
+<style>
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.top h2{margin:0;font-size:17px;font-weight:600}
+.top select{font:inherit;font-size:12.5px;padding:5px 9px;border:1px solid var(--line-2);border-radius:8px;background:var(--card);color:var(--ink)}
+.lead{font-size:14px;margin:10px 0 0;max-width:900px}
+.warn{background:var(--mid-bg);color:var(--ink);border-radius:12px;padding:12px 14px;font-size:12.5px}
+.warn b{color:var(--mid)}
+.site h2 .st{margin-left:auto;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:7px}
+.st.ok{background:var(--ok-bg);color:var(--ok)}.st.mid{background:var(--mid-bg);color:var(--mid)}.st.bad{background:var(--bad-bg);color:var(--bad)}
+.site .who{font-size:12.5px;color:var(--dim);margin:-6px 0 12px}.site .who b{color:var(--ink);font-weight:600}
+.site .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.site .kpi{background:var(--soft);border-radius:12px;padding:12px 14px;gap:3px}
+.site .kpi .v{font-size:22px}.site .kpi .row{font-size:11.5px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px}@media(max-width:900px){.cols{grid-template-columns:1fr}}
+.cols h3{margin:0 0 6px;font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.cols ul{margin:0;padding-left:18px;font-size:13px}.cols li{margin:4px 0}
+.next{margin-top:14px;background:var(--gold-soft);border-radius:12px;padding:11px 14px;font-size:13px}.next b{color:var(--gold)}
+.src{margin-top:10px;font-size:11.5px;color:var(--faint);word-break:break-all}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · Сайт · <b>Сводка по сайтам</b></div><h1>Сводка по сайтам</h1><p class="sub">Лендинг, журнал и поток: цель каждого сайта, главные цифры, что мешает измерять и следующий шаг. Главная метрика — заявки на диагностику, не позиции.</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main id="out"><p class="empty">загрузка…</p></main>
+<footer>Сводку собирают метрик-треды проекта «SEO завод» раз в две недели. Заявки — из выгрузки amoCRM (таблица «маркетинг»), визиты и поиск — из Метрики, Вебмастера и GSC, когда к ним будет доступ.</footer>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var BASE = "/marketing/site/svodka/data/";
+function getJson(f){ return fetch(BASE + f, { credentials: "same-origin", cache: "no-cache" }).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }); }
+function ru(d){ return d.split("-").reverse().join("."); }
+function period(s){ return ru(s.from).slice(0, 5) + "–" + ru(s.to); }
+var list = [];
+getJson("index.json").then(function(l){ list = l; return show(location.hash.slice(1) || l[0]); })
+  .catch(function(){ document.getElementById("out").innerHTML = '<p class="empty">Сводок пока нет.</p>'; });
+
+function show(date){
+  if (list.indexOf(date) < 0) date = list[0];
+  return getJson(date + ".json").then(function(s){ render(s, date); });
+}
+function li(a){ return (a || []).map(function(x){ return "<li>" + esc(x) + "</li>"; }).join(""); }
+function render(s, date){
+  document.getElementById("stamp").textContent = "сводка от " + ru(s.date);
+  var sel = list.length > 1 ? '<select id="arch" aria-label="Архив сводок">' + list.map(function(d){ return '<option value="' + d + '"' + (d === date ? " selected" : "") + ">от " + ru(d) + "</option>"; }).join("") + "</select>" : "";
+  var h = '<div class="card"><div class="top"><h2>Сводка за ' + period(s) + "</h2>" + sel + '</div><p class="lead">' + esc(s.lead) + "</p></div>";
+  if (s.access) h += '<div class="warn"><b>Доступ к данным.</b> ' + esc(s.access) + "</div>";
+  s.sites.forEach(function(x){
+    h += '<div class="card site" id="' + esc(x.id) + '"><h2>' + esc(x.name) + " <small>" + esc(x.host) + '</small><span class="st ' + esc(x.state) + '">' + esc(x.state_text) + "</span></h2>"
+      + '<p class="who">' + esc(x.role) + " Цель: <b>" + esc(x.goal) + "</b></p>"
+      + '<div class="kpis">' + x.kpis.map(function(k){ return '<div class="kpi"><span class="nm">' + esc(k.nm) + '</span><span class="v">' + esc(k.v) + '</span><span class="row"><span>' + esc(k.sub) + "</span></span></div>"; }).join("") + "</div>"
+      + '<div class="cols"><div><h3>Что видно</h3><ul>' + li(x.facts) + "</ul></div><div><h3>Что мешает измерять</h3><ul>" + li(x.blockers) + "</ul></div></div>"
+      + '<div class="next"><b>Следующий шаг.</b> ' + esc(x.next) + "</div>"
+      + (x.report ? '<div class="src">Полный отчёт: ' + esc(x.report) + "</div>" : "") + "</div>";
+  });
+  if (s.months) {
+    h += '<div class="card"><h2>Заявки с сайтов по месяцам <small>заявки / диагностики / оплаты</small></h2><div class="wide"><table><thead><tr><th>Месяц</th>'
+      + s.months.cols.map(function(c){ return '<th class="num">' + esc(c) + "</th>"; }).join("") + "</tr></thead><tbody>"
+      + s.months.rows.map(function(r){ return '<tr><td class="k">' + esc(r.m) + "</td>" + r.v.map(function(v){ return '<td class="num">' + esc(v) + "</td>"; }).join("") + "</tr>"; }).join("")
+      + '</tbody></table></div><p class="note">' + esc(s.months.note) + "</p></div>";
+  }
+  document.getElementById("out").innerHTML = h;
+  var a = document.getElementById("arch");
+  if (a) a.onchange = function(){ location.hash = a.value; show(a.value); };
+}
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>

@@ -11,6 +11,7 @@
 - `site/public/` — страницы. Каждая страница — отдельный html с `/ui.css`, `/ui.js`, `/nav.js`; данные берутся из `/api/points` и других API.
   - `sales/l1/` — Первая линия (менеджеры, окна на день), `sales/l2/` — Вторая линия и ОКК (страницы ОКК собираются из репозитория `okk`, в git не попадают),
   - `marketing/` — источники (страницы генерируются из `site/src/source.tpl.html` и `web.tpl.html` скриптом `build.py`),
+    `marketing/site/svodka/` — сводка по трём сайтам (лендинг, журнал, поток); данные из приватного `shtab-docs/site-svodka/`, их копирует `cf-build.sh`,
   - `index.html` — общий экран, `tags.html`, `users.html`, `budget.html` — настройки (только админ),
     `settings/dashboard/` — личный дашборд проектов Никиты: три вкладки показывают страницы из KV (`/api/dashboard`), которые присылает его локальная сборка (`Local/dashboard/publish.mjs`); в git их нет.
     `api/tgtask.js` — вебхук бота Штаба: Никита пересылает сообщение коллеги или пишет задачу → очередь в KV, её забирает `Local/dashboard/sync.mjs`.
