@@ -111,7 +111,10 @@
     + "header{padding-left:62px}.pane header .crumbs{padding-left:0}"
     + ".side nav .grp,.side nav .it{display:flex!important;justify-content:flex-start!important;padding:9px 10px!important}.side nav .it.l1{padding-left:26px!important}.side nav .it.l2{padding-left:44px!important}.side .tg{display:grid!important}.side nav .it span,.side .it span,.side .txt{display:inline!important}.side .brand .txt,.side .brand b,.side .brand span{display:block!important}.side .chev{display:inline-block!important}.side .sub{display:flex!important}.side .sub[hidden],.side [data-admin][hidden],.side a[hidden],.side button[hidden]{display:none!important}}"
     + "@media (min-width:761px){.nav-burger,.nav-backdrop{display:none}}"
-    + ".acct{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);margin-left:8px;white-space:nowrap}.acct b{color:var(--ink);font-weight:600}.acct a{color:var(--gold);text-decoration:none;padding:4px 9px;border-radius:7px;background:var(--gold-soft);font-weight:600}";
+    + ".acct{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);margin-left:8px;white-space:nowrap}.acct b{color:var(--ink);font-weight:600}.acct a{color:var(--gold);text-decoration:none;padding:4px 9px;border-radius:7px;background:var(--gold-soft);font-weight:600}"
+    + "@supports not selector(::-webkit-scrollbar){*{scrollbar-width:thin;scrollbar-color:rgba(140,140,140,.35) transparent}*:hover{scrollbar-color:rgba(140,140,140,.55) transparent}}"
+    + "::-webkit-scrollbar{width:8px;height:8px;background:transparent}::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}::-webkit-scrollbar-button{display:none;width:0;height:0}"
+    + "::-webkit-scrollbar-thumb{background:rgba(140,140,140,.35);border-radius:8px;border:2px solid transparent;background-clip:padding-box}::-webkit-scrollbar-thumb:hover{background-color:rgba(140,140,140,.6)}";
   var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
