@@ -55,7 +55,12 @@ function ru(d){ return d.split("-").reverse().join("."); }
 function period(s){ return ru(s.from).slice(0, 5) + "–" + ru(s.to); }
 var list = [];
 getJson("index.json").then(function(l){ list = l; return show(location.hash.slice(1) || l[0]); })
-  .catch(function(){ document.getElementById("out").innerHTML = '<p class="empty">Сводок пока нет.</p>'; });
+  .catch(function(){
+    // файлов сводки нет (сборка не достала shtab-docs) — живые цифры витрины всё равно показываем
+    document.getElementById("out").innerHTML = '<div class="card live" id="live"><h2>Сейчас в витрине <small>загрузка…</small></h2></div>'
+      + '<p class="empty">Сводок пока нет: сборка не получила файлы из shtab-docs.</p>';
+    live();
+  });
 
 function show(date){
   if (list.indexOf(date) < 0) date = list[0];
@@ -90,7 +95,7 @@ function render(s, date){
 // живые цифры из витрины Штаба: Метрика (collector/metrika.py, ключи площадок в секрете METRIKA_COUNTERS) и лиды amo
 var LIVE = [
   { name: "Лендинг", key: "site", tag: "tilda" },
-  { name: "Журнал", key: "journal", tag: "журнал" },
+  { name: "Журнал", key: "journal", tag: "журнал", since: "2026-09-19" },   // свой счётчик журнала шлёт хиты только с 19.09
   { name: "Поток", key: "potok", utm: "potok" }
 ];
 function pts(q){ return fetch("/api/points?" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }).catch(function(){ return { ok: false, rows: [] }; }); }
@@ -114,13 +119,17 @@ function live(){
   }).concat([pts("metric=ads.cost,ads.clicks&dimlike=" + encodeURIComponent("google|%") + range)])).then(function(res){
     var ads = (res.pop().rows) || [];
     if (!res[0][0].ok) { box.innerHTML = '<h2>Сейчас в витрине</h2><p class="empty">Нет доступа к витрине.</p>'; return; }
-    // витрина хранит данные не с начала времён: если прошлые 28 дней покрыты не целиком, сравнение не показываем
-    var first = null;
-    res.forEach(function(r){ (r[0].rows || []).forEach(function(p){ if (p.metric === "web.visits" && (!first || p.period < first)) first = p.period; }); });
-    var partial = !first || first > iso(pFrom);
-    function cmp(a, b){ return partial ? "" : delta(a, b); }
+    // витрина хранит данные не с начала времён (а счётчик журнала считает с 19.09): если у площадки прошлые 28 дней
+    // покрыты не целиком, сравнение по ней не показываем
+    var off = LIVE.map(function(x, i){
+      var f = null; (res[i][0].rows || []).forEach(function(p){ if (p.metric === "web.visits" && (!f || p.period < f)) f = p.period; });
+      if (x.since && (!f || x.since > f)) f = x.since;
+      return !f || f > iso(pFrom) ? (f || "—") : null;
+    });
+    var partial = off.every(function(f){ return f; });
     function tot(rows, metric, a, b){ var t = 0; rows.forEach(function(r){ if (r.metric === metric && r.period >= iso(a) && r.period <= iso(b)) t += r.value; }); return t; }
     var body = LIVE.map(function(x, i){
+      function cmp(a, b){ return off[i] ? "" : delta(a, b); }
       var w = res[i][0].rows || [], src = res[i][1].rows || [], ld = res[i][2].rows || [];
       var v = tot(w, "web.visits", from, to), vp = tot(w, "web.visits", pFrom, pTo), u = tot(w, "web.users", from, to), up = tot(w, "web.users", pFrom, pTo);
       var search = 0, all = 0; src.forEach(function(r){ all += r.value; if (/поиск/.test(r.dim)) search += r.value; });
@@ -129,7 +138,7 @@ function live(){
       return '<tr><td class="k">' + esc(x.name) + '</td><td class="num"><b>' + v + '</b>' + cmp(v, vp) + '</td><td class="num">' + u + cmp(u, up) + '</td><td class="num">' + fmtPct(pct(search, all)) + '</td><td class="num"><b>' + l + '</b>' + cmp(l, lp) + '</td><td class="num">' + (v ? (Math.round(10000 * l / v) / 10).toString().replace(".", ",") : "—") + '</td></tr>';
     }).join("");
     box.innerHTML = '<h2>Сейчас в витрине <small>последние 28 дней, ' + dmy(from) + '–' + dmy(to) + (partial ? "" : ", к прошлым 28") + '</small></h2><div class="wide"><table><thead><tr><th>Сайт</th><th class="num">Визиты</th><th class="num">Посетители</th><th class="num">Из поиска</th><th class="num">Лиды</th><th class="num">Лидов на 1000 визитов</th></tr></thead><tbody>' + body + '</tbody></table></div>'
-      + (partial ? '<p class="note">Сравнения с прошлыми 28 днями пока нет: витрина хранит данные с ' + (first ? dmy(new Date(first + "T00:00:00")) : "—") + ', прошлый период покрыт не целиком.</p>' : "")
+      + (off.some(function(f){ return f; }) ? '<p class="note">Без сравнения с прошлыми 28 днями: ' + LIVE.map(function(x, i){ return off[i] ? x.name.toLowerCase() + " (данные с " + (off[i] === "—" ? "—" : dmy(new Date(off[i] + "T00:00:00"))) + ")" : ""; }).filter(Boolean).join(", ") + ' — прошлый период покрыт не целиком.</p>' : "")
       + adsNote(ads, tot, from, to, pFrom, pTo, partial)
       + '<p class="note">Обновляется каждую ночь. Визиты — Яндекс Метрика; лиды — amo: лендинг по тегу tilda, журнал по тегу «журнал», поток по utm_source=potok. Подробно по площадкам — в пунктах «Сайт gitelman.team» и «Журнал».</p>';
   });
