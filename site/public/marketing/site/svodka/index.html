@@ -26,6 +26,7 @@
 .cols ul{margin:0;padding-left:18px;font-size:13px}.cols li{margin:4px 0}
 .next{margin-top:14px;background:var(--gold-soft);border-radius:12px;padding:11px 14px;font-size:13px}.next b{color:var(--gold)}
 .src{margin-top:10px;font-size:11.5px;color:var(--faint);word-break:break-all}
+.live td.num b{font-weight:600}.live td .d{margin-left:4px}.live .off{color:var(--faint)}
 </style>
 </head>
 <body>
@@ -65,6 +66,7 @@ function render(s, date){
   document.getElementById("stamp").textContent = "сводка от " + ru(s.date);
   var sel = list.length > 1 ? '<select id="arch" aria-label="Архив сводок">' + list.map(function(d){ return '<option value="' + d + '"' + (d === date ? " selected" : "") + ">от " + ru(d) + "</option>"; }).join("") + "</select>" : "";
   var h = '<div class="card"><div class="top"><h2>Сводка за ' + period(s) + "</h2>" + sel + '</div><p class="lead">' + esc(s.lead) + "</p></div>";
+  h += '<div class="card live" id="live"><h2>Сейчас в витрине <small>загрузка…</small></h2></div>';
   if (s.access) h += '<div class="warn"><b>Доступ к данным.</b> ' + esc(s.access) + "</div>";
   s.sites.forEach(function(x){
     h += '<div class="card site" id="' + esc(x.id) + '"><h2>' + esc(x.name) + " <small>" + esc(x.host) + '</small><span class="st ' + esc(x.state) + '">' + esc(x.state_text) + "</span></h2>"
@@ -81,8 +83,46 @@ function render(s, date){
       + '</tbody></table></div><p class="note">' + esc(s.months.note) + "</p></div>";
   }
   document.getElementById("out").innerHTML = h;
+  live();
   var a = document.getElementById("arch");
   if (a) a.onchange = function(){ location.hash = a.value; show(a.value); };
+}
+// живые цифры из витрины Штаба: Метрика (collector/metrika.py, ключи площадок в секрете METRIKA_COUNTERS) и лиды amo
+var LIVE = [
+  { name: "Лендинг", key: "site", tag: "tilda" },
+  { name: "Журнал", key: "journal", tag: "журнал" },
+  { name: "Поток", key: "potok", utm: "potok" }
+];
+function pts(q){ return fetch("/api/points?" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }).catch(function(){ return { ok: false, rows: [] }; }); }
+function live(){
+  var box = document.getElementById("live"); if (!box) return;
+  var today = new Date(); today.setHours(0,0,0,0);
+  var to = addDays(today, -1), from = addDays(to, -27), pTo = addDays(from, -1), pFrom = addDays(pTo, -27);
+  var mFrom = iso(new Date(today.getFullYear(), today.getMonth(), 1)).slice(0, 7);
+  var range = "&ptype=day&from=" + iso(pFrom) + "&to=" + iso(to);
+  Promise.all(LIVE.map(function(x){
+    return Promise.all([
+      pts("metric=web.visits,web.users&dim=" + encodeURIComponent(x.key) + range),
+      pts("metric=web.src&dimlike=" + encodeURIComponent(x.key + "|%") + "&ptype=day&from=" + iso(from) + "&to=" + iso(to)),
+      x.tag ? pts("metric=mkt.leads&dim=" + encodeURIComponent("tag:" + x.tag) + range)
+            : pts("metric=seg.leads&ptype=month&from=" + mFrom + "&dimlike=" + encodeURIComponent("%|s|" + x.utm))
+    ]);
+  })).then(function(res){
+    if (!res[0][0].ok) { box.innerHTML = '<h2>Сейчас в витрине</h2><p class="empty">Нет доступа к витрине.</p>'; return; }
+    function tot(rows, metric, a, b){ var t = 0; rows.forEach(function(r){ if (r.metric === metric && r.period >= iso(a) && r.period <= iso(b)) t += r.value; }); return t; }
+    var body = LIVE.map(function(x, i){
+      var w = res[i][0].rows || [], src = res[i][1].rows || [], ld = res[i][2].rows || [];
+      var v = tot(w, "web.visits", from, to), vp = tot(w, "web.visits", pFrom, pTo), u = tot(w, "web.users", from, to), up = tot(w, "web.users", pFrom, pTo);
+      var search = 0, all = 0; src.forEach(function(r){ all += r.value; if (/поиск/.test(r.dim)) search += r.value; });
+      var l, lp, lnote = "";
+      if (x.tag) { l = tot(ld, "mkt.leads", from, to); lp = tot(ld, "mkt.leads", pFrom, pTo); }
+      else { l = ld.reduce(function(t, r){ return t + r.value; }, 0); lp = null; lnote = ' <span class="plan">с начала месяца</span>'; }
+      if (!w.length) return '<tr><td class="k">' + esc(x.name) + '</td><td class="off" colspan="5">Метрики нет в витрине: счётчик не подключён к ночному сбору</td></tr>';
+      return '<tr><td class="k">' + esc(x.name) + '</td><td class="num"><b>' + v + '</b>' + delta(v, vp) + '</td><td class="num">' + u + delta(u, up) + '</td><td class="num">' + fmtPct(pct(search, all)) + '</td><td class="num"><b>' + l + '</b>' + (lp == null ? lnote : delta(l, lp)) + '</td><td class="num">' + (v ? (Math.round(10000 * l / v) / 10).toString().replace(".", ",") : "—") + '</td></tr>';
+    }).join("");
+    box.innerHTML = '<h2>Сейчас в витрине <small>последние 28 дней, ' + dmy(from) + '–' + dmy(to) + ', к прошлым 28</small></h2><div class="wide"><table><thead><tr><th>Сайт</th><th class="num">Визиты</th><th class="num">Посетители</th><th class="num">Из поиска</th><th class="num">Лиды</th><th class="num">Лидов на 1000 визитов</th></tr></thead><tbody>' + body + '</tbody></table></div>'
+      + '<p class="note">Обновляется каждую ночь. Визиты — Яндекс Метрика; лиды — amo: лендинг по тегу tilda, журнал по тегу «журнал», поток по utm_source=potok. Подробно по площадкам — в пунктах «Сайт gitelman.team» и «Журнал».</p>';
+  });
 }
 </script>
 <script src="/nav.js"></script>
