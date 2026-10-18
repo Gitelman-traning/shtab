@@ -3,6 +3,7 @@
 
 Переменные окружения: METRIKA_TOKEN (OAuth-токен Яндекса с правом metrika:read),
 METRIKA_COUNTERS — JSON {"site": 12345678, "journal": 87654321} (ключ площадки → номер счётчика).
+К нему добавляются DEFAULT_COUNTERS (номера счётчиков не секрет: они видны в коде страниц); секрет их перекрывает.
 Точки: web.visits / web.users (dim = площадка), web.src (dim = «площадка|тип источника»),
 web.eng (dim = «площадка|источник подробно», например «site|Google» или «journal|instagram.com»).
 """
@@ -14,6 +15,7 @@ import time
 import requests
 
 API = "https://api-metrika.yandex.net/stat/v1/data"
+DEFAULT_COUNTERS = {"potok": 111555446}   # potok.gitelman.team
 SRC_NAMES = {
     "organic": "поиск", "direct": "прямые заходы", "referral": "переходы с сайтов", "social": "соцсети", "ad": "реклама",
     "internal": "внутренние переходы", "recommend": "рекомендательные системы", "messenger": "мессенджеры",
@@ -52,34 +54,43 @@ def metrika_points(day_from, day_to, log=print):
     if not token or not counters:
         log("Метрика: METRIKA_TOKEN / METRIKA_COUNTERS не заданы — пропуск")
         return []
-    counters = json.loads(counters)
+    counters = dict(DEFAULT_COUNTERS, **json.loads(counters))
     points = []
     for key, cid in counters.items():
-        # визиты и посетители по дням
-        for row in _rows(token, cid, "ym:s:date", "ym:s:visits,ym:s:users", day_from, day_to):
-            d = row["dimensions"][0]["name"]
-            v, u = row["metrics"]
-            points.append({"metric": "web.visits", "ptype": "day", "period": d, "dim": key, "value": v})
-            points.append({"metric": "web.users", "ptype": "day", "period": d, "dim": key, "value": u})
-        # тип источника (последний значимый)
-        for row in _rows(token, cid, "ym:s:date,ym:s:lastTrafficSource", "ym:s:visits", day_from, day_to):
-            d = row["dimensions"][0]["name"]
-            src = row["dimensions"][1].get("id") or row["dimensions"][1].get("name") or "undefined"
-            points.append({"metric": "web.src", "ptype": "day", "period": d, "dim": key + "|" + SRC_NAMES.get(src, src), "value": row["metrics"][0]})
-        # источник подробно: поисковик, соцсеть, сайт-реферер, рекламная система
-        for row in _rows(token, cid, "ym:s:date,ym:s:lastSourceEngine", "ym:s:visits", day_from, day_to):
-            d = row["dimensions"][0]["name"]
-            eng = row["dimensions"][1].get("name") or "не определено"
-            points.append({"metric": "web.eng", "ptype": "day", "period": d, "dim": key + "|" + eng, "value": row["metrics"][0]})
-        # дни без визитов — нулём, чтобы графики не рвались
-        have = {p["period"] for p in points if p["metric"] == "web.visits" and p["dim"] == key}
-        d = day_from
-        while d <= day_to:
-            if d.isoformat() not in have:
-                points.append({"metric": "web.visits", "ptype": "day", "period": d.isoformat(), "dim": key, "value": 0})
-                points.append({"metric": "web.users", "ptype": "day", "period": d.isoformat(), "dim": key, "value": 0})
-            d += dt.timedelta(days=1)
-        log("Метрика %s (%s): точек %d" % (key, cid, sum(1 for p in points if p["dim"].startswith(key))))
+        try:
+            points.extend(_counter_points(token, key, cid, day_from, day_to, log))
+        except Exception as e:      # один недоступный счётчик не роняет остальные
+            log("Метрика %s (%s): ошибка %s" % (key, cid, e))
+    return points
+
+
+def _counter_points(token, key, cid, day_from, day_to, log):
+    points = []
+    # визиты и посетители по дням
+    for row in _rows(token, cid, "ym:s:date", "ym:s:visits,ym:s:users", day_from, day_to):
+        d = row["dimensions"][0]["name"]
+        v, u = row["metrics"]
+        points.append({"metric": "web.visits", "ptype": "day", "period": d, "dim": key, "value": v})
+        points.append({"metric": "web.users", "ptype": "day", "period": d, "dim": key, "value": u})
+    # тип источника (последний значимый)
+    for row in _rows(token, cid, "ym:s:date,ym:s:lastTrafficSource", "ym:s:visits", day_from, day_to):
+        d = row["dimensions"][0]["name"]
+        src = row["dimensions"][1].get("id") or row["dimensions"][1].get("name") or "undefined"
+        points.append({"metric": "web.src", "ptype": "day", "period": d, "dim": key + "|" + SRC_NAMES.get(src, src), "value": row["metrics"][0]})
+    # источник подробно: поисковик, соцсеть, сайт-реферер, рекламная система
+    for row in _rows(token, cid, "ym:s:date,ym:s:lastSourceEngine", "ym:s:visits", day_from, day_to):
+        d = row["dimensions"][0]["name"]
+        eng = row["dimensions"][1].get("name") or "не определено"
+        points.append({"metric": "web.eng", "ptype": "day", "period": d, "dim": key + "|" + eng, "value": row["metrics"][0]})
+    # дни без визитов — нулём, чтобы графики не рвались
+    have = {p["period"] for p in points if p["metric"] == "web.visits" and p["dim"] == key}
+    d = day_from
+    while d <= day_to:
+        if d.isoformat() not in have:
+            points.append({"metric": "web.visits", "ptype": "day", "period": d.isoformat(), "dim": key, "value": 0})
+            points.append({"metric": "web.users", "ptype": "day", "period": d.isoformat(), "dim": key, "value": 0})
+        d += dt.timedelta(days=1)
+    log("Метрика %s (%s): точек %d" % (key, cid, len(points)))
     return points
 
 

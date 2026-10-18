@@ -94,6 +94,12 @@ var LIVE = [
   { name: "Поток", key: "potok", utm: "potok" }
 ];
 function pts(q){ return fetch("/api/points?" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }).catch(function(){ return { ok: false, rows: [] }; }); }
+function adsNote(rows, tot, from, to, pFrom, pTo){
+  var c = tot(rows, "ads.cost", from, to), cp = tot(rows, "ads.cost", pFrom, pTo), k = tot(rows, "ads.clicks", from, to);
+  if (!rows.length) return '<p class="note">Google Ads: данных в витрине пока нет — сборщик ждёт ключей кабинета.</p>';
+  function rub(v){ return Math.round(v).toLocaleString("ru-RU") + " ₽"; }
+  return '<p class="note"><b>Google Ads за те же 28 дней:</b> расход ' + rub(c) + delta(Math.round(c), Math.round(cp)) + ', клики ' + k + (k ? ", цена клика " + rub(c / k) : "") + '.</p>';
+}
 function live(){
   var box = document.getElementById("live"); if (!box) return;
   var today = new Date(); today.setHours(0,0,0,0);
@@ -107,7 +113,8 @@ function live(){
       x.tag ? pts("metric=mkt.leads&dim=" + encodeURIComponent("tag:" + x.tag) + range)
             : pts("metric=seg.leads&ptype=month&from=" + mFrom + "&dimlike=" + encodeURIComponent("%|s|" + x.utm))
     ]);
-  })).then(function(res){
+  }).concat([pts("metric=ads.cost,ads.clicks&dimlike=" + encodeURIComponent("google|%") + range)])).then(function(res){
+    var ads = (res.pop().rows) || [];
     if (!res[0][0].ok) { box.innerHTML = '<h2>Сейчас в витрине</h2><p class="empty">Нет доступа к витрине.</p>'; return; }
     function tot(rows, metric, a, b){ var t = 0; rows.forEach(function(r){ if (r.metric === metric && r.period >= iso(a) && r.period <= iso(b)) t += r.value; }); return t; }
     var body = LIVE.map(function(x, i){
@@ -121,6 +128,7 @@ function live(){
       return '<tr><td class="k">' + esc(x.name) + '</td><td class="num"><b>' + v + '</b>' + delta(v, vp) + '</td><td class="num">' + u + delta(u, up) + '</td><td class="num">' + fmtPct(pct(search, all)) + '</td><td class="num"><b>' + l + '</b>' + (lp == null ? lnote : delta(l, lp)) + '</td><td class="num">' + (v ? (Math.round(10000 * l / v) / 10).toString().replace(".", ",") : "—") + '</td></tr>';
     }).join("");
     box.innerHTML = '<h2>Сейчас в витрине <small>последние 28 дней, ' + dmy(from) + '–' + dmy(to) + ', к прошлым 28</small></h2><div class="wide"><table><thead><tr><th>Сайт</th><th class="num">Визиты</th><th class="num">Посетители</th><th class="num">Из поиска</th><th class="num">Лиды</th><th class="num">Лидов на 1000 визитов</th></tr></thead><tbody>' + body + '</tbody></table></div>'
+      + adsNote(ads, tot, from, to, pFrom, pTo)
       + '<p class="note">Обновляется каждую ночь. Визиты — Яндекс Метрика; лиды — amo: лендинг по тегу tilda, журнал по тегу «журнал», поток по utm_source=potok. Подробно по площадкам — в пунктах «Сайт gitelman.team» и «Журнал».</p>';
   });
 }

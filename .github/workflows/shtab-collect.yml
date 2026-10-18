@@ -40,6 +40,12 @@ jobs:
           SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
           METRIKA_TOKEN: ${{ secrets.METRIKA_TOKEN }}
           METRIKA_COUNTERS: ${{ secrets.METRIKA_COUNTERS }}
+          GADS_DEVELOPER_TOKEN: ${{ secrets.GADS_DEVELOPER_TOKEN }}
+          GADS_CLIENT_ID: ${{ secrets.GADS_CLIENT_ID }}
+          GADS_CLIENT_SECRET: ${{ secrets.GADS_CLIENT_SECRET }}
+          GADS_REFRESH_TOKEN: ${{ secrets.GADS_REFRESH_TOKEN }}
+          GADS_CUSTOMER_ID: ${{ secrets.GADS_CUSTOMER_ID }}
+          GADS_LOGIN_CUSTOMER_ID: ${{ secrets.GADS_LOGIN_CUSTOMER_ID }}
           FROM: ${{ inputs.from }}
           TO: ${{ inputs.to }}
           SYNC_METRICS: ${{ inputs.sync_metrics }}

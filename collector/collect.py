@@ -438,7 +438,13 @@ def main():
     except Exception as e:      # Метрика не должна ронять весь сбор
         log("Метрика: ошибка %s" % e)
         mp = []
-    ap = ap + mp
+    try:
+        from gads import gads_points
+        gp = gads_points(day_from, day_to, log)
+    except Exception as e:      # реклама тоже не роняет сбор
+        log("Google Ads: ошибка %s" % e)
+        gp = []
+    ap = ap + mp + gp
     fp, plans = plan_points(values, today)
     send(pts + pp + ap + fp, "период %s—%s" % (day_from, day_to), plans)
     log("ГОТОВО")

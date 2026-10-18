@@ -565,5 +565,41 @@
   "kind": "flow",
   "better": "up",
   "definition": "Визиты за день по конкретному источнику: поисковик, соцсеть, сайт-реферер, рекламная система. Срез: «площадка|источник»."
+ },
+ {
+  "id": "ads.cost",
+  "name": "Расход на рекламу",
+  "section": "marketing.site",
+  "unit": "₽",
+  "kind": "flow",
+  "better": "down",
+  "definition": "Расход рекламного кабинета за день в валюте аккаунта. Срез: «система|кампания» (google|… — Google Ads)."
+ },
+ {
+  "id": "ads.clicks",
+  "name": "Клики по рекламе",
+  "section": "marketing.site",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Клики по объявлениям за день. Срез: «система|кампания»."
+ },
+ {
+  "id": "ads.impr",
+  "name": "Показы рекламы",
+  "section": "marketing.site",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Показы объявлений за день. Срез: «система|кампания»."
+ },
+ {
+  "id": "ads.conv",
+  "name": "Конверсии рекламы",
+  "section": "marketing.site",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Конверсии по данным рекламного кабинета за день (как настроены в кабинете). Срез: «система|кампания»."
  }
 ]
