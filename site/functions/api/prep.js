@@ -85,8 +85,10 @@ export async function onRequestGet(context) {
     const dt = await env.DB.prepare("SELECT COUNT(*) AS n FROM prep WHERE status = 'ready' AND created_at >= ?").bind(today).first();
     const c = await env.DB.prepare("SELECT deal, pipeline, name, company, niche, sphere, turn, staff, site, role, city, country, paid_at, result, checked_at, source FROM prep_cases").all();
     const st = await env.DB.prepare("SELECT manager, text FROM prep_style").all();
+    let alumni = [];   // база кейсов выпускников из отчётных презентаций (19.10.2026)
+    try { alumni = (await env.DB.prepare("SELECT * FROM prep_alumni ORDER BY id").all()).results || []; } catch (e) { alumni = []; }
     return json({ ok: true, queued: (q.results || []).map((r) => r.deal), known: (k.results || []).map((r) => r.deal), no_manager: (nm.results || []).map((r) => r.deal),
-      done_today: (dt && dt.n) || 0, cases: c.results || [], styles: st.results || [] });
+      done_today: (dt && dt.n) || 0, cases: c.results || [], styles: st.results || [], alumni });
   }
   const user = await canRead(request, env);
   if (!user || level(user, "sales.l2") < 1) return bad("нет доступа", 401);

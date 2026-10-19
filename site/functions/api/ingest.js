@@ -52,7 +52,7 @@ export async function onRequestPost({ request, env }) {
   const plans = Array.isArray(body.plans) ? body.plans : [];
   const collector = String(body.collector || "unknown").slice(0, 60);
   const has = (k) => Array.isArray(body[k]) && body[k].length;
-  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("prep_debrief") && !has("prep_debrief_versions") && !has("debrief_status") && !has("expenses")) return bad("пустая пачка");
+  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("prep_debrief") && !has("prep_debrief_versions") && !has("debrief_status") && !has("prep_alumni") && !has("expenses")) return bad("пустая пачка");
 
   const stamp = now();
   const stmt = env.DB.prepare(
@@ -207,6 +207,17 @@ export async function onRequestPost({ request, env }) {
     const batch = dst.slice(0, 200).filter((r) => r && Number(r.deal))
       .map((r) => q.bind(Number(r.deal), Number(r.l2) || null, v(r.status, 20), v(r.note, 300), v(r.client, 80), v(r.company, 120), v(r.manager, 80), v(r.meet_at, 20), stamp));
     try { for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); } } catch (e) { /* таблицы может ещё не быть */ }
+  }
+  // база кейсов выпускников из отчётных презентаций (19.10.2026): {replace: true, rows: [...]} — заливается целиком
+  if (body.prep_alumni && Array.isArray(body.prep_alumni.rows)) {
+    const v = (x, n) => String(x == null ? "" : x).slice(0, n);
+    const F = ["file_id", "stream", "company", "person", "niche", "region", "size", "evidence", "problems", "results", "grow", "pct",
+               "changed", "say", "confirmed", "cannot", "when_use", "transition", "takeaway", "question", "ask_alumni"];
+    if (body.prep_alumni.replace) await env.DB.prepare("DELETE FROM prep_alumni").run();
+    const q = env.DB.prepare("INSERT INTO prep_alumni (" + F.join(", ") + ", updated_at) VALUES (" + F.map(() => "?").join(",") + ",?)");
+    const batch = body.prep_alumni.rows.slice(0, 1000).filter((r) => r && (r.say || r.changed))
+      .map((r) => q.bind(...F.map((k) => v(r[k], k === "say" || k === "changed" || k === "confirmed" || k === "cannot" ? 1500 : 600)), stamp));
+    for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); }
   }
   // версии разбора без смены текущего (сравнение моделей, ручные эталоны)
   const dver = Array.isArray(body.prep_debrief_versions) ? body.prep_debrief_versions : [];

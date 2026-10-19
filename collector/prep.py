@@ -837,17 +837,61 @@ def factcheck_brief(brief, usage):
     return "\n".join(out)
 
 
+ALUMNI = []     # база кейсов выпускников из отчётов трекинга (prep_alumni), заполняется в cmd_run
+EV_W = {"high": 3.0, "medium": 2.0, "low": 0.6}
+
+
+def _words(t):
+    return {w for w in re.findall(r"[а-яёa-z]{4,}", (t or "").lower()) if w not in ("компания", "компании", "продажа", "продажи", "услуги")}
+
+
+def alumni_shortlist(ctx, n=12):
+    """Кандидаты из базы кейсов выпускников: доказательность + сходство ниши и масштаба. Выбор до 3 — за моделью (раздел 6 Жени)."""
+    if not ALUMNI:
+        return []
+    mine = _words(" ".join([ctx.get("niche") or "", ctx.get("company") or "", ctx["card"].get("Сфера деятельности", ""), ctx["card"].get("Ниша (список)", "")]))
+    turn, staff = _num(ctx.get("turn")), _num(ctx.get("staff"))
+
+    def score(a):
+        sc = EV_W.get(a.get("evidence"), 1.0)
+        sc += 1.5 * len(mine & _words(" ".join([a.get("niche") or "", a.get("company") or ""])))
+        size = a.get("size") or ""
+        m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:человек|сотрудник|чел)", size)
+        if staff and m and 0.33 <= float(m.group(1).replace(",", ".")) / staff <= 3:
+            sc += 1.0
+        m = re.search(r"(\d+(?:[.,]\d+)?)\s*млн", size)
+        if turn and m and 0.33 <= float(m.group(1).replace(",", ".")) / turn <= 3:
+            sc += 1.0
+        return sc
+    return sorted(ALUMNI, key=score, reverse=True)[:n]
+
+
+def alumni_text(rows):
+    ev = {"high": "высокая", "medium": "средняя", "low": "низкая"}
+    out = []
+    for i, a in enumerate(rows, 1):
+        out.append("### Кейс %d: %s (%s) · %s · %s поток · доказательность: %s\nМасштаб: %s\nПроблемы: %s · Результат: %s\n"
+                   "Было → стало: %s\nЧто поменял: %s\nФраза по шаблону: %s\nПодтверждено: %s\nНельзя утверждать: %s\n"
+                   "Когда использовать: %s\nПереход: %s\nГлавный вывод: %s\nВопрос после: %s" % (
+                       i, a.get("company") or "компания не указана", a.get("person") or "", a.get("niche") or "", a.get("stream") or "?",
+                       ev.get(a.get("evidence"), a.get("evidence")), a.get("size") or "не указан", a.get("problems") or "", a.get("results") or "",
+                       a.get("grow") or "цифр нет", a.get("changed") or "", a.get("say") or "", a.get("confirmed") or "", a.get("cannot") or "",
+                       a.get("when_use") or "", a.get("transition") or "", a.get("takeaway") or "", a.get("question") or ""))
+    return "\n\n".join(out)
+
+
 def build_brief(ctx, facts, picked, prompt, owner=""):
     cases_txt = []
     for i, c in enumerate(picked, 1):
         cases_txt.append("### Выпускник %d: %s\nЧем похож: %s\nДинамика по открытым источникам:\n%s" % (
             i, cases_lines([c]), c.get("why", ""), c.get("growth") or "не проверялось"))
     # истории журнала — только если подтверждённых выпускников меньше двух (13.10.2026: иначе модель брала их вместо наших кейсов)
-    heroes = open(HEROES_PATH, encoding="utf-8").read() if os.path.exists(HEROES_PATH) and len(picked) < 2 else ""
+    alumni = alumni_shortlist(ctx)
+    heroes = open(HEROES_PATH, encoding="utf-8").read() if os.path.exists(HEROES_PATH) and len(picked) < 2 and not alumni else ""
     style = STYLES.get(ctx.get("manager") or "")
     style_txt = ("\n\n# СТИЛЬ ВОПРОСОВ ДИАГНОСТА (%s) — из его реальных встреч\nЗаход (раздел 4) формулируй в этой манере, не копируя дословно:\n%s" % (ctx["manager"], style)) if style else ""
-    user = "%s\n\n# МАТЕРИАЛЫ ПО ОТКРЫТЫМ ИСТОЧНИКАМ (тексты страниц сайта, отчётность ФНС, найденные страницы)\n%s\n\n# О СОБСТВЕННИКЕ: ИНТЕРВЬЮ, ПОБЕДЫ, ФАКТЫ\n%s\n\n# ВЫПУСКНИКИ С ПОДТВЕРЖДЁННЫМ РОСТОМ (подобраны по сходству)\n%s\n\n# ГОТОВЫЕ ИСТОРИИ ВЫПУСКНИКОВ (журнал; результат со слов выпускника)\n%s%s" % (
-        card_text(ctx), facts, owner or "не искали", "\n\n".join(cases_txt) or "Подтверждённых нет.", heroes or "нет", style_txt)
+    user = "%s\n\n# МАТЕРИАЛЫ ПО ОТКРЫТЫМ ИСТОЧНИКАМ (тексты страниц сайта, отчётность ФНС, найденные страницы)\n%s\n\n# О СОБСТВЕННИКЕ: ИНТЕРВЬЮ, ПОБЕДЫ, ФАКТЫ\n%s\n\n# КЕЙСЫ ВЫПУСКНИКОВ ИЗ ОТЧЁТОВ ТРЕКИНГА (база; со слов выпускников; кандидаты по сходству — выбери до 3)\n%s\n\n# ВЫПУСКНИКИ С ПОДТВЕРЖДЁННЫМ РОСТОМ ПО ФНС (подобраны по сходству)\n%s\n\n# ГОТОВЫЕ ИСТОРИИ ВЫПУСКНИКОВ (журнал; результат со слов выпускника)\n%s%s" % (
+        card_text(ctx), facts, owner or "не искали", alumni_text(alumni) or "База пуста.", "\n\n".join(cases_txt) or "Подтверждённых нет.", heroes or "нет", style_txt)
     return claude(prompt, user, max_tokens=8000)
 
 
@@ -1405,6 +1449,9 @@ def cmd_run(deal, dry, out_path, cases_path, facts_path=None, picked_path=None):
         return
     global STYLES
     STYLES = styles
+    global ALUMNI
+    ALUMNI = (j.get("alumni") or []) if URL and STOKEN and not cases_path else []
+    log("база кейсов выпускников: %d" % len(ALUMNI))
     done, failed = 0, 0
     fill = json.loads(os.environ.get("PREP_FILL") or "null") if deal else None   # форма «не хватает вводных» в Штабе
     for d in ids:

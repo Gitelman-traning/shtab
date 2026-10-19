@@ -95,6 +95,8 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 .v-grow .pct{font-weight:700;color:var(--ok);font-size:15px}
 .v-say{font-size:13.5px;font-style:italic;background:var(--soft);border-radius:10px;padding:10px 12px}
 .v-changed b{color:var(--gold);font-weight:600}
+.v-ev{font-size:10.5px;padding:2px 8px;border-radius:7px;white-space:nowrap} .v-ev.hi{background:var(--ok-bg);color:var(--ok)} .v-ev.md{background:var(--mid-bg);color:var(--mid)} .v-ev.lo{background:var(--bad-bg);color:var(--bad)}
+.v-cxs{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--dim);border-top:1px solid var(--line);padding-top:8px} .v-cx b{color:var(--ink);font-weight:600} .v-cx.no b{color:var(--bad)}
 .v-bridge{margin-top:14px;padding:12px 16px;border-radius:12px;border:1px dashed var(--gold-b);font-size:14.5px;font-weight:500}
 .v-note{margin-top:10px;font-size:12.5px;color:var(--dim)}
 .v-chk{align-self:flex-start;font-size:11px;padding:2px 8px;border-radius:7px;background:var(--soft);color:var(--faint);border:1px solid var(--line-2)}
@@ -476,27 +478,34 @@ function v3cases(L){
   var cases = [], bridge = "", notes = [], cur = null;
   L.forEach(function(t){
     var m = t.match(/^\*\*(.+?)\*\*\s*(.*)$/);
-    if (m) { cur = { title: m[1].replace(/\.$/, ""), parts: m[2].split(/\s·\s/), say: "" }; cases.push(cur); return; }
+    if (m) { cur = { title: m[1].replace(/\.$/, ""), parts: m[2].split(/\s·\s/), say: "", extra: {} }; cases.push(cur); return; }
     var lv = v3label(t);
+    // поля кейса из базы выпускников (19.10.2026, формат Жени): почему подходит, когда, переход, вопрос после, нельзя
+    if (cur && /^(почему подходит|когда|переход|вопрос после|нельзя)$/i.test(lv[0])) { cur.extra[lv[0].toLowerCase()] = lv[1]; return; }
     if (/^мостик/i.test(lv[0])) { bridge = lv[1]; cur = null; return; }
     if (/^в запасе/i.test(lv[0]) || !cur) { notes.push(t); return; }
     if (/^«/.test(t)) { cur.say += (cur.say ? " " : "") + t; return; }
     cur.parts.push(t);
   });
   var html = cases.map(function(c){
-    var who = [], grow = "", changed = "";
+    var who = [], grow = "", changed = "", ev = "";
     c.parts.forEach(function(p){ p = p.trim(); if (!p) return;
+      if (/^доказательность/i.test(p)) { ev = p.replace(/^доказательность:\s*/i, ""); return; }
       if (/^поменялось/i.test(p)) changed = p.replace(/^поменялось:\s*/i, "");
       else if (/→/.test(p) && !grow) grow = p; else who.push(p); });
     var gm = grow.match(/(\d+(?:[.,]\d+)?)\s*(млн|млрд)[^→]*→\s*(\d+(?:[.,]\d+)?)\s*(млн|млрд)/), gh = "";
     if (gm) { var a = v3num(gm[1] + " " + gm[2]), b = v3num(gm[3] + " " + gm[4]);
       if (a && b && b > a) gh = '<div class="v-grow"><span class="bars"><span class="b then" style="width:' + Math.round(100 * a / b) + '%"></span><span class="b" style="width:100%"></span></span><span class="pct">+' + Math.round(100 * (b / a - 1)) + '%</span></div>'; }
+    if (!gh) { var xm = grow.match(/×\s?(\d+(?:[.,]\d+)?)/); if (xm) { var xv = parseFloat(xm[1].replace(",", ".")); if (xv > 1) gh = '<div class="v-grow"><span class="bars"><span class="b then" style="width:' + Math.round(100 / xv) + '%"></span><span class="b" style="width:100%"></span></span><span class="pct">×' + esc(xm[1]) + '</span></div>'; } }
     if (!gh) { var pm = c.parts.join(" ").match(/\+\s?(\d+)\s?%/); if (pm) gh = '<div class="v-grow"><span class="bars"><span class="b then" style="width:' + Math.round(10000 / (100 + Number(pm[1]))) + '%"></span><span class="b" style="width:100%"></span></span><span class="pct">+' + pm[1] + '%</span></div>'; }
-    return '<div class="v-case"><div><h3>' + inline(c.title) + '</h3><div class="who">' + inline(who.join(" · ")) + '</div></div>' + gh
+    var evc = /высок/i.test(ev) ? "hi" : /средн/i.test(ev) ? "md" : ev ? "lo" : "", x = c.extra || {};
+    var more = [["почему подходит", "Почему подходит"], ["когда", "Когда"], ["переход", "Переход"], ["вопрос после", "Вопрос после"], ["нельзя", "Нельзя"]]
+      .filter(function(k){ return x[k[0]]; }).map(function(k){ return '<div class="v-cx' + (k[0] === "нельзя" ? " no" : "") + '"><b>' + k[1] + ':</b> ' + inline(x[k[0]]) + '</div>'; }).join("");
+    return '<div class="v-case"><div><h3>' + inline(c.title) + '</h3><div class="who">' + inline(who.join(" · ")) + (ev ? ' <span class="v-ev ' + evc + '">' + esc(ev) + '</span>' : "") + '</div></div>' + gh
       + (grow ? '<div>' + inline(grow) + '</div>' : "") + (changed ? '<div class="v-changed"><b>Что поменялось:</b> ' + inline(changed) + '</div>' : "")
-      + (c.say ? '<div class="v-say">' + inline(c.say) + '</div>' : "") + '</div>';
+      + (c.say ? '<div class="v-say">' + inline(c.say) + '</div>' : "") + (more ? '<div class="v-cxs">' + more + '</div>' : "") + '</div>';
   }).join("");
-  return '<div class="card" id="v-cases"><h2>Кейсы <small>рост после тренинга подтверждён</small></h2><div class="v-cases">' + html + '</div>'
+  return '<div class="card" id="v-cases"><h2>Кейсы <small>выпускники с похожей задачей · из отчётов трекинга и ФНС</small></h2><div class="v-cases">' + html + '</div>'
     + (bridge ? '<div class="v-bridge"><small>Мостик после кейсов</small>' + inline(bridge) + '</div>' : "") + (notes.length ? '<div class="v-note">' + notes.map(inline).join("<br>") + '</div>' : "") + '</div>';
 }
 // разложить подготовку по блокам; null — если это не структура v3 (тогда прежний вид с раскрывающимися разделами)
