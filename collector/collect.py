@@ -449,7 +449,20 @@ def main():
     except Exception as e:      # реклама тоже не роняет сбор
         log("Google Ads: ошибка %s" % e)
         gp = []
-    ap = ap + mp + gp
+    try:
+        from articles import articles_points
+        sp = articles_points(day_to, log)
+    except Exception as e:      # и счёт статей тоже
+        log("статьи: ошибка %s" % e)
+        sp = []
+    sr = []
+    for name, fn in (("Search Console", "gsc_points"), ("Вебмастер", "webmaster_points")):
+        try:
+            import serp
+            sr += getattr(serp, fn)(day_from, day_to, log)
+        except Exception as e:  # выдача тоже не роняет сбор
+            log("%s: ошибка %s" % (name, e))
+    ap = ap + mp + gp + sp + sr
     fp, plans = plan_points(values, today)
     send(pts + pp + ap + fp, "период %s—%s" % (day_from, day_to), plans)
     log("ГОТОВО")

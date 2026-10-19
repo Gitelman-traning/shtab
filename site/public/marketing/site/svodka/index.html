@@ -26,6 +26,14 @@
 .cols ul{margin:0;padding-left:18px;font-size:13px}.cols li{margin:4px 0}
 .next{margin-top:14px;background:var(--gold-soft);border-radius:12px;padding:11px 14px;font-size:13px}.next b{color:var(--gold)}
 .src{margin-top:10px;font-size:11.5px;color:var(--faint);word-break:break-all}
+.kgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}@media(max-width:900px){.kgrid{grid-template-columns:1fr}}
+.kgrid.one{grid-template-columns:1fr;margin-top:16px}
+.kgrid h3,.knot h3{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.kl{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:6px 0;border-top:1px solid var(--line)}.kl:first-of-type{border-top:0}
+.kl .v{font-weight:600;white-space:nowrap}.kl .s{display:block;font-size:11.5px;color:var(--faint)}
+.goal{background:var(--soft);border-radius:12px;padding:12px 14px;margin-top:16px;font-size:13px}.goal .gm{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.goal .mo{background:var(--card);border-radius:9px;padding:7px 10px;font-size:12px;min-width:92px}.goal .mo b{display:block;font-size:18px;font-weight:600}
+.knot{margin-top:16px}.knot ul{margin:0;padding-left:18px;font-size:12.5px;color:var(--dim)}.knot li{margin:4px 0}.knot b{color:var(--ink);font-weight:600}
 .live td.num b{font-weight:600}.live td .d{margin-left:4px}.live .off{color:var(--faint)}
 </style>
 </head>
@@ -57,9 +65,9 @@ var list = [];
 getJson("index.json").then(function(l){ list = l; return show(location.hash.slice(1) || l[0]); })
   .catch(function(){
     // файлов сводки нет (сборка не достала shtab-docs) — живые цифры витрины всё равно показываем
-    document.getElementById("out").innerHTML = '<div class="card live" id="live"><h2>Сейчас в витрине <small>загрузка…</small></h2></div>'
+    document.getElementById("out").innerHTML = '<div class="card live" id="live"><h2>Сейчас в витрине <small>загрузка…</small></h2></div>' + KPI_BOX
       + '<p class="empty">Сводок пока нет: сборка не получила файлы из shtab-docs.</p>';
-    live();
+    live(); kpi();
   });
 
 function show(date){
@@ -71,7 +79,7 @@ function render(s, date){
   document.getElementById("stamp").textContent = "сводка от " + ru(s.date);
   var sel = list.length > 1 ? '<select id="arch" aria-label="Архив сводок">' + list.map(function(d){ return '<option value="' + d + '"' + (d === date ? " selected" : "") + ">от " + ru(d) + "</option>"; }).join("") + "</select>" : "";
   var h = '<div class="card"><div class="top"><h2>Сводка за ' + period(s) + "</h2>" + sel + '</div><p class="lead">' + esc(s.lead) + "</p></div>";
-  h += '<div class="card live" id="live"><h2>Сейчас в витрине <small>загрузка…</small></h2></div>';
+  h += '<div class="card live" id="live"><h2>Сейчас в витрине <small>загрузка…</small></h2></div>' + KPI_BOX;
   if (s.access) h += '<div class="warn"><b>Доступ к данным.</b> ' + esc(s.access) + "</div>";
   s.sites.forEach(function(x){
     h += '<div class="card site" id="' + esc(x.id) + '"><h2>' + esc(x.name) + " <small>" + esc(x.host) + '</small><span class="st ' + esc(x.state) + '">' + esc(x.state_text) + "</span></h2>"
@@ -88,9 +96,108 @@ function render(s, date){
       + '</tbody></table></div><p class="note">' + esc(s.months.note) + "</p></div>";
   }
   document.getElementById("out").innerHTML = h;
-  live();
+  live(); kpi();
   var a = document.getElementById("arch");
   if (a) a.onchange = function(){ location.hash = a.value; show(a.value); };
+}
+// ключевые показатели эффективности — только то, что уже считается в витрине; остальное списком «пока не считаем»
+var KPI_BOX = '<div class="card" id="kpi"><h2>Ключевые показатели <small>загрузка…</small></h2></div>';
+var SALES_GOAL = "15–20";   // вызов: продаж в месяц с сайта и телеграм-канала
+function kpi(){
+  var box = document.getElementById("kpi"); if (!box) return;
+  var today = new Date(); today.setHours(0,0,0,0);
+  var to = addDays(today, -1), from = addDays(to, -27), base = addDays(from, -1);
+  var m0 = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+  var r28 = "&ptype=day&from=" + iso(from) + "&to=" + iso(to), snap = "&ptype=day&from=" + iso(addDays(base, -60)) + "&to=" + iso(today);
+  Promise.all([
+    pts("metric=web.articles,web.quality,web.quality.fail" + snap),
+    pts("metric=web.eng&dimlike=" + encodeURIComponent("%|%") + r28),
+    pts("metric=web.visits" + r28),
+    pts("metric=l2.sales&dim=" + encodeURIComponent("src:Сайт") + "&ptype=day&from=" + iso(m0) + "&to=" + iso(to)),
+    pts("metric=l2.sales&dim=" + encodeURIComponent("src:Телеграм канал") + "&ptype=day&from=" + iso(m0) + "&to=" + iso(to)),
+    pts("metric=mkt.leads&dim=&ptype=day&from=" + iso(m0) + "&to=" + iso(to)),
+    pts("metric=web.goal&dimlike=" + encodeURIComponent("%|%") + r28),
+    pts("metric=web.serp.impr,web.serp.clicks,web.serp.pos&dimlike=" + encodeURIComponent("%|%") + r28),
+    pts("metric=web.serp.q,web.serp.q10,web.kw&dimlike=" + encodeURIComponent("%|%") + snap)
+  ]).then(function(res){
+    if (!res[2].ok) { box.innerHTML = '<h2>Ключевые показатели</h2><p class="empty">Нет доступа к витрине.</p>'; return; }
+    var lastLead = null; (res[5].rows || []).forEach(function(r){ if (r.value > 0 && (!lastLead || r.period > lastLead)) lastLead = r.period; });
+    function line(nm, v, sub){ return '<div class="kl"><span>' + nm + (sub ? '<span class="s">' + sub + "</span>" : "") + '</span><span class="v">' + v + "</span></div>"; }
+    function sum(rows, metric, dim){ var t = 0; rows.forEach(function(r){ if (r.metric === metric && r.dim === dim) t += r.value; }); return t; }
+    // последний снимок и снимок на начало периода (для метрик-снимков: статьи, проверка, топ-10)
+    function snapOf(rows, metric, dim, upto){ var x = null; rows.forEach(function(r){ if (r.metric === metric && r.dim === dim && (!upto || r.period <= upto) && (!x || r.period > x.period)) x = r; }); return x; }
+    var vis = res[2].rows || [];
+    function visits(key){ return sum(vis, "web.visits", key); }
+    var todo = [];
+
+    // 1. производство: статьи (sitemap.xml) и проверка качества (collector/articles.py)
+    var art = res[0].rows || [];
+    function artOf(key){
+      var last = snapOf(art, "web.articles", key), b = snapOf(art, "web.articles", key, iso(base));
+      if (!last) return line(LIVE_NAME[key], "—", "сборщик статей ещё не прошёл");
+      var ok = snapOf(art, "web.quality", key), fails = [];
+      art.forEach(function(r){ if (r.metric === "web.quality.fail" && ok && r.period === ok.period && r.dim.indexOf(key + "|") === 0 && r.value) fails.push(r.dim.slice(key.length + 1) + " — " + r.value); });
+      return line(LIVE_NAME[key], last.value, b ? "за 28 дней: +" + (last.value - b.value) : "новые за 28 дней — когда накопится история")
+        + (ok ? line("чек-лист качества", ok.value + " из " + last.value, fails.length ? "не прошли: " + fails.join(", ") : "все проверки пройдены") : "");
+    }
+    if (!art.some(function(r){ return r.metric === "web.quality"; })) todo.push("<li><b>Чек-лист качества статей</b> — сборщик проверит каждую статью в первую ночь после выкладки.</li>");
+
+    // связки сайт + телеграм + инстаграм: визиты на сайты из Telegram и Instagram (Метрика, источник подробно)
+    var eng = res[1].rows || [];
+    function bundle(key){
+      var tg = 0, ig = 0;
+      eng.forEach(function(r){ var p = r.dim.split("|"); if (p[0] !== key) return; if (/telegram|t\.me/i.test(p[1])) tg += r.value; else if (/instagram/i.test(p[1])) ig += r.value; });
+      return line(LIVE_NAME[key], tg + " / " + ig, "из Telegram / из Instagram, " + fmtPct(pct(tg + ig, visits(key))) + " всех визитов");
+    }
+
+    // 2. чтение: цели Метрики (дочитал статью, клик по кнопке диагностики)
+    var goals = res[6].rows || [];
+    function readOf(key){
+      var v = visits(key), rd = sum(goals, "web.goal", key + "|article_read"), cta = sum(goals, "web.goal", key + "|article_cta_click");
+      var has = goals.some(function(r){ return r.dim.indexOf(key + "|") === 0; });
+      if (!has) return line(LIVE_NAME[key] + " · дочитали", "—", "цели в Метрике ещё нет");
+      return line(LIVE_NAME[key] + " · дочитали", fmtPct(pct(rd, v)), "" + rd + " из " + v + " визитов; кликнули на диагностику " + cta + (rd ? " (" + fmtPct(pct(cta, rd)) + " дочитавших)" : ""));
+    }
+    if (!goals.some(function(r){ return /\|article_read$/.test(r.dim); })) todo.push("<li><b>Дочитывания и конверсия открывших в дочитавших</b> — цель article_read: код журнала делает тред «ТЗ по целям Метрики», затем цель заводится в настройках счётчиков журнала и потока. Штаб подхватит её сам.</li>");
+
+    // 3. поиск: показы, клики, CTR, позиция; запросы в топ-10 (Search Console и Вебмастер, collector/serp.py)
+    var serp = res[7].rows || [], snaps = res[8].rows || [];
+    function serpOf(key, eng, nm){
+      var dim = key + "|" + eng, im = sum(serp, "web.serp.impr", dim), cl = sum(serp, "web.serp.clicks", dim);
+      if (!im && !snapOf(snaps, "web.serp.q", dim)) return "";
+      var ps = 0; serp.forEach(function(r){ if (r.metric === "web.serp.pos" && r.dim === dim) ps += r.value * (sum(serp.filter(function(x){ return x.period === r.period; }), "web.serp.impr", dim)); });
+      var q = snapOf(snaps, "web.serp.q", dim), q10 = snapOf(snaps, "web.serp.q10", dim);
+      return line(LIVE_NAME[key] + " · " + nm, fmtPct(im ? Math.round(1000 * cl / im) / 10 : null).replace(".", ","),
+        "CTR: " + cl + " кликов из " + im + " показов" + (im ? ", позиция " + (Math.round(10 * ps / im) / 10).toString().replace(".", ",") : "") + (q ? "; в топ-10 " + (q10 ? q10.value : 0) + " из " + q.value + " запросов" : ""));
+    }
+    var search = "";
+    [["google", "Google"], ["yandex", "Яндекс"]].forEach(function(e){ ["site", "journal", "potok"].forEach(function(k){ search += serpOf(k, e[0], e[1]); }); });
+    var kws = {}; snaps.forEach(function(r){ if (r.metric !== "web.kw") return; var p = r.dim.split("|"); if (!kws[p[1]] || r.value < kws[p[1]]) kws[p[1]] = r.value; });
+    var kwn = Object.keys(kws).length, kw10 = Object.keys(kws).filter(function(q){ return kws[q] <= 10; }).length;
+    if (kwn) search += line("Ключевые запросы", kw10 + " из " + kwn, "в топ-10 Google или Яндекса (список — collector/keywords.txt)");
+    if (!serp.some(function(r){ return /\|google$/.test(r.dim); })) todo.push("<li><b>Google: клики на заголовок (CTR), позиции, запросы в топ-10</b> — добавить почту сервисного аккаунта Штаба пользователем в Search Console (её покажет лог сборщика).</li>");
+    if (!serp.some(function(r){ return /\|yandex$/.test(r.dim); })) todo.push("<li><b>Яндекс: CTR, позиции, запросы в топ-10</b> — токен Вебмастера с правом webmaster:read в GitHub Secrets Штаба: YANDEX_WEBMASTER_TOKEN.</li>");
+    if (!kwn) todo.push("<li><b>Доля выдачи по ключевым запросам</b> — список ключей из SEO-ядра в collector/keywords.txt (нужен semantic-core.xlsx).</li>");
+
+    // вызов: продажи с сайта и телеграм-канала по месяцам (amo, «клиент прислал чек», источник сделки)
+    var months = [];
+    for (var d = new Date(m0); d <= to; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) months.push(iso(d).slice(0, 7));
+    function byMonth(rows){ var o = {}; (rows || []).forEach(function(r){ var k = r.period.slice(0, 7); o[k] = (o[k] || 0) + r.value; }); return o; }
+    var ms = byMonth(res[3].rows), mt = byMonth(res[4].rows);
+    var MN = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+    var goal = months.map(function(k, i){
+      var s = ms[k] || 0, t = mt[k] || 0, cur = i === months.length - 1;
+      var stale = lastLead && k > lastLead.slice(0, 7);   // выгрузка amo отстала: за этот месяц продаж в витрине ещё нет
+      return '<div class="mo">' + MN[+k.slice(5) - 1] + (cur ? " (идёт)" : "") + "<b>" + (stale ? "—" : s + t) + "</b>" + (stale ? "нет данных amo" : "сайт " + s + " · канал " + t) + "</div>";
+    }).join("");
+    box.innerHTML = '<h2>Ключевые показатели <small>последние 28 дней, ' + dmy(from) + "–" + dmy(to) + "</small></h2>"
+      + '<div class="kgrid"><div><h3>Статьи</h3>' + artOf("journal") + artOf("potok") + "</div>"
+      + "<div><h3>Связка сайт + Telegram + Instagram</h3>" + bundle("site") + bundle("journal") + bundle("potok") + "</div>"
+      + "<div><h3>Посетители статей и дочитывания</h3>" + ["journal", "potok"].map(function(k){ return line(LIVE_NAME[k], visits(k), "визитов за 28 дней"); }).join("") + readOf("journal") + readOf("potok") + "</div></div>"
+      + (search ? '<div class="kgrid one"><div><h3>Поиск: клики на заголовок и позиции</h3>' + search + "</div></div>" : "")
+      + '<div class="goal"><b>Вызов: ' + SALES_GOAL + " продаж в месяц с сайта и телеграм-канала.</b> Продажи — сделки с чеком по источнику «Сайт» и «Телеграм канал» в amo." + '<div class="gm">' + goal + "</div></div>"
+      + (todo.length ? '<div class="knot"><h3>Пока не считаем — что нужно</h3><ul>' + todo.join("") + "</ul></div>" : "");
+  });
 }
 // живые цифры из витрины Штаба: Метрика (collector/metrika.py, ключи площадок в секрете METRIKA_COUNTERS) и лиды amo
 var LIVE = [
@@ -98,7 +205,17 @@ var LIVE = [
   { name: "Журнал", key: "journal", tag: "журнал", since: "2026-09-19" },   // свой счётчик журнала шлёт хиты только с 19.09
   { name: "Поток", key: "potok", utm: "potok" }
 ];
+var LIVE_NAME = { site: "Лендинг", journal: "Журнал", potok: "Поток" };
 function pts(q){ return fetch("/api/points?" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }).catch(function(){ return { ok: false, rows: [] }; }); }
+// конверсия визита в лид, %, и её сдвиг к прошлым 28 дням в процентных пунктах
+function cvCell(l, v, lp, vp, off){
+  if (!v) return "—";
+  function f(x){ return (Math.round(10 * x) / 10).toString().replace(".", ","); }
+  var c = 100 * l / v, h = "<b>" + f(c) + "%</b>";
+  if (off || !vp) return h;
+  var d = Math.round(10 * (c - 100 * lp / vp)) / 10, cls = d > 0.1 ? "up" : d < -0.1 ? "down" : "flat";
+  return h + '<span class="d ' + cls + '" title="прошлые 28 дней: ' + f(100 * lp / vp) + '%">' + (d > 0 ? "+" : "") + f(d) + " п.п.</span>";
+}
 function adsNote(rows, tot, from, to, pFrom, pTo, partial){
   var c = tot(rows, "ads.cost", from, to), cp = tot(rows, "ads.cost", pFrom, pTo), k = tot(rows, "ads.clicks", from, to);
   if (!rows.length) return '<p class="note">Google Ads: данных в витрине пока нет — сборщик ждёт ключей кабинета.</p>';
@@ -116,7 +233,10 @@ function live(){
       pts("metric=web.src&dimlike=" + encodeURIComponent(x.key + "|%") + "&ptype=day&from=" + iso(from) + "&to=" + iso(to)),
       pts("metric=mkt.leads&dim=" + encodeURIComponent(x.tag ? "tag:" + x.tag : "utm:" + x.utm) + range)
     ]);
-  }).concat([pts("metric=ads.cost,ads.clicks&dimlike=" + encodeURIComponent("google|%") + range)])).then(function(res){
+  }).concat([pts("metric=ads.cost,ads.clicks&dimlike=" + encodeURIComponent("google|%") + range), pts("metric=mkt.leads&dim=" + range)])).then(function(res){
+    // лиды приходят из выгрузки amo в таблицу: если она отстала, последние дни пустые — конверсию считаем только по дням с лидами
+    var lastLead = null; (res.pop().rows || []).forEach(function(r){ if (r.value > 0 && (!lastLead || r.period > lastLead)) lastLead = r.period; });
+    var lTo = lastLead && lastLead < iso(to) ? new Date(lastLead + "T00:00:00") : to, lag = lTo < to;
     var ads = (res.pop().rows) || [];
     if (!res[0][0].ok) { box.innerHTML = '<h2>Сейчас в витрине</h2><p class="empty">Нет доступа к витрине.</p>'; return; }
     // витрина хранит данные не с начала времён (а счётчик журнала считает с 19.09): если у площадки прошлые 28 дней
@@ -133,12 +253,13 @@ function live(){
       var w = res[i][0].rows || [], src = res[i][1].rows || [], ld = res[i][2].rows || [];
       var v = tot(w, "web.visits", from, to), vp = tot(w, "web.visits", pFrom, pTo), u = tot(w, "web.users", from, to), up = tot(w, "web.users", pFrom, pTo);
       var search = 0, all = 0; src.forEach(function(r){ all += r.value; if (/поиск/.test(r.dim)) search += r.value; });
-      var l = tot(ld, "mkt.leads", from, to), lp = tot(ld, "mkt.leads", pFrom, pTo);
+      var l = tot(ld, "mkt.leads", from, to), lp = tot(ld, "mkt.leads", pFrom, pTo), vl = lag ? tot(w, "web.visits", from, lTo) : v;
       if (!w.length) return '<tr><td class="k">' + esc(x.name) + '</td><td class="off" colspan="3">Метрики пока нет в витрине</td><td class="num"><b>' + l + '</b>' + cmp(l, lp) + '</td><td class="num">—</td></tr>';
-      return '<tr><td class="k">' + esc(x.name) + '</td><td class="num"><b>' + v + '</b>' + cmp(v, vp) + '</td><td class="num">' + u + cmp(u, up) + '</td><td class="num">' + fmtPct(pct(search, all)) + '</td><td class="num"><b>' + l + '</b>' + cmp(l, lp) + '</td><td class="num">' + (v ? (Math.round(10000 * l / v) / 10).toString().replace(".", ",") : "—") + '</td></tr>';
+      return '<tr><td class="k">' + esc(x.name) + '</td><td class="num"><b>' + v + '</b>' + cmp(v, vp) + '</td><td class="num">' + u + cmp(u, up) + '</td><td class="num">' + fmtPct(pct(search, all)) + '</td><td class="num"><b>' + l + '</b>' + (lag ? "" : cmp(l, lp)) + '</td><td class="num">' + cvCell(l, vl, lp, vp, off[i] || lag) + '</td></tr>';
     }).join("");
-    box.innerHTML = '<h2>Сейчас в витрине <small>последние 28 дней, ' + dmy(from) + '–' + dmy(to) + (partial ? "" : ", к прошлым 28") + '</small></h2><div class="wide"><table><thead><tr><th>Сайт</th><th class="num">Визиты</th><th class="num">Посетители</th><th class="num">Из поиска</th><th class="num">Лиды</th><th class="num">Лидов на 1000 визитов</th></tr></thead><tbody>' + body + '</tbody></table></div>'
+    box.innerHTML = '<h2>Сейчас в витрине <small>последние 28 дней, ' + dmy(from) + '–' + dmy(to) + (partial ? "" : ", к прошлым 28") + '</small></h2><div class="wide"><table><thead><tr><th>Сайт</th><th class="num">Визиты</th><th class="num">Посетители</th><th class="num">Из поиска</th><th class="num">Лиды</th><th class="num">Конверсия в лид</th></tr></thead><tbody>' + body + '</tbody></table></div>'
       + (off.some(function(f){ return f; }) ? '<p class="note">Без сравнения с прошлыми 28 днями: ' + LIVE.map(function(x, i){ return off[i] ? x.name.toLowerCase() + " (данные с " + (off[i] === "—" ? "—" : dmy(new Date(off[i] + "T00:00:00"))) + ")" : ""; }).filter(Boolean).join(", ") + ' — прошлый период покрыт не целиком.</p>' : "")
+      + (lag ? '<p class="warn"><b>Лиды отстают.</b> В витрине лиды из amo есть только по ' + (lastLead ? dmy(lTo) : "—") + ': выгрузка amo в таблицу «маркетинг» не обновлялась. Конверсия посчитана по визитам до этой даты, сравнение лидов скрыто.</p>' : "")
       + adsNote(ads, tot, from, to, pFrom, pTo, partial)
       + '<p class="note">Обновляется каждую ночь. Визиты — Яндекс Метрика; лиды — amo: лендинг по тегу tilda, журнал по тегу «журнал», поток по utm_source=potok. Подробно по площадкам — в пунктах «Сайт gitelman.team» и «Журнал».</p>';
   });

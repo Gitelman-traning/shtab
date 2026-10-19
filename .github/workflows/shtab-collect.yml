@@ -40,6 +40,7 @@ jobs:
           SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
           METRIKA_TOKEN: ${{ secrets.METRIKA_TOKEN }}
           METRIKA_COUNTERS: ${{ secrets.METRIKA_COUNTERS }}
+          YANDEX_WEBMASTER_TOKEN: ${{ secrets.YANDEX_WEBMASTER_TOKEN }}
           GADS_DEVELOPER_TOKEN: ${{ secrets.GADS_DEVELOPER_TOKEN }}
           GADS_CLIENT_ID: ${{ secrets.GADS_CLIENT_ID }}
           GADS_CLIENT_SECRET: ${{ secrets.GADS_CLIENT_SECRET }}
