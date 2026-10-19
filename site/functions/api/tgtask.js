@@ -12,17 +12,31 @@
 //   «готово 3» / «сделано 3»           → закрыть задачу № из последнего списка; «отложи 3» → отложить
 //   POST ?digest=1 (токен сборщика)     → утренний разбор хвоста: до 10 самых старых просроченных с кнопками,
 //                                         ⏩ переносит на 2 рабочих дня и считает переносы (поле moved)
+//
+// Задачи из чатов сами, без пересылки (с 19.10.2026) — два пути, оба без api_id и выгрузок:
+//   группы:   бота добавляют в группу (в BotFather /setprivacy → Disable, либо бот — админ группы). На первое сообщение
+//             бот спрашивает Никиту в личке: «Все сообщения» / «Только с @упоминанием или ответом мне» / «Не записывать».
+//   личные:   Telegram Business (нужен Premium): Настройки → Telegram Business → Чат-боты → этот бот → выбрать чаты.
+//             У бота в BotFather должен быть включён Business Mode. Сообщения выбранных собеседников приходят как
+//             business_message, записываются все (чаты выбраны в самом Telegram); свои исходящие пропускаем.
+//   Карточка задачи с кнопками идёт в личку Никите, в сам чат бот НИКОГДА не пишет (в бизнес-чате это было бы «от Никиты»).
+//   Пропускаем: свои сообщения, ботов, «ок/спасибо/👍» и короче 3 букв. В заметке — текст и ссылка на сообщение (супергруппы).
+//   «чаты» → список известных чатов с кнопками режима. Режимы в KV dash:tg-watch, бизнес-подключения — dash:tg-biz.
+//
 // Проект угадывается по ключевым словам из projects.json (их присылает sync.mjs в KV dash:tg-projects),
 // а пока их нет — по запасному списку ниже.
 // Данные: KV dash:tg-tasks — копия tasks.json (присылает sync.mjs с компьютера Никиты), dash:inbox — очередь правок
 // (add / status / project / due / delete), которую sync.mjs забирает перед каждой сборкой дашборда и применяет к tasks.json.
 //
 // Настройка вебхука: POST /api/tgtask?setup=1 с Bearer INGEST_TOKEN — ставит setWebhook на этот адрес
-// с секретом (KV dash:tg-secret), слушает message и callback_query. GET с тем же токеном — куда смотрит вебхук.
+// с секретом (KV dash:tg-secret), слушает message, callback_query, business_connection и business_message.
+// GET с тем же токеном — куда смотрит вебхук.
 import { json, bad, hasIngestToken, randomId, tgSend, tgRequestAccess } from "./_lib.js";
 
 // dash:tasks / dash:projects заняты страницами дашборда (/api/dashboard?page=…) — данные бота живут под dash:tg-*
-const K = { tasks: "dash:tg-tasks", inbox: "dash:inbox", secret: "dash:tg-secret", list: "dash:tg-list", projects: "dash:tg-projects" };
+const K = { tasks: "dash:tg-tasks", inbox: "dash:inbox", secret: "dash:tg-secret", list: "dash:tg-list", projects: "dash:tg-projects", watch: "dash:tg-watch", biz: "dash:tg-biz" };
+// режимы чата: all — все сообщения, mention — только с @упоминанием/ответом Никите, off — не записывать, ask — ждём ответа Никиты
+const MODES = { all: "все сообщения", mention: "только @упоминания и ответы мне", off: "не записывать", ask: "ждёт выбора" };
 // запасной список, пока sync.mjs не прислал projects.json; слова отсюда добавляются и к присланным
 const PROJECTS = {
   shtab: ["штаб", "shtab", "витрин", "doppler", "пинг", "окна", "окно"],
@@ -70,6 +84,13 @@ async function isAdminTg(env, tgId) {
   return r || null;
 }
 
+// владелец дашборда — кому слать карточки из чатов и чьи сообщения пропускать: {tg_id, tg_username}
+async function owner(env) {
+  if (!env.DB) return null;
+  const r = await env.DB.prepare("SELECT tg_id, tg_username FROM users WHERE login = ? AND role = 'admin' AND active = 1").bind(env.DASH_OWNER || "nikita").first();
+  return r && r.tg_id ? { id: Number(r.tg_id), username: String(r.tg_username || "").replace(/^@/, "").toLowerCase() } : null;
+}
+
 // [{id, label, words}] — из projects.json (через sync.mjs) плюс запасные слова; «Без проекта» не входит
 async function loadProjects(env) {
   const sent = await readJson(env, K.projects, []);
@@ -97,22 +118,23 @@ function projectOf(projects, text) {
 }
 
 // срок из хвоста: «2д», «3 дня», «до 10.10», «до пт», «завтра», «сегодня»; возвращает {due, est, title без хвоста}
+// (без \b: в JS он не видит границ кириллических слов — до 19.10 хвосты не распознавались вовсе)
 function parseDue(title) {
   const t0 = today();
   let due = null, est = null, s = title;
   let m;
-  if ((m = /(?:^|\s)(\d{1,2})\s*(?:д|дн|дня|дней)\b\.?$/i.exec(s))) { est = +m[1]; due = workdays(t0, est); s = s.slice(0, m.index); }
-  else if ((m = /\bдо\s+(\d{1,2})[.\/](\d{1,2})(?:[.\/](\d{2,4}))?\s*$/i.exec(s))) {
+  if ((m = /(?:^|\s)(\d{1,2})\s*(?:д|дн|дня|дней)\.?$/i.exec(s))) { est = +m[1]; due = workdays(t0, est); s = s.slice(0, m.index); }
+  else if ((m = /(?:^|\s)до\s+(\d{1,2})[.\/](\d{1,2})(?:[.\/](\d{2,4}))?\.?\s*$/i.exec(s))) {
     let y = m[3] ? (m[3].length === 2 ? "20" + m[3] : m[3]) : t0.slice(0, 4);
     due = `${y}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
     if (!m[3] && due < t0) due = `${+y + 1}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
     s = s.slice(0, m.index);
-  } else if ((m = /\bдо\s+(пн|вт|ср|чт|пт|сб|вс)\b\.?$/i.exec(s))) {
+  } else if ((m = /(?:^|\s)до\s+(пн|вт|ср|чт|пт|сб|вс)\.?$/i.exec(s))) {
     const want = DOW[m[1].toLowerCase()]; let d = t0;
     do { d = addDays(d, 1); } while (new Date(d + "T00:00:00Z").getUTCDay() !== want);
     due = d; s = s.slice(0, m.index);
-  } else if (/\bзавтра\b\.?$/i.test(s)) { due = workdays(t0, 1); s = s.replace(/\s*завтра\.?$/i, ""); }
-  else if (/\bсегодня\b\.?$/i.test(s)) { due = t0; s = s.replace(/\s*сегодня\.?$/i, ""); }
+  } else if (/(?:^|\s)завтра\.?$/i.test(s)) { due = workdays(t0, 1); s = s.replace(/\s*завтра\.?$/i, ""); }
+  else if (/(?:^|\s)сегодня\.?$/i.test(s)) { due = t0; s = s.replace(/\s*сегодня\.?$/i, ""); }
   if (!est) { est = 1; if (!due) due = workdays(t0, 1); }
   return { due, est, title: s.replace(/[\s,;:—-]+$/, "").trim() };
 }
@@ -181,7 +203,133 @@ function card(projects, t, from, menu) {
   return { text: lines.join("\n"), reply_markup: { inline_keyboard: kb } };
 }
 
-const HELP = "Перешли мне сообщение коллеги — запишу задачей и сам подберу проект. Или напиши задачу сам: «Проверить таблицу hh 2д», «Ключ Wazzup в Doppler до пт».\nПод каждой задачей кнопки: ✅ сделано, ⏸ пауза, 📦 архив, 🔥 выше / ↓ ниже приоритет, сменить проект.\n«список» — открытые задачи, «готово 3» — закрыть третью из списка.";
+const HELP = "Перешли мне сообщение коллеги — запишу задачей и сам подберу проект. Или напиши задачу сам: «Проверить таблицу hh 2д», «Ключ Wazzup в Doppler до пт».\nПод каждой задачей кнопки: ✅ сделано, ⏸ пауза, 📦 архив, 🔥 выше / ↓ ниже приоритет, сменить проект.\n«список» — открытые задачи, «готово 3» — закрыть третью из списка.\n\nЧтобы задачи приходили из чатов сами: добавь меня в группу (спрошу, что записывать) или подключи как чат-бота в Telegram Business и выбери личные чаты. «чаты» — что я слушаю и в каком режиме.";
+
+// ── задачи из чатов без пересылки: группы, куда добавлен бот, и личные чаты через Telegram Business ──
+const ACK = /^(ок|окей|ok|okay|да|нет|ага|угу|спасибо|спс|благодарю|принял|принято|понял|поняла|хорошо|супер|отлично|класс|готово|сделано|\+|[\p{Extended_Pictographic}\s.!?)]+)$/iu;
+const senderName = (u) => u ? ([u.first_name, u.last_name].filter(Boolean).join(" ") || u.username || "кто-то") : "кто-то";
+const chatTitle = (chat) => chat.title || senderName(chat) || String(chat.id);
+const msgLink = (chat, msgId) => chat.username ? `https://t.me/${chat.username}/${msgId}`
+  : /^-100\d+$/.test(String(chat.id)) ? `https://t.me/c/${String(chat.id).slice(4)}/${msgId}` : "";
+
+// есть ли в сообщении обращение к владельцу: @username, упоминание без username или ответ на его сообщение
+function mentionsOwner(msg, own) {
+  if (msg.reply_to_message && msg.reply_to_message.from && Number(msg.reply_to_message.from.id) === own.id) return true;
+  const text = String(msg.text || msg.caption || "");
+  for (const e of [...(msg.entities || []), ...(msg.caption_entities || [])]) {
+    if (e.type === "text_mention" && e.user && Number(e.user.id) === own.id) return true;
+    if (e.type === "mention" && own.username && text.slice(e.offset, e.offset + e.length).toLowerCase() === "@" + own.username) return true;
+  }
+  return false;
+}
+
+// текст задачи из чужого сообщения: пусто или «ок/спасибо/👍» → null (не задача)
+function chatText(msg, name) {
+  let text = String(msg.text || msg.caption || "").trim();
+  if (!text && mediaKind(msg)) text = `${mediaKind(msg)} от ${name}`.trim();
+  if (!text || ACK.test(text) || text.replace(/[^\p{L}\p{N}]/gu, "").length < 3) return null;
+  return text;
+}
+
+// записать задачу из сообщения чата и прислать карточку владельцу в личку; src = {chat, message_id, name, text}
+async function addChatTask(env, own, src, entry) {
+  const { text, name } = src;
+  const tasks = await readJson(env, K.tasks, []);
+  const projects = await loadProjects(env);
+  const parsed = parseDue(text.split("\n")[0]);
+  const title = parsed.title.slice(0, 160) || "задача из чата";
+  const project = projectOf(projects, text);
+  const link = msgLink(src.chat, src.message_id);
+  const from = `${name} из «${entry.title}»`;
+  const task = {
+    id: `${project}-tg${Date.now().toString(36)}`, project, title, created: today(), estimateDays: parsed.est, due: parsed.due, status: "open",
+    source: "telegram-chat", why: `от ${from}, ${dm(today())}`, note: (text + (link ? "\n" + link : "")).slice(0, 1500),
+  };
+  tasks.push(task);
+  await writeJson(env, K.tasks, tasks);
+  await pushInbox(env, { action: "add", task });
+  await tg(env, "sendMessage", { chat_id: own.id, disable_web_page_preview: true, ...card(projects, task, from) });
+  return true;
+}
+
+// клавиатура выбора режима для чата (callback_data «c:<режим>:<id чата>»)
+const modeKeyboard = (chatId, kind) => ({ inline_keyboard: [
+  [{ text: "Все сообщения", callback_data: `c:all:${chatId}` }],
+  ...(kind === "group" ? [[{ text: "Только с @упоминанием или ответом мне", callback_data: `c:mention:${chatId}` }]] : []),
+  [{ text: "Не записывать", callback_data: `c:off:${chatId}` }],
+] });
+
+// сообщение в группе или бизнес-чате: пропустить, спросить про новый чат или записать задачей
+async function handleChatMessage(env, msg, kind) {
+  const own = await owner(env);
+  if (!own || !msg.from || msg.from.is_bot || Number(msg.from.id) === own.id) return;
+  const chat = msg.chat;
+  // Telegram повторяет доставку, если вебхук не ответил вовремя — одно сообщение записываем один раз
+  const seenKey = `dash:tg-seen:${chat.id}:${msg.message_id}`;
+  if (await env.OKK_KV.get(seenKey)) return;
+  await env.OKK_KV.put(seenKey, "1", { expirationTtl: 86400 });
+  const watch = await readJson(env, K.watch, {});
+  const name = senderName(msg.from);
+  const src = { chat: { id: chat.id, username: chat.username }, message_id: msg.message_id, name, text: chatText(msg, name) };
+  let entry = watch[chat.id];
+  if (!entry) {
+    // бизнес-чаты Никита уже выбрал в настройках Telegram — пишем сразу; про группу спрашиваем один раз,
+    // первое сообщение придерживаем и записываем после ответа, если режим его допускает
+    entry = { title: chatTitle(chat), kind, mode: kind === "business" ? "all" : "ask", since: today() };
+    if (entry.mode === "ask") {
+      if (src.text) entry.first = { ...src, mention: mentionsOwner(msg, own) };
+      watch[chat.id] = entry;
+      await writeJson(env, K.watch, watch);
+      await tg(env, "sendMessage", { chat_id: own.id, text: `Меня добавили в чат «${entry.title}». Записывать сообщения оттуда задачами?` + (src.text ? `\n(первое уже есть: ${name} — «${src.text.slice(0, 80)}»)` : ""), reply_markup: modeKeyboard(chat.id, kind) });
+      return;
+    }
+    watch[chat.id] = entry;
+    await writeJson(env, K.watch, watch);
+  } else if (entry.title !== chatTitle(chat)) { entry.title = chatTitle(chat); await writeJson(env, K.watch, watch); }
+  if (entry.mode === "off" || entry.mode === "ask" || !src.text) return;
+  if (entry.mode === "mention" && !mentionsOwner(msg, own)) return;
+  await addChatTask(env, own, src, entry);
+}
+
+// «чаты» — что бот слушает, с кнопками режима под каждым
+async function listChats(env, chatId) {
+  const watch = await readJson(env, K.watch, {});
+  const ids = Object.keys(watch);
+  if (!ids.length) { await tgSend(env, chatId, "Пока ни одного чата. Добавь меня в группу или подключи в Telegram Business → Чат-боты и выбери личные чаты."); return; }
+  await tgSend(env, chatId, `Чаты (${ids.length}). Под каждым — переключение режима:`);
+  for (const id of ids.slice(0, 25)) {
+    const e = watch[id];
+    await tg(env, "sendMessage", { chat_id: chatId, text: `${e.kind === "business" ? "👤" : "👥"} «${e.title}» — ${MODES[e.mode] || e.mode}`, reply_markup: modeKeyboard(id, e.kind) });
+  }
+}
+
+// кнопка режима чата: сохранить, перерисовать строку, записать придержанное первое сообщение
+async function setChatMode(env, cq, mode, chatId) {
+  const watch = await readJson(env, K.watch, {});
+  const e = watch[chatId];
+  if (!e || !MODES[mode] || mode === "ask") return "Чат уже не в списке";
+  e.mode = mode;
+  const first = e.first; delete e.first;
+  await writeJson(env, K.watch, watch);
+  if (cq.message) await tg(env, "editMessageText", { chat_id: cq.message.chat.id, message_id: cq.message.message_id, text: `${e.kind === "business" ? "👤" : "👥"} «${e.title}» — ${MODES[mode]}`, reply_markup: modeKeyboard(chatId, e.kind) });
+  if (first && first.text && (mode === "all" || (mode === "mention" && first.mention))) {
+    const own = await owner(env);
+    if (own) await addChatTask(env, own, first, e);
+  }
+  return `«${e.title}»: ${MODES[mode]}`;
+}
+
+// подключение/отключение бизнес-аккаунта: принимаем только от владельца дашборда
+async function handleBusinessConnection(env, bc) {
+  const own = await owner(env);
+  if (!own || !bc.user || Number(bc.user.id) !== own.id) return;
+  const biz = await readJson(env, K.biz, {});
+  if (bc.is_enabled) biz[bc.id] = { user: own.id, chat: bc.user_chat_id, since: today() }; else delete biz[bc.id];
+  await writeJson(env, K.biz, biz);
+  await tgSend(env, own.id, bc.is_enabled
+    ? "Telegram Business подключён: сообщения из выбранных там личных чатов буду записывать задачами и присылать сюда карточки. «чаты» — список и режимы."
+    : "Telegram Business отключён — личные чаты больше не слушаю.");
+}
 
 // «удалено» в tasks.json не попадает: sync.mjs убирает задачу, а «Вернуть» присылает её заново целиком
 async function setStatus(env, tasks, t, status) {
@@ -203,6 +351,7 @@ async function handle(env, msg) {
   const projects = await loadProjects(env);
 
   if (!text || low === "/start" || /^(помощь|help|\/help)$/.test(low)) { await tgSend(env, chat, HELP); return; }
+  if (!from && /^(\/chats|чаты)$/.test(low)) { await listChats(env, chat); return; }
 
   if (!from && /^(\/list|список|задачи)$/.test(low)) {
     const list = openTasks(tasks);
@@ -292,9 +441,10 @@ async function sendDigest(env, chat, limit, force) {
 // нажатие кнопки под задачей
 async function handleButton(env, cq) {
   const answer = (text) => tg(env, "answerCallbackQuery", { callback_query_id: cq.id, text: text || "" });
-  const m = /^([dpxomjrauw]):(?:([^:]+):)?(.+)$/.exec(String(cq.data || ""));
+  const m = /^([dpxomjrauwc]):(?:([^:]+):)?(.+)$/.exec(String(cq.data || ""));
   if (!m) return answer();
   const [, op0, proj, id] = m;
+  if (op0 === "c") return answer(await setChatMode(env, cq, proj, id));
   const tasks = await readJson(env, K.tasks, []);
   const projects = await loadProjects(env);
   const t = tasks.find((x) => x.id === id);
@@ -318,7 +468,7 @@ async function handleButton(env, cq) {
     return answer(note ? note + ": " + t.title.slice(0, 60) : "");
   }
   const op = op0;
-  const fromLine = t.source === "telegram-forward" ? (/переслано от (.+?), \d/.exec(t.why || "") || [])[1] : null;
+  const fromLine = t.source === "telegram-forward" || t.source === "telegram-chat" ? (/от (.+?), \d{1,2}\.\d{2}$/.exec(t.why || "") || [])[1] : null;
   let menu = false, note = "";
   if (op === "d") { await setStatus(env, tasks, t, "done"); note = "Закрыл"; }
   else if (op === "p") { await setStatus(env, tasks, t, "parked"); note = "На паузе"; }
@@ -358,7 +508,7 @@ export async function onRequestPost({ request, env }) {
     const hook = `${url.origin}/api/tgtask`;
     const r = await fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/setWebhook`, {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url: hook, secret_token: secret, allowed_updates: ["message", "callback_query"], drop_pending_updates: true }),
+      body: JSON.stringify({ url: hook, secret_token: secret, allowed_updates: ["message", "callback_query", "business_connection", "business_message"], drop_pending_updates: true }),
     });
     return json({ ok: r.ok, hook, telegram: await r.json().catch(() => null) });
   }
@@ -390,8 +540,27 @@ export async function onRequestPost({ request, env }) {
     }
     return json({ ok: true });
   }
+  // Telegram Business: подключение бота к аккаунту и сообщения из выбранных там личных чатов
+  if (update && update.business_connection) {
+    try { await handleBusinessConnection(env, update.business_connection); } catch { /* молча */ }
+    return json({ ok: true });
+  }
+  const bm = update && update.business_message;
+  if (bm) {
+    try {
+      const biz = await readJson(env, K.biz, {});
+      if (biz[bm.business_connection_id]) await handleChatMessage(env, bm, "business");
+    } catch { /* в бизнес-чат не отвечаем никогда */ }
+    return json({ ok: true });
+  }
   const msg = update && update.message;
-  if (!msg || !msg.from || msg.chat?.type !== "private") return json({ ok: true });
+  if (!msg || !msg.from) return json({ ok: true });
+  // группа, куда добавили бота: задачи из чужих сообщений по режиму чата; в саму группу бот не пишет
+  if (msg.chat?.type === "group" || msg.chat?.type === "supergroup") {
+    try { await handleChatMessage(env, msg, "group"); } catch { /* молча */ }
+    return json({ ok: true });
+  }
+  if (msg.chat?.type !== "private") return json({ ok: true });
   // вход с сайта: «/start <код>» — код выдан страницей входа (/__tglink), привязываем к нему аккаунт
   const start = /^\/start\s+([a-f0-9]{32})\s*$/.exec(String(msg.text || ""));
   if (start && env.DB) {
