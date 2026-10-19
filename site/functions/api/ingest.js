@@ -52,7 +52,7 @@ export async function onRequestPost({ request, env }) {
   const plans = Array.isArray(body.plans) ? body.plans : [];
   const collector = String(body.collector || "unknown").slice(0, 60);
   const has = (k) => Array.isArray(body[k]) && body[k].length;
-  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("prep_debrief") && !has("prep_debrief_versions") && !has("debrief_status") && !has("prep_alumni") && !has("expenses")) return bad("пустая пачка");
+  if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("prep_debrief") && !has("prep_debrief_versions") && !has("debrief_status") && !(body.prep_alumni && body.prep_alumni.rows) && !has("expenses")) return bad("пустая пачка");
 
   const stamp = now();
   const stmt = env.DB.prepare(
