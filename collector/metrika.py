@@ -7,7 +7,8 @@ METRIKA_COUNTERS — JSON {"site": 12345678, "journal": 87654321} (ключ пл
 METRIKA_FILTERS — необязательный JSON {"site": "<фильтр Метрики>"} поверх DEFAULT_FILTERS: счётчик лендинга 103426590
 стоит и на журнале, и на чате, поэтому площадку «site» считаем только по входам на сам gitelman.team.
 Точки: web.visits / web.users (dim = площадка), web.src (dim = «площадка|тип источника»),
-web.eng (dim = «площадка|источник подробно», например «site|Google» или «journal|instagram.com»).
+web.eng (dim = «площадка|источник подробно», например «site|Google» или «journal|instagram.com»),
+web.goal (dim = «площадка|идентификатор цели», визиты с достижением JS-цели из GOALS: дочитывания, клики на диагностику, заявки).
 """
 import datetime as dt
 import json
@@ -19,6 +20,9 @@ import requests
 API = "https://api-metrika.yandex.net/stat/v1/data"
 DEFAULT_COUNTERS = {"potok": 111555446}   # potok.gitelman.team
 DEFAULT_FILTERS = {"site": "ym:s:startURLDomain=='gitelman.team'"}
+# JS-цели (reachGoal), которые забираем в витрину. Номер цели не нужен: ищем её в настройках счётчика по идентификатору.
+GOALS = ["article_read", "article_cta_click", "lead_form_start", "lead_success"]
+MGMT = "https://api-metrika.yandex.net/management/v1/counter/%s/goals"
 SRC_NAMES = {
     "organic": "поиск", "direct": "прямые заходы", "referral": "переходы с сайтов", "social": "соцсети", "ad": "реклама",
     "internal": "внутренние переходы", "recommend": "рекомендательные системы", "messenger": "мессенджеры",
@@ -89,6 +93,7 @@ def _counter_points(token, key, cid, day_from, day_to, log, flt=""):
         d = row["dimensions"][0]["name"]
         eng = row["dimensions"][1].get("name") or "не определено"
         points.append({"metric": "web.eng", "ptype": "day", "period": d, "dim": key + "|" + eng, "value": row["metrics"][0]})
+    points.extend(_goal_points(token, key, cid, day_from, day_to, log, flt))
     # дни без визитов — нулём, чтобы графики не рвались
     have = {p["period"] for p in points if p["metric"] == "web.visits" and p["dim"] == key}
     d = day_from
@@ -98,6 +103,26 @@ def _counter_points(token, key, cid, day_from, day_to, log, flt=""):
             points.append({"metric": "web.users", "ptype": "day", "period": d.isoformat(), "dim": key, "value": 0})
         d += dt.timedelta(days=1)
     log("Метрика %s (%s%s): точек %d" % (key, cid, ", фильтр " + flt if flt else "", len(points)))
+    return points
+
+
+def _goal_points(token, key, cid, day_from, day_to, log, flt=""):
+    """Визиты с достижением целей из GOALS по дням. Цели, которых в счётчике нет, пропускаем молча — их ещё не завели."""
+    r = requests.get(MGMT % cid, headers={"Authorization": "OAuth " + token}, timeout=60)
+    if r.status_code >= 400:
+        log("Метрика %s: список целей недоступен (%s)" % (key, r.status_code))
+        return []
+    ids = {}
+    for g in r.json().get("goals", []):
+        for c in g.get("conditions") or []:
+            if c.get("url") in GOALS:
+                ids[c["url"]] = g["id"]
+    points = []
+    for name, gid in ids.items():
+        for row in _rows(token, cid, "ym:s:date", "ym:s:goal%svisits" % gid, day_from, day_to, flt):
+            points.append({"metric": "web.goal", "ptype": "day", "period": row["dimensions"][0]["name"], "dim": key + "|" + name, "value": row["metrics"][0]})
+    if ids:
+        log("Метрика %s: цели %s" % (key, ", ".join(sorted(ids))))
     return points
 
 

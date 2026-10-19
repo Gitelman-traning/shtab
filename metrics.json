@@ -576,6 +576,87 @@
   "definition": "Снимок числа страниц в sitemap.xml журнала и потока на день сбора, без главной. Срез: площадка. Новые статьи за период — разница снимков."
  },
  {
+  "id": "web.quality",
+  "name": "Статей прошли проверку качества",
+  "section": "marketing.site",
+  "unit": "шт",
+  "kind": "stock",
+  "better": "up",
+  "definition": "Снимок: сколько статей из sitemap.xml прошли все проверки чек-листа сборщика (collector/articles.py: title, description, один H1, canonical, schema.org, alt у картинок, кнопка диагностики, объём). Срез: площадка."
+ },
+ {
+  "id": "web.quality.fail",
+  "name": "Статей не прошли проверку",
+  "section": "marketing.site",
+  "unit": "шт",
+  "kind": "stock",
+  "better": "down",
+  "definition": "Снимок: сколько статей не прошли конкретную проверку чек-листа. Срез: «площадка|проверка»."
+ },
+ {
+  "id": "web.goal",
+  "name": "Визиты с целью",
+  "section": "marketing.site",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Визиты за день, в которых достигнута JS-цель Метрики (article_read — дочитал статью, article_cta_click — клик по кнопке диагностики, lead_form_start, lead_success). Срез: «площадка|цель»."
+ },
+ {
+  "id": "web.serp.impr",
+  "name": "Показы в поиске",
+  "section": "marketing.site",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Показы страниц сайта в выдаче за день: Google — Search Console, Яндекс — Вебмастер. Срез: «площадка|google» или «площадка|yandex»."
+ },
+ {
+  "id": "web.serp.clicks",
+  "name": "Клики из поиска",
+  "section": "marketing.site",
+  "unit": "шт",
+  "kind": "flow",
+  "better": "up",
+  "definition": "Клики по сниппету сайта в выдаче за день. CTR = клики / показы. Срез: «площадка|поисковик»."
+ },
+ {
+  "id": "web.serp.pos",
+  "name": "Средняя позиция в поиске",
+  "section": "marketing.site",
+  "unit": "место",
+  "kind": "stock",
+  "better": "down",
+  "definition": "Средняя позиция показа за день (взвешена по показам). Срез: «площадка|поисковик»."
+ },
+ {
+  "id": "web.serp.q",
+  "name": "Запросов с показами",
+  "section": "marketing.site",
+  "unit": "шт",
+  "kind": "stock",
+  "better": "up",
+  "definition": "Снимок на день сбора: сколько разных запросов давали показы сайта за последние 28 дней. Срез: «площадка|поисковик»."
+ },
+ {
+  "id": "web.serp.q10",
+  "name": "Запросов в топ-10",
+  "section": "marketing.site",
+  "unit": "шт",
+  "kind": "stock",
+  "better": "up",
+  "definition": "Снимок: сколько из запросов с показами за 28 дней имеют среднюю позицию 10 и выше. Срез: «площадка|поисковик»."
+ },
+ {
+  "id": "web.kw",
+  "name": "Позиция по ключевому запросу",
+  "section": "marketing.site",
+  "unit": "место",
+  "kind": "stock",
+  "better": "down",
+  "definition": "Снимок: средняя позиция за 28 дней по запросу из collector/keywords.txt (лучшая из трёх сайтов). Срез: «поисковик|запрос»."
+ },
+ {
   "id": "ads.cost",
   "name": "Расход на рекламу",
   "section": "marketing.site",
