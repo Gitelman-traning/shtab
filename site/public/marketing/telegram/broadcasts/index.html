@@ -27,6 +27,10 @@
 .st{display:inline-block;font-size:11px;padding:1px 7px;border-radius:7px;background:var(--soft);color:var(--dim)}
 .st.sending,.st.scheduled{background:var(--mid-bg);color:var(--mid)}.st.done{background:var(--ok-bg);color:var(--ok)}.st.stopped{background:var(--bad-bg);color:var(--bad)}
 .bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:4px;min-width:80px}.bar i{display:block;height:100%;background:var(--gold-b)}
+.tb{display:flex;gap:6px;margin-bottom:6px}.tb button{font:inherit;font-size:13px;min-width:34px;padding:4px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);cursor:pointer}
+.tg-pv{background:#0e1621;border-radius:14px;padding:12px;margin-top:8px}.tg-pv .bub{background:#182533;color:#e9edf1;border-radius:12px 12px 12px 4px;padding:8px 11px;font-size:13.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word;max-width:100%}
+.tg-pv .bub a{color:#6ab3f3}.tg-pv img{display:block;max-width:100%;max-height:260px;border-radius:10px;margin-bottom:6px}.tg-pv .kb{margin-top:6px;background:#17212b;border-radius:9px;padding:7px;text-align:center;color:#6ab3f3;font-size:13px;font-weight:600}
+.photo-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -73,14 +77,22 @@
 
         <div class="blk"><h3>Что</h3>
           <label>Готовый материал (вместо текста)</label><select name="material" id="material"><option value="">— свой текст —</option></select>
-          <div id="textbox"><label>Текст <span class="hint">можно &lt;b&gt;, &lt;i&gt;, &lt;a href="…"&gt;</span></label><textarea name="text"></textarea>
-          <label>Кнопки</label><div id="btns"></div><button type="button" class="btn ghost" id="addbtn">+ кнопка</button></div>
+          <div id="textbox">
+          <label>Картинка <span class="hint">необязательно · jpg, png, webp до 10 МБ · текст встанет подписью под ней</span></label>
+          <div class="photo-row"><input type="file" id="photo" accept="image/jpeg,image/png,image/webp" style="width:auto"><span class="hint" id="photo-st"></span><button type="button" class="btn ghost" id="photo-x" hidden>убрать картинку</button></div>
+          <label>Текст <span class="hint">выделите слова и нажмите кнопку</span></label>
+          <div class="tb"><button type="button" data-w="b" title="Жирный"><b>Ж</b></button><button type="button" data-w="i" title="Курсив"><i>К</i></button><button type="button" data-w="a" title="Ссылка">🔗 ссылка</button></div>
+          <textarea name="text"></textarea>
+          <div class="hint" id="len"></div>
+          <label>Кнопки</label><div id="btns"></div><button type="button" class="btn ghost" id="addbtn">+ кнопка</button>
+          <label>Как увидит человек</label><div class="tg-pv" id="pv"></div></div>
         </div>
 
         <div class="blk"><h3>Когда и как быстро</h3>
           <div class="two"><div><label>Даты: с</label><input name="date_from" type="date"></div><div><label>по</label><input name="date_to" type="date"></div></div>
           <div class="two"><div><label>Часы (МСК): с</label><input name="hours_from" type="number" min="0" max="23" value="10"></div><div><label>до</label><input name="hours_to" type="number" min="1" max="24" value="20"></div></div>
-          <div class="two"><div><label>Не больше в час</label><input name="per_hour" type="number" min="1" value="300"></div><div><label>Не больше в день</label><input name="per_day" type="number" min="1" value="2000"></div></div>
+          <div class="two"><div><label>Скорость: сообщений в час</label><input name="per_hour" type="number" min="1" value="300"><div class="hint">сколько человек получат за один час</div></div><div><label>Предел: сообщений в сутки</label><input name="per_day" type="number" min="1" value="2000"><div class="hint">больше этого за день не уйдёт, остальное — завтра</div></div></div>
+          <p class="hint">Зачем медленно: ответы приходят менеджерам — если отправить всем сразу, они не успеют ответить. Плюс меньше риск, что Telegram сочтёт бота спамом.</p>
           <div class="hint" id="eta"></div>
         </div>
 
@@ -122,7 +134,7 @@ function buttons(){ var rows = []; document.querySelectorAll("#btns .brow").forE
 function segment(){ var s = {}; ["bot", "list", "phone", "source", "medium", "tag", "q", "from", "to"].forEach(function(k){ var v = f[k].value.trim(); if (v) s[k] = v; }); return s; }
 function body(){
   return { id: cur ? cur.id : undefined, title: f.title.value.trim(), segment: segment(),
-    content: f.material.value ? { material: f.material.value } : { text: f.text.value, buttons: buttons() },
+    content: f.material.value ? { material: f.material.value } : { text: f.text.value, buttons: buttons(), photo_r2: photoR2 || undefined },
     date_from: f.date_from.value, date_to: f.date_to.value, hours_from: Number(f.hours_from.value), hours_to: Number(f.hours_to.value),
     per_hour: Number(f.per_hour.value), per_day: Number(f.per_day.value) };
 }
@@ -143,7 +155,50 @@ function eta(){
   if (lastCount == null) return;
   var ph = Number(f.per_hour.value) || 1, pd = Number(f.per_day.value) || 1, hrs = Math.max(1, Number(f.hours_to.value) - Number(f.hours_from.value));
   var perDay = Math.min(pd, ph * hrs), days = Math.ceil(lastCount / perDay);
-  document.getElementById("eta").textContent = "≈ " + n(perDay) + " в день → займёт " + days + " дн.";
+  var why = ph * hrs <= pd ? n(ph) + " в час × " + hrs + " ч окна" : "предел " + n(pd) + " в сутки";
+  document.getElementById("eta").innerHTML = "Получателей " + n(lastCount) + ". В день уйдёт до <b>" + n(perDay) + "</b> (" + why + ") → вся рассылка займёт <b>" + days + " " + plural(days, "день", "дня", "дней") + "</b>." +
+    (days > 1 ? " Быстрее — поднимите «в час» и «в сутки»." : "");
+}
+function plural(x, a, b, c){ var m = x % 10, h = x % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 12 || h > 14) ? b : c; }
+
+/* текст: кнопки Ж / К / ссылка, превью как в Telegram, картинка */
+var photoR2 = "", photoUrl = "";
+document.querySelectorAll(".tb button").forEach(function(b){ b.onclick = function(){
+  var ta = f.text, s = ta.selectionStart, e = ta.selectionEnd, sel = ta.value.slice(s, e), w = b.dataset.w;
+  if (!sel) return say("bad", "Сначала выделите в тексте слова, которые нужно оформить");
+  var open = "<" + w + ">", close = "</" + w + ">";
+  if (w === "a") { var u = prompt("Ссылка для «" + sel + "»:", "https://"); if (!u || !/^https?:\/\//.test(u)) return; open = '<a href="' + u.replace(/"/g, "%22") + '">'; }
+  ta.value = ta.value.slice(0, s) + open + sel + close + ta.value.slice(e);
+  ta.focus(); ta.setSelectionRange(s, s + open.length + sel.length + close.length); preview();
+}; });
+// Безопасный показ: экранируем всё, потом возвращаем только <b>, <i>, <a href>.
+function tgHtml(t){
+  return esc(t || "").replace(/&lt;(\/?)(b|i|u|s)&gt;/g, "<$1$2>")
+    .replace(/&lt;a href=&quot;(https?:\/\/[^"<>]*?)&quot;&gt;/g, '<a href="$1" target="_blank" rel="noopener">').replace(/&lt;\/a&gt;/g, "</a>");
+}
+function preview(){
+  var pv = document.getElementById("pv"), t = f.text.value, plain = t.replace(/<[^>]+>/g, "");
+  var kb = buttons().map(function(r){ return '<div class="kb">' + esc(r[0].text) + '</div>'; }).join("");
+  var long = photoR2 && plain.length > 1024;
+  pv.innerHTML = (photoR2 ? '<div class="bub">' + (photoUrl ? '<img src="' + photoUrl + '" alt="">' : '🖼 картинка прикреплена') + (long ? "" : tgHtml(t)) + '</div>' + (long ? "" : kb) : "") +
+    (!photoR2 || long ? (t ? '<div class="bub" style="margin-top:6px">' + tgHtml(t) + '</div>' + kb : '<div class="hint">текста пока нет</div>') : "");
+  document.getElementById("len").textContent = plain.length + " знаков" + (photoR2 ? (plain.length > 1024 ? " — длиннее 1024: картинка уйдёт отдельно, текст следом" : " · под картинкой можно до 1024") : " · до 4000");
+}
+f.text.addEventListener("input", preview);
+document.getElementById("btns").addEventListener("input", preview);
+document.getElementById("photo").onchange = function(){
+  var file = this.files[0]; if (!file) return;
+  document.getElementById("photo-st").textContent = "загружаю…";
+  fetch(A + "broadcast-photo", { method: "POST", credentials: "same-origin", headers: { "content-type": file.type }, body: file })
+    .then(function(r){ return r.json(); }).then(function(j){
+      if (!j.ok) { document.getElementById("photo-st").textContent = ""; return say("bad", j.error || "картинка не загрузилась"); }
+      photoR2 = j.photo_r2; photoUrl = URL.createObjectURL(file); showPhoto(); say("ok", "Картинка загружена. Не забудьте сохранить черновик.");
+    });
+};
+document.getElementById("photo-x").onclick = function(){ photoR2 = ""; photoUrl = ""; document.getElementById("photo").value = ""; showPhoto(); };
+function showPhoto(){
+  document.getElementById("photo-st").textContent = photoR2 ? "✓ картинка прикреплена" : "";
+  document.getElementById("photo-x").hidden = !photoR2; preview();
 }
 f.addEventListener("input", function(e){ if (["title", "text", "date_from", "date_to"].indexOf(e.target.name) < 0) recount(); eta(); });
 f.material.onchange = function(){ document.getElementById("textbox").hidden = !!f.material.value; };
@@ -152,17 +207,17 @@ function setState(b){
   document.getElementById("start").disabled = !b || b.status !== "tested";
 }
 function edit(b){
-  cur = b || null; f.reset(); document.getElementById("btns").innerHTML = ""; lastCount = null;
+  cur = b || null; f.reset(); document.getElementById("btns").innerHTML = ""; lastCount = null; photoR2 = ""; photoUrl = "";
   document.getElementById("ftitle").textContent = b ? "Рассылка «" + b.title + "» · " + (ST[b.status] || b.status) : "Новая рассылка";
   if (b) {
     var s = JSON.parse(b.segment || "{}"), c = JSON.parse(b.content || "{}");
     f.title.value = b.title; Object.keys(s).forEach(function(k){ if (f[k]) f[k].value = s[k]; });
-    f.material.value = c.material || ""; f.text.value = c.text || "";
+    f.material.value = c.material || ""; f.text.value = c.text || ""; photoR2 = c.photo_r2 || "";
     (c.buttons || []).forEach(function(row){ (Array.isArray(row) ? row : [row]).forEach(btnRow); });
     f.date_from.value = isoDay(b.window_from); f.date_to.value = isoDay(b.window_to);
     f.hours_from.value = b.hours_from; f.hours_to.value = b.hours_to; f.per_hour.value = b.per_hour; f.per_day.value = b.per_day;
   }
-  f.material.onchange(); setState(b); recount();
+  f.material.onchange(); setState(b); recount(); showPhoto();
 }
 document.getElementById("new").onclick = function(){ edit(null); };
 f.onsubmit = function(e){ e.preventDefault(); post("broadcasts", body()).then(function(j){ if (!j.ok) return say("bad", j.error || "не сохранилось"); say("ok", "Черновик сохранён. Дальше — тест себе."); load(j.id); }); };
