@@ -66,7 +66,7 @@ const TGIN_TEMPLATES = [
 
 // Порядок колонок менять нельзя — строки читаются по индексам. Новые — только в конец.
 const HEADER = ["Дата", "Тег", "Заказчик", "Блогер и площадка", "Типы", "WA текст", "WA ссылка", "WA длина",
-  "TG-бот ссылка", "TG-входящее фраза", "TG-входящее ссылка", "Статус", "Выдал", "Примечание", "Кружок", "Логин заказчика", "Рабочие таблицы"];
+  "TG-бот ссылка", "TG-входящее фраза", "TG-входящее ссылка", "Статус", "Выдал", "Примечание", "Кружок", "Логин заказчика", "Рабочие таблицы", "amoCRM"];
 const C = Object.fromEntries(HEADER.map((h, i) => [h, i]));
 const LAST = String.fromCharCode(64 + HEADER.length);
 
@@ -165,7 +165,7 @@ function view(x) {
   const g = (h) => x.v[C[h]] || "";
   return { row: x.row, date: g("Дата"), tag: g("Тег"), by: g("Заказчик"), who: g("Блогер и площадка"), types: g("Типы"), waText: g("WA текст"), wa: g("WA ссылка"),
     waLen: g("WA длина"), bot: g("TG-бот ссылка"), phrase: g("TG-входящее фраза"), tgin: g("TG-входящее ссылка"), status: g("Статус"), issued: g("Выдал"),
-    circle: g("Кружок"), login: g("Логин заказчика"), tables: g("Рабочие таблицы") };
+    circle: g("Кружок"), login: g("Логин заказчика"), tables: g("Рабочие таблицы"), amo: g("amoCRM") };
 }
 async function updateCells(sa, row, patch) {
   const data = Object.entries(patch).map(([h, val]) => ({ range: `${TAB}!${String.fromCharCode(65 + C[h])}${row}`, values: [[val]] }));
@@ -249,6 +249,55 @@ async function tgOfLogin(env, login) {
   if (!login) return null;
   const r = await env.DB.prepare("SELECT tg_id FROM users WHERE login = ?").bind(login).first();
   return r && r.tg_id ? r.tg_id : null;
+}
+
+// ---------- статус «заведено в amo» ----------
+const AMO_WAIT = "ждёт заведения";
+async function amoHash(tag, types) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(tag + "|" + types));
+  return [...new Uint8Array(d)].slice(0, 4).map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+async function tgButtons(env, chat, text, keyboard) {
+  if (!env.TG_BOT_TOKEN || !chat) return null;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chat, text, disable_web_page_preview: true, reply_markup: { inline_keyboard: keyboard } }) });
+    return await r.json();
+  } catch (e) { return null; }
+}
+// Строку ищем по номеру и сверяем хеш тега; строки могли сдвинуться — тогда ищем по хешу.
+async function markAmoDone(env, sa, row, hash, who) {
+  const rows = await readRows(sa);
+  let x = rows.find((r) => r.row === row);
+  if (x && hash && (await amoHash(view(x).tag, view(x).types)) !== hash) x = null;
+  if (!x && hash) { for (const r of rows) if ((await amoHash(view(r).tag, view(r).types)) === hash) { x = r; break; } }
+  if (!x) return { ok: false, error: "заявка не найдена" };
+  const r = view(x);
+  if (r.amo && r.amo !== AMO_WAIT) return { ok: true, already: true, tag: r.tag, amo: r.amo };
+  const mark = "заведено " + fmtMsk(Date.now()) + (who ? ", " + who : "");
+  await updateCells(sa, x.row, { "amoCRM": mark });
+  await audit(env, "tg", "influence.links.amo", r.tag, who);
+  return { ok: true, tag: r.tag, amo: mark };
+}
+// Нажатие кнопки «✅ Заведено в amo» в канале. Вызывается из /api/tgtask (там вебхук бота Штаба).
+export async function handleAmoButton(env, cq) {
+  const answer = (text) => fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/answerCallbackQuery`, { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ callback_query_id: cq.id, text }) }).catch(() => {});
+  const admin = cq.from && env.DB ? await env.DB.prepare("SELECT name, login FROM users WHERE tg_id = ? AND role = 'admin' AND active = 1").bind(cq.from.id).first() : null;
+  if (!admin) return answer("Отмечать может только администратор Штаба");
+  useSheets(env);
+  const { sa, error } = serviceAccount(env);
+  if (!sa) return answer("Реестр не подключён: " + error);
+  const m = /^ia:(\d+):([0-9a-f]{8})$/.exec(String(cq.data || ""));
+  if (!m) return answer("Не понял кнопку");
+  const r = await markAmoDone(env, sa, Number(m[1]), m[2], admin.name || admin.login);
+  if (!r.ok) return answer(r.error);
+  if (cq.message) {
+    await fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/editMessageText`, { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: cq.message.chat.id, message_id: cq.message.message_id, disable_web_page_preview: true,
+        text: (cq.message.text || "") + "\n\n✅ В amo " + r.amo }) }).catch(() => {});
+  }
+  return answer(r.already ? "Уже отмечено" : "Готово: " + r.tag);
 }
 
 // ---------- маршруты ----------
@@ -349,8 +398,11 @@ export async function onRequestPost({ request, env }) {
     const waiting = [types.includes("tgin") ? "ссылку TG" : "", circle.startsWith("нужен") ? "кружок" : ""].filter(Boolean);
     const status = waiting.length ? "ждёт: " + waiting.join(", ") : "выдано";
     await ensureTab(sa);
-    await sheets(sa, SHEET_ID, "POST", `/values/${q(TAB)}!A1:${LAST}1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
-      { values: [[fmtMsk(Date.now()), tag, by, who, types.join(","), waText, wa, waLen, bot, phrase, "", status, waiting.length ? "" : by, "", circle, user.login]] });
+    // В amo для WhatsApp и TG-входящего нужен блок в триггерах (текст = фраза → источник, тег) — его заводит администратор.
+    const needAmo = !!(wa || phrase);
+    const ap = await sheets(sa, SHEET_ID, "POST", `/values/${q(TAB)}!A1:${LAST}1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+      { values: [[fmtMsk(Date.now()), tag, by, who, types.join(","), waText, wa, waLen, bot, phrase, "", status, waiting.length ? "" : by, "", circle, user.login, "", needAmo ? AMO_WAIT : ""]] });
+    const newRow = Number((/!A(\d+)/.exec((ap.updates && ap.updates.updatedRange) || "") || [])[1] || 0);
     await audit(env, user.login, "influence.links.save", tag, types.join(","));
 
     const steps = [];
@@ -386,9 +438,19 @@ export async function onRequestPost({ request, env }) {
       if (bot && !circle.startsWith("нужен")) parts.push("Выдано: TG-бот\n\nТег: " + tag + "\n" + bot);
       const footer = "Блогер: " + who + "\nЗаказчик: " + customer + (user.name && user.name !== customer ? " (оформил " + user.name + ")" : "")
         + (waiting.length ? "\nВыдать: " + new URL(request.url).origin + "/marketing/influence/links/" : "");
-      await tgSend(env, adminChat(env), parts.join("\n\n———\n\n") + "\n\n" + footer);
+      const amoText = needAmo ? "\n\nЗавести в amo: триггер «текст сообщения = " + (phrase || waText) + "» · воронка 08733326 · статус 70705174 → источник «интеграции», тег " + tag : "";
+      const text = parts.join("\n\n———\n\n") + amoText + "\n\n" + footer;
+      if (needAmo && newRow) await tgButtons(env, adminChat(env), text, [[{ text: "✅ Заведено в amo", callback_data: "ia:" + newRow + ":" + (await amoHash(tag, types.join(","))) }]]);
+      else await tgSend(env, adminChat(env), text);
     }
     return json({ ok: true, tag, wa, waLen, bot, waiting, tables: wt.failed.length ? "ошибка" : "ok" });
+  }
+
+  if (action === "amo") {
+    if (!isAdmin(user)) return bad("только для администратора", 403);
+    const row = parseInt(String(b.row || ""), 10);
+    const r = await markAmoDone(env, sa, row, "", user.name || user.login);
+    return r.ok ? json({ ok: true }) : bad(r.error, 404);
   }
 
   if (action === "issue" || action === "circle") {

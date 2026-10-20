@@ -29,7 +29,7 @@
 .acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
 .msg{padding:11px 14px;border-radius:10px;margin:0 0 14px;font-size:13px;word-break:break-word}.msg.ok{background:var(--ok-bg);color:var(--ok)}.msg.bad{background:var(--bad-bg);color:var(--bad)}.msg.mid{background:var(--mid-bg);color:var(--mid)}
 .tagc{display:inline-block;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--gold-soft);border-radius:6px;padding:1px 7px}
-.pill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px}.pill.wait{background:var(--mid-bg);color:var(--mid)}
+.pill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px}.pill.wait{background:var(--mid-bg);color:var(--mid)}.pill.done{background:var(--ok-bg);color:var(--ok)}
 .sub{font-size:12px;color:var(--dim);margin-top:3px;word-break:break-word}
 .it{padding:12px 0;border-top:1px solid var(--line)}.it:first-child{border-top:0;padding-top:0}
 .tabs{display:flex;gap:4px;background:var(--soft);border-radius:12px;padding:4px;margin:0 0 6px}
@@ -183,7 +183,7 @@ function checkPhrase(){ clearTimeout(pt); var v = $('phrase').value.trim(); if (
 
 function list(rows){
   $('cnt').textContent = rows.length ? 'последние ' + rows.length : '';
-  var pend = rows.filter(function(r){ return String(r.status).indexOf('ждёт') === 0; }).length;
+  var pend = rows.filter(function(r){ return String(r.status).indexOf('ждёт') === 0 || r.amo === 'ждёт заведения'; }).length;
   if (pend) $('cnt').innerHTML = 'последние ' + rows.length + ' · <span class="pill wait">ждут администратора: ' + pend + '</span>';
   if (!rows.length) { $('list').innerHTML = '<p class="note">Заявок пока нет</p>'; return; }
   $('list').innerHTML = rows.map(function(r){
@@ -196,6 +196,8 @@ function list(rows){
       if (r.tgin) out += '<div class="ln"><span class="sub">TG-входящее</span><div class="mono">' + esc(r.tgin) + '</div><button class="btn ghost cp" type="button" data-v="' + esc(r.tgin) + '">Копировать</button></div>';
       else out += '<div class="ln"><span class="pill wait">TG-входящее: ждёт ссылку</span><div class="sub">«' + esc(r.phrase) + '»</div>' + (ME.admin ? '<div class="inl"><input type="url" placeholder="https://t.me/m/…" id="lk' + r.row + '"><button class="btn ghost act" type="button" data-a="issue" data-row="' + r.row + '">Выдать</button></div>' : '') + '</div>';
     }
+    if (r.amo === 'ждёт заведения') out += '<div class="ln"><span class="pill wait">amo: ждёт заведения</span>' + (ME.admin ? ' <button class="btn ghost act" type="button" data-a="amo" data-row="' + r.row + '">Заведено в amo</button>' : '') + '</div>';
+    else if (r.amo) out += '<div class="ln"><span class="pill done">✅ amo: ' + esc(r.amo) + '</span></div>';
     return out + '</div>';
   }).join('');
   $('list').querySelectorAll('.cp').forEach(function(b){ b.onclick = function(){ copy(b, b.getAttribute('data-v'), 'Копировать'); }; });
@@ -203,14 +205,14 @@ function list(rows){
     var row = b.getAttribute('data-row'), a = b.getAttribute('data-a'), body = { action: a, row: row };
     if (a === 'issue') { body.link = ($('lk' + row).value || '').trim(); if (!body.link) return; }
     b.disabled = true;
-    api('POST', body).then(function(d){ msg('ok', (a === 'issue' ? 'Ссылка выдана.' : 'Кружок отмечен.') + (d.notified ? ' Заказчику ушло сообщение в Telegram.' : ' У заказчика не привязан Telegram — передайте ему сами.')); load(); })
+    api('POST', body).then(function(d){ msg('ok', (a === 'issue' ? 'Ссылка выдана.' : a === 'amo' ? 'Отмечено: заведено в amo.' : 'Кружок отмечен.') + (a === 'amo' ? '' : (d.notified ? ' Заказчику ушло сообщение в Telegram.' : ' У заказчика не привязан Telegram — передайте ему сами.'))); load(); })
       .catch(function(e){ b.disabled = false; msg('bad', esc(e.message)); });
   }; });
 }
 
 function load(){ return api('GET').then(function(d){
   ME = d.me; list(d.rows || []);
-  var waitN = (d.rows || []).filter(function(r){ return String(r.status).indexOf('ждёт') === 0; }).length;
+  var waitN = (d.rows || []).filter(function(r){ return String(r.status).indexOf('ждёт') === 0 || r.amo === 'ждёт заведения'; }).length;
   $('stamp').textContent = waitN ? 'ждут администратора: ' + waitN : 'всё выдано';
   $('reg').innerHTML = 'Реестр — <a href="' + esc(d.sheetUrl) + '" target="_blank" rel="noopener">Google Таблица, лист «' + esc(d.tab) + '»</a>.';
   var warns = [];

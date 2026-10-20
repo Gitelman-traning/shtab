@@ -31,6 +31,7 @@
 // Настройка вебхука: POST /api/tgtask?setup=1 с Bearer INGEST_TOKEN — ставит setWebhook на этот адрес
 // с секретом (KV dash:tg-secret), слушает message, callback_query, business_connection и business_message.
 // GET с тем же токеном — куда смотрит вебхук.
+import { handleAmoButton } from "./influence-links.js";
 import { json, bad, hasIngestToken, randomId, tgSend, tgRequestAccess } from "./_lib.js";
 
 // dash:tasks / dash:projects заняты страницами дашборда (/api/dashboard?page=…) — данные бота живут под dash:tg-*
@@ -535,6 +536,11 @@ export async function onRequestPost({ request, env }) {
   const update = await request.json().catch(() => null);
   const cq = update && update.callback_query;
   if (cq) {
+    // кнопка «✅ Заведено в amo» из канала генератора ссылок (Маркетинг → Инфлюенс)
+    if (String(cq.data || "").startsWith("ia:")) {
+      try { await handleAmoButton(env, cq); } catch (e) { await tg(env, "answerCallbackQuery", { callback_query_id: cq.id, text: "Не получилось: " + (e.message || e) }); }
+      return json({ ok: true });
+    }
     if (cq.from && await isAdminTg(env, cq.from.id)) {
       try { await handleButton(env, cq); } catch (e) { await tg(env, "answerCallbackQuery", { callback_query_id: cq.id, text: "Не получилось: " + (e.message || e) }); }
     }
