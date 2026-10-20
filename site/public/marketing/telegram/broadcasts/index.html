@@ -72,6 +72,12 @@
             <div><label>Пришёл с</label><input name="from" type="date"></div>
             <div><label>по</label><input name="to" type="date"></div>
           </div>
+          <div class="two">
+            <div><label>Сегмент по ответам</label><select name="seg"><option value="">любой</option><option value="hot">🔥 горячие</option><option value="mid">ЦА</option><option value="no">не ЦА</option><option value="none">без квалификации</option></select></div>
+            <div><label>Не слать тем, кто в списке</label><select name="exclude_list" id="exclude_list"><option value="">—</option></select></div>
+          </div>
+          <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin-top:12px"><input type="checkbox" name="rules" value="anna" checked style="width:auto;margin-top:3px">
+            <span><b>Правила Анны</b> — не слать тем, кто заходил в ботов заявок (Таня, Павел, gitelmanteam), кто оставил номер где угодно, не собственникам и собственникам с оборотом до $400 тыс.</span></label>
           <div class="cnt" id="cnt">выберите бота</div>
         </div>
 
@@ -131,7 +137,7 @@ function btnRow(b){
 }
 document.getElementById("addbtn").onclick = function(){ btnRow(null); };
 function buttons(){ var rows = []; document.querySelectorAll("#btns .brow").forEach(function(r){ var i = r.querySelectorAll("input"), t = i[0].value.trim(), v = i[1].value.trim(), k = r.querySelector("select").value; if (t && v) { var o = { text: t }; o[k] = v; rows.push([o]); } }); return rows; }
-function segment(){ var s = {}; ["bot", "list", "phone", "source", "medium", "tag", "q", "from", "to"].forEach(function(k){ var v = f[k].value.trim(); if (v) s[k] = v; }); return s; }
+function segment(){ var s = {}; ["bot", "list", "phone", "source", "medium", "tag", "q", "from", "to", "seg", "exclude_list"].forEach(function(k){ var v = f[k].value.trim(); if (v) s[k] = v; }); if (f.rules.checked) s.rules = "anna"; return s; }
 function body(){
   return { id: cur ? cur.id : undefined, title: f.title.value.trim(), segment: segment(),
     content: f.material.value ? { material: f.material.value } : { text: f.text.value, buttons: buttons(), photo_r2: photoR2 || undefined },
@@ -211,7 +217,7 @@ function edit(b){
   document.getElementById("ftitle").textContent = b ? "Рассылка «" + b.title + "» · " + (ST[b.status] || b.status) : "Новая рассылка";
   if (b) {
     var s = JSON.parse(b.segment || "{}"), c = JSON.parse(b.content || "{}");
-    f.title.value = b.title; Object.keys(s).forEach(function(k){ if (f[k]) f[k].value = s[k]; });
+    f.title.value = b.title; Object.keys(s).forEach(function(k){ if (f[k] && k !== "rules") f[k].value = s[k]; }); f.rules.checked = s.rules === "anna";
     f.material.value = c.material || ""; f.text.value = c.text || ""; photoR2 = c.photo_r2 || "";
     (c.buttons || []).forEach(function(row){ (Array.isArray(row) ? row : [row]).forEach(btnRow); });
     f.date_from.value = isoDay(b.window_from); f.date_to.value = isoDay(b.window_to);
@@ -243,7 +249,9 @@ function load(open){
 Promise.all([get("bots"), get("lists"), get("materials")]).then(function(r){
   var bots = (r[0].rows || []).filter(function(b){ return b.connected; });
   f.bot.innerHTML = '<option value="">— выберите —</option>' + bots.map(function(b){ return '<option value="' + esc(b.key) + '">' + esc(b.title || b.key) + ' (@' + esc(b.key) + ')</option>'; }).join("");
-  f.list.innerHTML = '<option value="">любой</option>' + (r[1].rows || []).map(function(l){ return '<option value="' + esc(l.key) + '">' + esc(l.title || l.key) + ' · ' + n(l.people) + '</option>'; }).join("");
+  var listOpts = (r[1].rows || []).map(function(l){ return '<option value="' + esc(l.key) + '">' + esc(l.title || l.key) + ' · ' + n(l.people) + '</option>'; }).join("");
+  f.list.innerHTML = '<option value="">любой</option>' + listOpts;
+  f.exclude_list.innerHTML = '<option value="">—</option>' + listOpts;
   f.material.innerHTML = '<option value="">— свой текст —</option>' + (r[2].rows || []).filter(function(m){ return m.active; }).map(function(m){ return '<option value="' + esc(m.key) + '">' + esc(m.title) + '</option>'; }).join("");
   document.getElementById("stamp").textContent = bots.length + " бот(ов) с токеном";
   load(); edit(null);
