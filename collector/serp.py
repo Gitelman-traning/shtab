@@ -110,12 +110,9 @@ def webmaster_points(day_from, day_to, log=print):
         log("Вебмастер: нет YANDEX_WEBMASTER_TOKEN — пропуск")
         return []
     h = {"Authorization": "OAuth " + token}
-    # у раннеров GitHub нет IPv6, а api.webmaster.yandex.net отдаёт и AAAA: ходим только по IPv4
-    import urllib3.util.connection as uc
-    uc.HAS_IPV6 = False
 
     def get(path, **params):
-        r = requests.get(WM + path, headers=h, params=params, timeout=30)
+        r = requests.get(WM + path, headers=h, params=params, timeout=60)
         r.raise_for_status()
         return r.json()
 
