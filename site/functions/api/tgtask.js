@@ -22,6 +22,8 @@
 //   Карточка задачи с кнопками идёт в личку Никите, в сам чат бот НИКОГДА не пишет (в бизнес-чате это было бы «от Никиты»).
 //   Пропускаем: свои сообщения, ботов, «ок/спасибо/👍» и короче 3 букв. В заметке — текст и ссылка на сообщение (супергруппы).
 //   «чаты» → список известных чатов с кнопками режима. Режимы в KV dash:tg-watch, бизнес-подключения — dash:tg-biz.
+//   Третий путь (с 21.10.2026, основной для групп): Local/tg-tasks/tg_tasks.py читает выбранные чаты аккаунтом Никиты
+//   (Telethon, свой api_id) и шлёт новые сообщения сюда POST ?ingest=1 с Bearer INGEST_TOKEN — бот в группах не нужен.
 //
 // Проект угадывается по ключевым словам из projects.json (их присылает sync.mjs в KV dash:tg-projects),
 // а пока их нет — по запасному списку ниже.
@@ -224,12 +226,14 @@ function mentionsOwner(msg, own) {
   return false;
 }
 
-// текст задачи из чужого сообщения: пусто или «ок/спасибо/👍» → null (не задача)
+// «ок/спасибо/👍», пусто или короче 3 букв — не задача
+const isNoise = (text) => !text || ACK.test(text) || text.replace(/[^\p{L}\p{N}]/gu, "").length < 3;
+
+// текст задачи из чужого сообщения: шум → null
 function chatText(msg, name) {
   let text = String(msg.text || msg.caption || "").trim();
   if (!text && mediaKind(msg)) text = `${mediaKind(msg)} от ${name}`.trim();
-  if (!text || ACK.test(text) || text.replace(/[^\p{L}\p{N}]/gu, "").length < 3) return null;
-  return text;
+  return isNoise(text) ? null : text;
 }
 
 // записать задачу из сообщения чата и прислать карточку владельцу в личку; src = {chat, message_id, name, text}
@@ -528,6 +532,28 @@ export async function onRequestPost({ request, env }) {
     }
     if (!body.chat_id) return bad("нужен chat_id или login администратора с привязанным Telegram");
     return json({ ok: true, ...(await sendDigest(env, body.chat_id, Math.min(+body.limit || 10, 15), !!body.force)) });
+  }
+
+  // пачка сообщений от Local/tg-tasks/tg_tasks.py (читает выбранные чаты Никиты его же аккаунтом, Telethon):
+  // {"items": [{chat_id, chat_username, chat_title, message_id, from_name, text}]} → задачи + карточки в личку.
+  // Какие чаты и режим (все / только упоминания) решает скрипт; здесь — шум, повторы и запись.
+  if (url.searchParams.get("ingest")) {
+    if (!hasIngestToken(request, env)) return bad("нет доступа", 401);
+    const own = await owner(env);
+    if (!own) return bad("у владельца дашборда не привязан Telegram", 500);
+    const body = await request.json().catch(() => ({}));
+    let added = 0, skipped = 0;
+    for (const it of (Array.isArray(body.items) ? body.items : []).slice(0, 30)) {
+      const text = String(it.text || "").trim().slice(0, 3000);
+      const seenKey = `dash:tg-seen:${it.chat_id}:${it.message_id}`;
+      if (!it.chat_id || !it.message_id || isNoise(text) || await env.OKK_KV.get(seenKey)) { skipped++; continue; }
+      await env.OKK_KV.put(seenKey, "1", { expirationTtl: 14 * 864e2 });
+      await addChatTask(env, own,
+        { chat: { id: it.chat_id, username: it.chat_username || "" }, message_id: it.message_id, name: String(it.from_name || "кто-то").slice(0, 60), text },
+        { title: String(it.chat_title || "чат").slice(0, 80) });
+      added++;
+    }
+    return json({ ok: true, added, skipped });
   }
 
   // вебхук Telegram
