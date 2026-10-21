@@ -308,6 +308,12 @@ export async function tgRequestAccess(env, tg, origin) {
   return { status: "created", login };
 }
 
+// темы уведомлений в Telegram (users.notify через запятую); новая тема = строка здесь
+export const NOTIFY = { journal: "Вышла статья журнала" };
+export function notifyList(v) {
+  return String(Array.isArray(v) ? v.join(",") : v || "").split(",").map((s) => s.trim()).filter((s) => NOTIFY[s]).join(",");
+}
+
 export async function tgSend(env, chatId, text) {
   if (!env.TG_BOT_TOKEN || !chatId) return false;
   try {

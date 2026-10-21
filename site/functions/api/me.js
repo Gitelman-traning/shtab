@@ -1,5 +1,6 @@
 // GET /api/me — кто вошёл; PUT /api/me {password, new_password} — сменить свой пароль (только именные)
-import { json, bad, canRead, currentUser, hashPassword, verifyPassword, randomId, audit, now, effectivePerms } from "./_lib.js";
+// PATCH /api/me {notify: ["journal", …]} — свои уведомления в Telegram
+import { json, bad, canRead, currentUser, hashPassword, verifyPassword, randomId, audit, now, effectivePerms, NOTIFY, notifyList } from "./_lib.js";
 
 export async function onRequestGet({ request, env }) {
   const user = await canRead(request, env);
@@ -10,8 +11,25 @@ export async function onRequestGet({ request, env }) {
     const r = await env.DB.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'pending'").first();
     pending = (r && r.n) || 0;
   }
+  const personal = user.login !== "shared" && user.login !== "collector";
+  let tg = false, notify = "";
+  if (personal) {
+    const r = await env.DB.prepare("SELECT tg_id, notify FROM users WHERE login = ?").bind(user.login).first();
+    tg = !!(r && r.tg_id); notify = (r && r.notify) || "";
+  }
   return json({ ok: true, user: { login: user.login, name: user.name || "", role: user.role, sections: user.sections || "",
-    personal: user.login !== "shared" && user.login !== "collector", must_change: !!user.must_change, perms: effectivePerms(user) }, pending });
+    personal, must_change: !!user.must_change, perms: effectivePerms(user), tg, notify }, pending, topics: NOTIFY });
+}
+
+export async function onRequestPatch({ request, env }) {
+  const user = await currentUser(request, env);
+  if (!user) return bad("уведомления настраивает только именной пользователь", 401);
+  let body;
+  try { body = await request.json(); } catch (e) { return bad("тело не JSON"); }
+  const notify = notifyList(body.notify);
+  await env.DB.prepare("UPDATE users SET notify = ? WHERE login = ?").bind(notify, user.login).run();
+  await audit(env, user.login, "user.notify", user.login, notify || "выключены");
+  return json({ ok: true, notify });
 }
 
 export async function onRequestPut({ request, env }) {

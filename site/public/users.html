@@ -266,6 +266,7 @@ document.addEventListener('click', function(e){
 });
 
 /* ---------- состояние ---------- */
+var TOPICS={};   // темы уведомлений в Telegram из /api/users
 var ME=null, USERS=[], PENDING=[], AUDIT=[], FILTER="all", SEL=null, PTAB="profile", NEWMODE=false, LAST_PW=null;
 var FILTERS=[["all","Все"],["admin","Админы"],["head","Руководители"],["member","Сотрудники"],["viewer","Смотрят"],["off","Отключены"]];
 function initials(u){ var n=String(u.name||u.login||"?").trim().split(/\s+/); return ((n[0]||"")[0]||"").toUpperCase()+((n[1]||"")[0]||"").toUpperCase(); }
@@ -298,7 +299,7 @@ $("tabs").addEventListener("click",function(e){
 function loadUsers(){
   return api("/api/users").then(function(r){
     if(!r.ok){$("people").innerHTML='<p class="err" style="padding:12px">'+esc(r.error)+'</p>';return}
-    extendTree(r.sections);
+    extendTree(r.sections); TOPICS=r.topics||{};
     PENDING=r.users.filter(function(u){return u.role==="pending"});
     USERS=r.users.filter(function(u){return u.role!=="pending"});
     USERS.sort(function(a,b){ var o={admin:0,head:1,member:2,viewer:3}; return (b.active-a.active)||((o[a.role]||9)-(o[b.role]||9))||String(a.name||a.login).localeCompare(String(b.name||b.login),"ru"); });
@@ -379,6 +380,7 @@ function renderPanel(){
       +'<label class="fld"><span>Имя</span><input id="e-name" value="'+esc(u.name)+'" placeholder="Имя Фамилия"></label>'
       +'<label class="fld"><span>Роль</span>'+roleSelect("e-role",u.role)+'</label>'
       +'<dl class="facts"><dt>Логин</dt><dd>'+esc(u.login)+'</dd><dt>Telegram</dt><dd>'+(u.tg_id?(u.tg_username?'@'+esc(u.tg_username):'привязан'):'не привязан')+'</dd><dt>Создан</dt><dd>'+dt(u.created_at)+'</dd><dt>Последний вход</dt><dd>'+(u.last_login?dt(u.last_login):'ещё не входил')+'</dd></dl>'
+      +'<div class="fld"><span>Уведомления в Telegram</span>'+notifyBoxes(u)+'</div>'
       +'<p class="sub" style="margin:0">Администратор видит всё и управляет пользователями. Руководитель и сотрудник меняют вид только в разделах с «правкой», «смотрит» ничего не меняет.</p>'
       +'</div><div id="pp-rights"'+(PTAB==="rights"?'':' hidden')+'>'+(u.role==="admin"?'<div class="note">Администратор видит и меняет всё, права ниже действуют, если роль сменить.</div>':'')+'<div class="rights" id="e-rights"></div></div>'
       +'<div class="foot"><button data-p="save">Сохранить</button><span class="sub" id="p-out"></span></div>';
@@ -395,6 +397,12 @@ function renderPanel(){
     b.innerHTML=rows.length?'<div class="hist">'+rows.map(function(x){ return '<div><b style="font-weight:500">'+esc(actName(x.action))+'</b>'+(x.login===u.login&&x.target!==u.login?' <span class="sub">— сам, '+esc(x.target||'')+'</span>':x.login!==u.login?' <span class="sub">· '+esc(x.login)+'</span>':'')
       +'<br><span class="sub">'+dt(x.at)+(x.note?' · '+esc(x.note):'')+'</span></div>'; }).join("")+'</div>':'<p class="sub">В последних '+AUDIT.length+' записях журнала о нём ничего нет.</p>';
   }
+}
+function notifyBoxes(u){
+  var on=","+(u.notify||"")+",", keys=Object.keys(TOPICS);
+  if(!keys.length) return '<span class="sub">тем пока нет</span>';
+  return keys.map(function(k){ return '<label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink)"><input type="checkbox" style="width:auto" data-notify="'+k+'"'+(on.indexOf(","+k+",")>=0?' checked':'')+(u.tg_id?'':' disabled')+'> '+esc(TOPICS[k])+'</label>'; }).join("")
+    +(u.tg_id?'':'<span class="sub">Telegram не привязан: человек должен один раз войти через кнопку Telegram.</span>');
 }
 function newForm(){
   return '<div class="top"><div class="av lg">+</div><div class="nm"><b>Новый пользователь</b><span class="sub">временный пароль покажем один раз</span></div><button class="x" data-p="close" aria-label="Закрыть">×</button></div>'
@@ -424,7 +432,7 @@ $("panel").addEventListener("click",function(e){
     var role=$("e-role").value;
     if(ME&&l===ME.login&&role!=="admin"){ out.className="err"; out.textContent="нельзя снять с себя администратора"; return; }
     b.disabled=true;
-    api("/api/users",{method:"PATCH",body:{login:l,action:"perms",name:$("e-name").value,role:role,perms:$("e-rights").__val||{}}}).then(function(r){
+    api("/api/users",{method:"PATCH",body:{login:l,action:"perms",name:$("e-name").value,role:role,perms:$("e-rights").__val||{},notify:[].filter.call(document.querySelectorAll("[data-notify]"),function(c){return c.checked}).map(function(c){return c.getAttribute("data-notify")})}}).then(function(r){
       b.disabled=false; if(!r.ok){out.className="err";out.textContent=r.error;return}
       loadUsers().then(function(){ var o=$("p-out"); if(o){o.className="ok";o.textContent="сохранено";} }); loadLog();
     }); return;
@@ -440,7 +448,7 @@ $("panel").addEventListener("click",function(e){
 });
 
 /* ---------- журнал ---------- */
-var ACT={"user.create":"создан пользователь","user.reset":"сброшен пароль","user.disable":"отключён","user.enable":"включён","user.approve":"заявка подтверждена","user.reject":"заявка отклонена","user.perms":"изменены права","user.update":"изменён профиль","user.password":"сменил свой пароль","login":"вход по паролю","login.tg":"вход через Telegram","login.fail":"неудачный вход","register":"заявка на доступ","tg.request":"запрос входа через Telegram","section.draft":"черновик раздела","section.draft.fail":"черновик раздела не собрался","section.publish":"раздел опубликован","section.unpublish":"раздел откатан","chat.ask":"вопрос Claude","chat.fail":"ошибка вопроса Claude","budget.add":"бюджет: добавлено","budget.delete":"бюджет: удалено","budget.plan":"бюджет: план","tags.kind":"теги: тип","tags.owner":"теги: владелец","tags.rule_add":"теги: правило добавлено","tags.rule_del":"теги: правило удалено","okna.goal":"окна: цель","prep.feedback":"подготовка: отзыв","prep.hook":"подготовка: вебхук","prep.manager":"подготовка: менеджер","prep.recalc":"подготовка: пересчёт","influence.links.save":"ссылки блогеров","hr.person_add":"HR: сотрудник добавлен","hr.person_edit":"HR: сотрудник изменён","hr.person_del":"HR: сотрудник удалён","hr.dept_add":"HR: отдел добавлен","hr.dept_edit":"HR: отдел изменён","hr.dept_del":"HR: отдел удалён","hr.import":"HR: импорт"};
+var ACT={"user.create":"создан пользователь","user.reset":"сброшен пароль","user.disable":"отключён","user.enable":"включён","user.approve":"заявка подтверждена","user.reject":"заявка отклонена","user.perms":"изменены права","user.update":"изменён профиль","user.password":"сменил свой пароль","login":"вход по паролю","login.tg":"вход через Telegram","login.fail":"неудачный вход","register":"заявка на доступ","tg.request":"запрос входа через Telegram","section.draft":"черновик раздела","section.draft.fail":"черновик раздела не собрался","section.publish":"раздел опубликован","section.unpublish":"раздел откатан","chat.ask":"вопрос Claude","chat.fail":"ошибка вопроса Claude","budget.add":"бюджет: добавлено","budget.delete":"бюджет: удалено","budget.plan":"бюджет: план","tags.kind":"теги: тип","tags.owner":"теги: владелец","tags.rule_add":"теги: правило добавлено","tags.rule_del":"теги: правило удалено","okna.goal":"окна: цель","prep.feedback":"подготовка: отзыв","prep.hook":"подготовка: вебхук","prep.manager":"подготовка: менеджер","prep.recalc":"подготовка: пересчёт","influence.links.save":"ссылки блогеров","hr.person_add":"HR: сотрудник добавлен","hr.person_edit":"HR: сотрудник изменён","hr.person_del":"HR: сотрудник удалён","hr.dept_add":"HR: отдел добавлен","hr.dept_edit":"HR: отдел изменён","hr.dept_del":"HR: отдел удалён","hr.import":"HR: импорт","user.notify":"изменил свои уведомления","journal.publish":"статья журнала: уведомление","journal.publish.fail":"статья журнала: уведомление не дошло"};
 function actName(a){ return ACT[a]||a; }
 function loadLog(){
   api("/api/audit?limit=500").then(function(r){

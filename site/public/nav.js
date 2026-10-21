@@ -206,5 +206,26 @@
     d.innerHTML = (u && u.personal) ? "<span><b>" + esc(u.name || u.login) + "</b> · " + esc(R[u.role] || u.role) + "</span><a href=\"/__logout\">Выйти</a>"
       : "<span>общий вход</span><a href=\"/__logout\">Войти под своим именем</a>";
     h.appendChild(d);
+    // свои уведомления в Telegram: клик по имени открывает галочки (PATCH /api/me)
+    var T = (m && m.topics) || {};
+    if (!(u && u.personal) || !Object.keys(T).length) return;
+    var nm = d.querySelector("span"); nm.style.cursor = "pointer"; nm.title = "Мои уведомления в Telegram";
+    nm.insertAdjacentHTML("beforeend", " 🔔");
+    var pop = document.createElement("div"); pop.hidden = true; d.style.position = "relative";
+    pop.style.cssText = "position:absolute;right:0;top:calc(100% + 6px);z-index:70;min-width:250px;padding:12px;border-radius:11px;border:1px solid var(--line-2);background:var(--card);box-shadow:0 8px 28px rgba(0,0,0,.18);white-space:normal;font-size:12.5px;color:var(--ink)";
+    var on = "," + (u.notify || "") + ",";
+    pop.innerHTML = "<b>Уведомления в Telegram</b>" + Object.keys(T).map(function (k) {
+      return '<label style="display:flex;gap:8px;align-items:center;margin-top:8px;cursor:pointer"><input type="checkbox" data-mynotify="' + esc(k) + '"' + (on.indexOf("," + k + ",") >= 0 ? " checked" : "") + (u.tg ? "" : " disabled") + "> " + esc(T[k]) + "</label>";
+    }).join("") + '<div data-mymsg style="margin-top:8px;color:var(--dim)">' + (u.tg ? "" : "Сначала войдите в Штаб через кнопку Telegram, тогда бот сможет писать вам.") + "</div>";
+    d.appendChild(pop);
+    nm.addEventListener("click", function () { pop.hidden = !pop.hidden; });
+    document.addEventListener("click", function (e) { if (!pop.hidden && !d.contains(e.target)) pop.hidden = true; });
+    pop.addEventListener("change", function () {
+      var list = [].filter.call(pop.querySelectorAll("[data-mynotify]"), function (c) { return c.checked; }).map(function (c) { return c.getAttribute("data-mynotify"); });
+      var msg = pop.querySelector("[data-mymsg]"); msg.style.color = "var(--dim)"; msg.textContent = "сохраняю…";
+      fetch("/api/me", { method: "PATCH", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ notify: list }) })
+        .then(function (r) { return r.json(); }).then(function (x) { msg.style.color = x.ok ? "var(--dim)" : "var(--bad)"; msg.textContent = x.ok ? "сохранено" : (x.error || "не сохранилось"); })
+        .catch(function () { msg.style.color = "var(--bad)"; msg.textContent = "не сохранилось: нет связи"; });
+    });
   }).catch(function () {});
 })();
