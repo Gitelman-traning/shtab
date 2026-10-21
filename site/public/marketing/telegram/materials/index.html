@@ -67,10 +67,19 @@
           <div id="pollwrap" hidden><label>Опрос</label><select name="poll_key"></select></div>
           <div id="askwrap" hidden><label>Текст просьбы (необязательно)</label><input type="text" name="ask_text" placeholder="Оставьте номер — и гайд ваш"></div>
           <label>Список <span class="hint">по умолчанию file_&lt;ключ&gt;</span></label><input type="text" name="list_key" placeholder="file_guide_team">
+          <label><input type="checkbox" name="default_buttons" checked> добавить стандартные кнопки бота <span class="hint">(YouTube, журнал — настраиваются ниже)</span></label>
           <label><input type="checkbox" name="active" checked> активен (ссылка работает)</label>
           <div class="acts"><button class="btn" type="submit">Сохранить</button><button class="btn ghost" type="button" id="mnew">Новый</button></div>
         </form>
         <div id="mlink"></div>
+      </div>
+      <div class="card"><h2>Стандартные кнопки <small>под каждой выдачей материала</small></h2>
+        <p class="hint">Добавляются после кнопок материала. В ссылке <b>{tag}</b> заменится меткой, по которой человек пришёл (для журнала — utm_campaign).</p>
+        <form class="f" id="dbf" autocomplete="off">
+          <label>Бот</label><select id="dbbot"></select>
+          <div id="dbbtns"></div><button type="button" class="btn ghost" id="dbadd">+ кнопка</button>
+          <div class="acts"><button class="btn" type="submit">Сохранить кнопки бота</button></div>
+        </form>
       </div>
     </div>
   </section>
@@ -138,7 +147,7 @@ function readButtons(){
 }
 function syncCond(){ var c = mf.condition.value; document.getElementById("pollwrap").hidden = c !== "poll"; document.getElementById("askwrap").hidden = c === "none"; }
 mf.condition.onchange = syncCond;
-mf.text.oninput = function(){ var n = mf.text.value.length, el = document.getElementById("tlen"); el.textContent = n + " / 1024"; el.className = "hint" + (n > 1024 ? " bad" : ""); };
+mf.text.oninput = function(){ var n = mf.text.value.length, el = document.getElementById("tlen"); el.textContent = n + (n > 1024 ? " знаков — длиннее 1024: файл уйдёт без подписи, текст следом" : " / 1024 под файлом"); el.className = "hint" + (n > 4000 ? " bad" : ""); };
 function fillPolls(){
   mf.poll_key.innerHTML = polls.map(function(p){ return '<option value="' + esc(p.key) + '">' + esc(p.title || p.key) + '</option>'; }).join("") || '<option value="">сначала создайте опрос</option>';
 }
@@ -150,7 +159,7 @@ function editMaterial(m){
   mf.key.readOnly = !!m;
   if (m) {
     mf.key.value = m.key; mf.title.value = m.title || ""; mf.text.value = m.text || ""; mf.condition.value = m.condition || "none";
-    mf.poll_key.value = m.poll_key || ""; mf.ask_text.value = m.ask_text || ""; mf.list_key.value = m.list_key || ""; mf.active.checked = !!m.active;
+    mf.poll_key.value = m.poll_key || ""; mf.ask_text.value = m.ask_text || ""; mf.list_key.value = m.list_key || ""; mf.active.checked = !!m.active; mf.default_buttons.checked = m.default_buttons !== 0;
     try { (JSON.parse(m.buttons || "[]") || []).forEach(function(row){ (Array.isArray(row) ? row : [row]).forEach(btnRow); }); } catch (e) {}
     document.getElementById("fname").textContent = m.file_name ? m.file_name : "не загружен";
     document.getElementById("mlink").innerHTML = '<p class="note">Ссылка: <span class="mono">' + esc(link(m.key)) + '</span></p>';
@@ -161,7 +170,7 @@ document.getElementById("mnew").onclick = function(){ editMaterial(null); };
 mf.onsubmit = function(e){
   e.preventDefault();
   var body = { key: mf.key.value.trim(), title: mf.title.value.trim(), text: mf.text.value, buttons: readButtons(), condition: mf.condition.value,
-    poll_key: mf.condition.value === "poll" ? mf.poll_key.value : null, ask_text: mf.ask_text.value.trim() || null, list_key: mf.list_key.value.trim() || null, active: mf.active.checked };
+    poll_key: mf.condition.value === "poll" ? mf.poll_key.value : null, ask_text: mf.ask_text.value.trim() || null, list_key: mf.list_key.value.trim() || null, active: mf.active.checked, default_buttons: mf.default_buttons.checked };
   post("materials", body).then(function(j){
     if (!j.ok) return say(false, j.error || "не сохранилось");
     var f = document.getElementById("file").files[0];
@@ -218,6 +227,32 @@ function loadPolls(){
   });
 }
 
+/* ---------- стандартные кнопки бота ---------- */
+function dbRow(b){
+  var div = document.createElement("div"); div.className = "brow";
+  div.innerHTML = '<input type="text" placeholder="Текст кнопки" value="' + esc(b ? b.text : "") + '"><input type="text" placeholder="https://… ({tag} — метка)" value="' + esc(b ? b.url : "") + '" style="grid-column:span 2"><button type="button" class="btn ghost" title="убрать">×</button>';
+  div.querySelector("button").onclick = function(){ div.remove(); };
+  document.getElementById("dbbtns").appendChild(div);
+}
+document.getElementById("dbadd").onclick = function(){ dbRow(null); };
+function dbLoad(){
+  var b = bots.find(function(x){ return x.key === document.getElementById("dbbot").value; });
+  document.getElementById("dbbtns").innerHTML = "";
+  try { (JSON.parse((b && b.default_buttons) || "[]") || []).forEach(function(row){ row.forEach(dbRow); }); } catch (e) {}
+}
+document.getElementById("dbbot").onchange = dbLoad;
+document.getElementById("dbf").onsubmit = function(e){
+  e.preventDefault();
+  var rows = [];
+  document.querySelectorAll("#dbbtns .brow").forEach(function(r){ var i = r.querySelectorAll("input"), t = i[0].value.trim(), u = i[1].value.trim(); if (t && u) rows.push([{ text: t, url: u }]); });
+  var key = document.getElementById("dbbot").value;
+  post("bot-buttons", { key: key, buttons: rows }).then(function(j){
+    if (!j.ok) return say(false, j.error || "не сохранилось");
+    var b = bots.find(function(x){ return x.key === key; }); if (b) b.default_buttons = rows.length ? JSON.stringify(rows) : null;
+    say(true, "Кнопки бота сохранены — появятся под следующими выдачами.");
+  });
+};
+
 /* ---------- списки ---------- */
 function loadLists(){
   get("lists").then(function(j){
@@ -232,6 +267,8 @@ get("bots").then(function(j){
   document.getElementById("botsel").innerHTML = bots.length ? bots.map(function(b){ return '<option value="' + esc(b.key) + '">' + esc(b.title || b.key) + '</option>'; }).join("") : '<option value="">нет подключённых ботов</option>';
   document.getElementById("stamp").textContent = bots.length + " бот(ов) на движке";
   document.getElementById("botsel").onchange = function(){ loadMaterials(); };
+  document.getElementById("dbbot").innerHTML = bots.map(function(b){ return '<option value="' + esc(b.key) + '"' + (b.key === "PotokGitelmanabot" ? " selected" : "") + '>' + esc(b.title || b.key) + '</option>'; }).join("");
+  dbLoad();
   loadPolls().then(function(){ loadMaterials(); editMaterial(null); editPoll(null); });
 });
 </script>
