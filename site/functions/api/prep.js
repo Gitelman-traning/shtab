@@ -11,6 +11,7 @@
 // POST /api/prep {action:"debrief_start", deal}                — «Встреча проведена»: разбор сразу, как появится запись
 // POST /api/prep {action:"feedback", deal, useful, comment}    — «полезно / не полезно»
 // POST /api/prep {action:"manager", deal, manager}             — диагност вручную
+import { ownerMaps } from "./_owners.js";
 import { json, bad, canRead, level, now, audit, hasIngestToken } from "./_lib.js";
 
 const LIST_COLS = "deal, contact, meet_at, manager, client, company, niche, turn, staff, geo, status, error, model, tokens_in, tokens_out, searches, amo_url, updated_at";
@@ -96,7 +97,8 @@ export async function onRequestGet(context) {
     const r = await env.DB.prepare("SELECT deal, loyalty, client, company, manager, meeting_at, model, updated_at FROM prep_debrief ORDER BY meeting_at DESC LIMIT 500").all();
     let pending = [];   // цепочка (15.10.2026): по каким сделкам разбор ещё не готов и почему
     try { pending = (await env.DB.prepare("SELECT deal, l2, status, note, client, company, manager, meet_at, updated_at FROM debrief_queue WHERE status != 'ready' ORDER BY meet_at DESC LIMIT 200").all()).results || []; } catch (e) { pending = []; }
-    return json({ ok: true, rows: r.results || [], pending });
+    const own = await ownerMaps(env);   // 22.10.2026: «чья» + фильтр «Мои / Все»
+    return json({ ok: true, rows: (r.results || []).map((x) => own.tag(x)), pending: pending.map((x) => own.tag(x)), me: user.login, me_name: own.names[user.login] || "" });
   }
   if (mode === "managers") {
     const users = await amoUsers(env);
@@ -153,7 +155,9 @@ export async function onRequestGet(context) {
     await work;
   }
   const cases = await env.DB.prepare("SELECT COUNT(*) AS n, SUM(CASE WHEN result != '' THEN 1 ELSE 0 END) AS checked FROM prep_cases").first();
-  return json({ ok: true, rows, cases: (cases && cases.n) || 0, checked: (cases && cases.checked) || 0, me: user.login });
+  const own = await ownerMaps(env);
+  rows.forEach((x) => own.tag(x));
+  return json({ ok: true, rows, cases: (cases && cases.n) || 0, checked: (cases && cases.checked) || 0, me: user.login, me_name: own.names[user.login] || "" });
 }
 
 export async function onRequestPost({ request, env }) {

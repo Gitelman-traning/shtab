@@ -150,7 +150,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
   <div class="stamp" id="stamp">—</div>
 </header>
 <main>
-  <div class="card"><div class="bar-row"><select id="f-mgr"><option value="">Все менеджеры</option></select><span class="spacer" style="flex:1"></span><span class="hint">Повод берётся только из договорённостей встречи; нет договорённости — нет пинга.</span></div></div>
+  <div class="card"><div class="bar-row"><select id="f-own" title="Мои — отправил я или я диагност"><option value="mine">Мои</option><option value="all">Все</option></select><select id="f-mgr"><option value="">Все менеджеры</option></select><span class="spacer" style="flex:1"></span><span class="hint">Повод берётся только из договорённостей встречи; нет договорённости — нет пинга.</span></div></div>
   <div class="card wide"><h2>Сегодня и просроченные <small id="n-now"></small></h2><div id="now"><p class="empty">Загружаю…</p></div></div>
   <div class="card wide"><h2>Впереди <small id="n-next"></small></h2><div id="next"></div></div>
   <div class="card wide"><h2>Сделано <small id="n-done"></small></h2><div id="done"></div></div>
@@ -164,12 +164,18 @@ var DONE = { text: "отправлен текст", video: "записан кр�
 function api(q){ return fetch("/api/pings" + (q ? "?" + q : ""), { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
 function post(b){ return fetch("/api/pings", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then(function(r){ return r.json(); }); }
 function d(s){ var p = String(s || "").slice(0, 10).split("-"); return p.length === 3 ? p[2] + "." + p[1] : s; }
+// «Мои / Все» (22.10.2026): мои — отправил я (owner) или я диагност по сделке
+var ME = "", ME_NAME = "";
+function ownWords(n){ return String(n || "").split("|")[0].toLowerCase().split(/[^a-zа-яё]+/i).filter(function(x){ return x.length >= 3; }); }
+function isMine(r){ if (r.owner && r.owner === ME) return true; var w = ownWords(ME_NAME), m = String(r.manager || "").toLowerCase(); return !!(w.length && m && w.every(function(x){ return m.indexOf(x) >= 0; })); }
+function ownInit(rows){ var s = document.getElementById("f-own"), v = null; try { v = localStorage.getItem("l2-own"); } catch (e) {} if (!v) v = rows.some(isMine) ? "mine" : "all"; s.value = v; }
+function ownOk(r){ return document.getElementById("f-own").value !== "mine" || isMine(r); }
 function card(r){
   var hl = (location.hash.match(/id=(\d+)/) || [])[1] == r.id;
   var loy = r.loyalty ? '<span class="st ' + (r.loyalty >= 9 ? "ready" : r.loyalty >= 7 ? "queued" : "error") + '">' + r.loyalty + '/10</span>' : "";
   var state = r.status !== "new" ? '<span class="v-chip">' + (DONE[r.status] || r.status) + (r.decided_at ? " · " + d(r.decided_at) : "") + '</span>' : "";
   return '<div class="pcard' + (r.status !== "new" ? " done" : "") + (hl ? " hl" : "") + '" id="p-' + r.id + '">'
-    + '<h3>' + esc(r.client || "клиент") + (r.company ? ' <span class="hint">' + esc(r.company) + '</span>' : '') + ' ' + loy + ' <span class="hint">' + d(r.due_day) + ' · ' + esc(r.manager || "") + '</span> ' + state + '</h3>'
+    + '<h3>' + esc(r.client || "клиент") + (r.company ? ' <span class="hint">' + esc(r.company) + '</span>' : '') + ' ' + loy + ' <span class="hint">' + d(r.due_day) + ' · ' + esc(r.manager || "") + (r.owner_name ? ' · отправил: ' + esc(r.owner_name) : '') + '</span> ' + state + '</h3>'
     + '<div class="why"><b>Повод:</b> ' + esc(r.reason) + '</div>'
     + '<div class="pv"><div><small>Вариант 1 · сообщение</small><span id="t-' + r.id + '">' + esc(r.text) + '</span></div><div><small>Вариант 2 · кружочек — что сказать</small><span id="s-' + r.id + '">' + esc(r.script) + '</span></div></div>'
     + '<div class="pact"><button class="btn" data-copy="t-' + r.id + '">Скопировать текст</button><button class="btn" data-copy="s-' + r.id + '">Скопировать сценарий</button><span class="spacer" style="flex:1"></span>'
@@ -179,7 +185,7 @@ function card(r){
 }
 function render(){
   var mgr = document.getElementById("f-mgr").value;
-  var rows = ROWS.filter(function(r){ return !mgr || r.manager === mgr; });
+  var rows = ROWS.filter(function(r){ return ownOk(r) && (!mgr || r.manager === mgr); });
   var now = rows.filter(function(r){ return r.status === "new" && r.due_day <= TODAY; }),
       next = rows.filter(function(r){ return r.status === "new" && r.due_day > TODAY; }),
       done = rows.filter(function(r){ return r.status !== "new"; }).reverse();
@@ -192,7 +198,7 @@ function render(){
 function load(){
   api("mode=suggest").then(function(res){
     if (!res.ok) { document.getElementById("now").innerHTML = '<p class="empty">' + esc(res.error || "нет доступа") + '</p>'; return; }
-    ROWS = res.rows || []; TODAY = res.today || new Date().toISOString().slice(0, 10);
+    ROWS = res.rows || []; ME = res.me || ""; ME_NAME = res.me_name || ""; ownInit(ROWS); TODAY = res.today || new Date().toISOString().slice(0, 10);
     var sel = document.getElementById("f-mgr"), cur = sel.value, m = {};
     ROWS.forEach(function(r){ if (r.manager) m[r.manager] = 1; });
     sel.innerHTML = '<option value="">Все менеджеры</option>' + Object.keys(m).sort().map(function(x){ return '<option' + (x === cur ? " selected" : "") + '>' + esc(x) + '</option>'; }).join("");
@@ -201,6 +207,7 @@ function load(){
   });
 }
 document.getElementById("f-mgr").addEventListener("change", render);
+document.getElementById("f-own").addEventListener("change", function(){ try { localStorage.setItem("l2-own", this.value); } catch (e) {} render(); });
 document.addEventListener("click", function(e){
   var c = e.target.closest && e.target.closest("[data-copy]");
   if (c) { var el = document.getElementById(c.getAttribute("data-copy")); if (el && navigator.clipboard) navigator.clipboard.writeText(el.textContent).then(function(){ var t = c.textContent; c.textContent = "Скопировано"; setTimeout(function(){ c.textContent = t; }, 1400); }); return; }

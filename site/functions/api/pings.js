@@ -4,6 +4,7 @@
 // POST /api/pings {action:"suggest", silent?, rows:[{deal, manager, client, company, due_day, reason, loyalty, text, script, model}]} — сборщик (токен):
 //      добавить предложения; что уже пора — сразу в Telegram менеджеру.
 // POST /api/pings {action:"notify_due"} — сборщик (токен), утром: разослать в Telegram предложения, у которых наступил день.
+import { ownerMaps } from "./_owners.js";
 import { json, bad, canRead, level, now, audit, hasIngestToken, tgSend } from "./_lib.js";
 
 export async function onRequestGet({ request, env }) {
@@ -18,7 +19,9 @@ export async function onRequestGet({ request, env }) {
       rows = (await env.DB.prepare("SELECT id, deal, manager, client, company, due_day, reason, loyalty, text, script, status, decided_by, decided_at, model, created_at " +
         "FROM ping_suggest WHERE due_day >= ? ORDER BY due_day, id LIMIT 1000").bind(from).all()).results || [];
     } catch (e) { rows = []; }
-    return json({ ok: true, rows, today: new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10) });
+    const own = await ownerMaps(env);   // 22.10.2026: «чья» + фильтр «Мои / Все»
+    rows.forEach((x) => own.tag(x));
+    return json({ ok: true, rows, today: new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10), me: user.login, me_name: own.names[user.login] || "" });
   }
   const manager = (u.searchParams.get("manager") || "").slice(0, 40);
   const days = Math.min(Number(u.searchParams.get("days")) || 120, 400);

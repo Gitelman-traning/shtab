@@ -145,7 +145,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 </header>
 <main id="list">
   <div class="card">
-    <div class="bar-row"><select id="f-mgr"><option value="">Все диагносты</option></select><span class="spacer" style="flex:1"></span></div>
+    <div class="bar-row"><select id="f-own" title="Мои — отправил я или я диагност"><option value="mine">Мои</option><option value="all">Все</option></select><select id="f-mgr"><option value="">Все диагносты</option></select><span class="spacer" style="flex:1"></span></div>
     <p class="hint" style="margin:10px 0 0">Разбор делается сам по встречам, к которым была подготовка. Провели встречу — нажмите «Встреча проведена» в блоке «В работе»: как только в сделке появится ссылка на запись Zoom и Zoom её обработает, через 5–10 минут будет разбор. Без кнопки запись проверяется раз в 30 минут (9:15–22:45 МСК). Лояльность ставит модель по словам клиента; 9–10 — близок к покупке, 7–8 — интерес есть, 5–6 — не сформировано, ниже 5 — нет основания продолжать.</p>
   </div>
   <div class="card wide" id="pend-card" hidden><h2>В работе <small id="pend-sub"></small></h2><div id="pend"></div></div>
@@ -207,6 +207,13 @@ function renderDebrief(d){
     + (tail ? '<div class="v-note">' + md(tail) + '</div>' : '');
 }
 
+// «Мои / Все» (22.10.2026): мои — отправил я (owner) или я диагност по сделке
+var ME = "", ME_NAME = "";
+function ownWords(n){ return String(n || "").split("|")[0].toLowerCase().split(/[^a-zа-яё]+/i).filter(function(x){ return x.length >= 3; }); }
+function isMine(r){ if (r.owner && r.owner === ME) return true; var w = ownWords(ME_NAME), m = String(r.manager || "").toLowerCase(); return !!(w.length && m && w.every(function(x){ return m.indexOf(x) >= 0; })); }
+function ownInit(rows){ var s = document.getElementById("f-own"), v = null; try { v = localStorage.getItem("l2-own"); } catch (e) {} if (!v) v = rows.some(isMine) ? "mine" : "all"; s.value = v; }
+function ownOk(r){ return document.getElementById("f-own").value !== "mine" || isMine(r); }
+function ownTag(r){ return r.owner_name ? '<span class="sub">отправил: ' + esc(r.owner_name) + '</span>' : ''; }
 var ROWS = [], PEND = [];
 var PST = { plan: ["", "встреча впереди"], wait: ["queued", "ждём"], running: ["run", "в процессе"], error: ["error", "ошибка"] };
 function dateLabel(s){ if (!s) return "<span class='sub'>дата не указана</span>"; var d = s.slice(0,10).split("-"); return d[2] + "." + d[1] + "." + d[0] + (s.length > 10 ? " <span class='sub'>" + esc(s.slice(11)) + " МСК</span>" : ""); }
@@ -214,12 +221,12 @@ function loyChip(L){ if (!L) return '<span class="st">—</span>'; var c = L >= 
 function renderList(){
   var mgr = document.getElementById("f-mgr").value;
   renderPend(mgr);
-  var rows = ROWS.filter(function(r){ return !mgr || r.manager === mgr; });
+  var rows = ROWS.filter(function(r){ return ownOk(r) && (!mgr || r.manager === mgr); });
   document.getElementById("list-sub").textContent = rows.length ? rows.length + " из " + ROWS.length : "";
   if (!rows.length) { document.getElementById("rows").innerHTML = '<p class="empty">Разборов пока нет.</p>'; return; }
   document.getElementById("rows").innerHTML = '<table><thead><tr><th>Встреча</th><th>Клиент</th><th>Диагност</th><th>Лояльность</th><th></th></tr></thead><tbody>'
     + rows.map(function(r){
-      return '<tr class="row" data-deal="' + r.deal + '"><td>' + dateLabel(r.meeting_at) + '</td><td>' + esc(r.client || "—") + (r.company ? '<span class="sub">' + esc(r.company) + '</span>' : '') + '</td><td>' + esc(r.manager || "—") + '</td><td>' + loyChip(r.loyalty) + '</td><td class="num"><a class="btn ghost" href="https://pavelgitelman.amocrm.ru/leads/detail/' + r.deal + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">amo ↗</a></td></tr>';
+      return '<tr class="row" data-deal="' + r.deal + '"><td>' + dateLabel(r.meeting_at) + '</td><td>' + esc(r.client || "—") + (r.company ? '<span class="sub">' + esc(r.company) + '</span>' : '') + '</td><td>' + esc(r.manager || "—") + ownTag(r) + '</td><td>' + loyChip(r.loyalty) + '</td><td class="num"><a class="btn ghost" href="https://pavelgitelman.amocrm.ru/leads/detail/' + r.deal + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">amo ↗</a></td></tr>';
     }).join("") + '</tbody></table>';
   Array.prototype.forEach.call(document.querySelectorAll("tr.row"), function(tr){ tr.addEventListener("click", function(){ location.hash = "deal=" + tr.getAttribute("data-deal"); }); });
 }
@@ -227,6 +234,7 @@ function loadList(){
   api("mode=debriefs").then(function(res){
     if (!res.ok) { document.getElementById("rows").innerHTML = '<p class="empty">' + esc(res.error || "нет доступа") + '</p>'; return; }
     ROWS = res.rows || [];
+    ME = res.me || ""; ME_NAME = res.me_name || ""; ownInit(ROWS.concat(res.pending || []));
     var last = ROWS.map(function(r){ return r.updated_at || ""; }).sort().pop();
     document.getElementById("stamp").textContent = last ? "обновлено " + last.slice(0, 16).replace("T", " ") + " UTC" : "";
     var sel = document.getElementById("f-mgr"), cur = sel.value, m = {};
@@ -238,7 +246,7 @@ function loadList(){
 }
 // блок «В работе» (15.10.2026): по каким встречам разбор ещё не готов и на чём он сейчас
 function renderPend(mgr){
-  var rows = PEND.filter(function(r){ return !mgr || r.manager === mgr; });
+  var rows = PEND.filter(function(r){ return ownOk(r) && (!mgr || r.manager === mgr); });
   document.getElementById("pend-card").hidden = !rows.length;
   if (!rows.length) return;
   var last = rows.map(function(r){ return r.updated_at || ""; }).sort().pop();
@@ -246,7 +254,7 @@ function renderPend(mgr){
   document.getElementById("pend").innerHTML = '<table><thead><tr><th>Встреча</th><th>Клиент</th><th>Диагност</th><th>Статус</th><th></th></tr></thead><tbody>'
     + rows.map(function(r){
       var s = PST[r.status] || ["", r.status];
-      return '<tr><td>' + dateLabel(r.meet_at) + '</td><td>' + esc(r.client || "—") + (r.company ? '<span class="sub">' + esc(r.company) + '</span>' : '') + '</td><td>' + esc(r.manager || "—") + '</td><td><span class="st ' + s[0] + '">' + esc(s[1]) + '</span>' + (r.note ? '<span class="sub">' + esc(r.note) + '</span>' : '') + '</td>'
+      return '<tr><td>' + dateLabel(r.meet_at) + '</td><td>' + esc(r.client || "—") + (r.company ? '<span class="sub">' + esc(r.company) + '</span>' : '') + '</td><td>' + esc(r.manager || "—") + ownTag(r) + '</td><td><span class="st ' + s[0] + '">' + esc(s[1]) + '</span>' + (r.note ? '<span class="sub">' + esc(r.note) + '</span>' : '') + '</td>'
         + '<td class="num">' + (r.status !== "running" ? '<button type="button" class="btn gold" data-held="' + r.deal + '">Встреча проведена</button> ' : '') + '<a class="btn ghost" href="/sales/l2/prep/#deal=' + r.deal + '">подготовка</a> <a class="btn ghost" href="https://pavelgitelman.amocrm.ru/leads/detail/' + (r.l2 || r.deal) + '" target="_blank" rel="noopener">amo ↗</a></td></tr>';
     }).join("") + '</tbody></table>';
   [].forEach.call(document.querySelectorAll("#pend [data-held]"), function(btn){
@@ -260,6 +268,8 @@ function renderPend(mgr){
   });
 }
 document.getElementById("f-mgr").addEventListener("change", renderList);
+document.getElementById("f-own").addEventListener("change", function(){ try { localStorage.setItem("l2-own", this.value); } catch (e) {} renderList(); });
+
 function showDetail(deal){
   document.getElementById("list").hidden = true; document.getElementById("detail").hidden = false; window.scrollTo(0, 0);
   document.getElementById("d-amo").href = "https://pavelgitelman.amocrm.ru/leads/detail/" + deal;

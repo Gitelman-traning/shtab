@@ -147,6 +147,7 @@ details.sec[open] summary::before{content:"▾"} details.sec summary .n{color:va
 <main id="list">
   <div class="card">
     <div class="bar-row">
+      <select id="f-own" title="Мои — отправил я или я диагност"><option value="mine">Мои</option><option value="all">Все</option></select>
       <select id="f-mgr"><option value="">Все диагносты</option></select>
       <select id="f-st"><option value="">Все статусы</option><option value="ready">готово</option><option value="queued">запущено</option><option value="error">ошибка</option></select>
       <span class="spacer" style="flex:1"></span>
@@ -556,11 +557,18 @@ function renderDebrief(d){
     + (tail ? '<div class="v-note">' + md(tail) + '</div>' : '');
 }
 
+// «Мои / Все» (22.10.2026): мои — отправил я (owner) или я диагност по сделке
+var ME = "", ME_NAME = "";
+function ownWords(n){ return String(n || "").split("|")[0].toLowerCase().split(/[^a-zа-яё]+/i).filter(function(x){ return x.length >= 3; }); }
+function isMine(r){ if (r.owner && r.owner === ME) return true; var w = ownWords(ME_NAME), m = String(r.manager || "").toLowerCase(); return !!(w.length && m && w.every(function(x){ return m.indexOf(x) >= 0; })); }
+function ownInit(rows){ var s = document.getElementById("f-own"), v = null; try { v = localStorage.getItem("l2-own"); } catch (e) {} if (!v) v = rows.some(isMine) ? "mine" : "all"; s.value = v; }
+function ownOk(r){ return document.getElementById("f-own").value !== "mine" || isMine(r); }
+function ownTag(r){ return r.owner_name ? '<span class="sub">отправил: ' + esc(r.owner_name) + '</span>' : ''; }
 // ---------- список ----------
 function dateLabel(s){ if (!s) return "<span class='sub'>дата встречи не указана</span>"; var d = s.slice(0,10).split("-"); return d[2] + "." + d[1] + "." + d[0] + (s.length > 10 ? " <span class='sub'>" + s.slice(11) + " МСК</span>" : ""); }
 function renderList(){
   var mgr = document.getElementById("f-mgr").value, st = document.getElementById("f-st").value;
-  var rows = ROWS.filter(function(r){ return (!mgr || r.manager === mgr) && (!st || r.status === st); });
+  var rows = ROWS.filter(function(r){ return ownOk(r) && (!mgr || r.manager === mgr) && (!st || r.status === st); });
   document.getElementById("list-sub").textContent = rows.length ? rows.length + " из " + ROWS.length : "";
   if (!rows.length) { document.getElementById("rows").innerHTML = '<p class="empty">Подготовок пока нет. Сделка попадёт сюда, когда встреча будет подтверждена, или поставьте её по id сделки выше.</p>'; return; }
   document.getElementById("rows").innerHTML = '<table><thead><tr><th>Встреча</th><th>Клиент</th><th>Бизнес</th><th>Диагност</th><th>Подготовка</th><th></th></tr></thead><tbody>'
@@ -568,7 +576,7 @@ function renderList(){
       var biz = [r.niche, r.turn ? r.turn + " млн ₽" : "", r.staff ? r.staff + " чел" : "", r.geo].filter(Boolean).join(" · ");
       var status = '<span class="st ' + r.status + '">' + (ST[r.status] || r.status) + '</span>' + (r.status === "error" && r.error ? '<span class="sub" style="color:var(--bad)">' + esc(r.error.slice(0, 200)) + '</span>' : "");
       if (r.debrief != null) status += ' <span class="v-chip ' + (r.debrief >= 9 ? "" : "gold") + '" title="есть разбор встречи">разбор' + (r.debrief ? " " + r.debrief + "/10" : "") + '</span>';
-      var mgr = r.manager ? esc(r.manager) : '<span class="st">не определён</span>';
+      var mgr = (r.manager ? esc(r.manager) : '<span class="st">не определён</span>') + ownTag(r);
       return '<tr class="row" data-deal="' + r.deal + '"><td>' + dateLabel(r.meet_at) + '</td><td>' + esc(r.client || "—") + (r.company ? '<span class="sub">' + esc(r.company) + '</span>' : '') + '</td><td>' + (esc(biz) || '<span class="sub">поля не заполнены</span>') + '</td><td>' + mgr + '</td><td>' + status + '</td><td class="num"><a class="btn ghost" href="' + esc(r.amo_url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">amo ↗</a></td></tr>';
     }).join("") + '</tbody></table>';
   Array.prototype.forEach.call(document.querySelectorAll("tr.row"), function(tr){ tr.addEventListener("click", function(){ location.hash = "deal=" + tr.getAttribute("data-deal"); }); });
@@ -577,6 +585,7 @@ function loadList(){
   api("days=21&back=60").then(function(res){
     if (!res.ok) { document.getElementById("rows").innerHTML = '<p class="empty">' + esc(res.error || "нет доступа") + '</p>'; return; }
     ROWS = res.rows || [];
+    ME = res.me || ""; ME_NAME = res.me_name || ""; ownInit(ROWS);
     clearTimeout(window._prepPoll);   // есть подготовки в очереди — обновляем список, пока не будут готовы
     if (ROWS.some(function(r){ return r.status === "queued"; }) && !document.getElementById("list").hidden) window._prepPoll = setTimeout(loadList, 20000);
     document.getElementById("cases-n").textContent = res.cases ? res.cases + " компаний, рост проверен у " + (res.checked || 0) : "база пуста";
@@ -590,6 +599,8 @@ function loadList(){
 }
 document.getElementById("f-mgr").addEventListener("change", renderList);
 document.getElementById("f-st").addEventListener("change", renderList);
+document.getElementById("f-own").addEventListener("change", function(){ try { localStorage.setItem("l2-own", this.value); } catch (e) {} renderList(); });
+
 document.getElementById("add-btn").addEventListener("click", function(){
   var d = Number(document.getElementById("add-deal").value);
   if (!d) return;
