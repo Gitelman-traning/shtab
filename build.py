@@ -172,9 +172,7 @@ def build_sources():
     # площадки сайта: Метрика + лиды по тегу
     wtpl = rd(os.path.join(HERE, "site", "src", "web.tpl.html"))
     for slug, key, title, host, tag in [("main", "site", "Сайт", "gitelman.team", "tilda"), ("journal", "journal", "Журнал", "журнала", "журнал")]:
-        # у журнала карточка «Статья вышла» (уведомление в Telegram, /api/journal-publish)
-        publish = '<div class="card" id="journal-publish"></div><script src="/journal-publish.js" defer></script>\n' if slug == "journal" else ""
-        page = wtpl.replace("{{TITLE}}", title).replace("{{HOST}}", host).replace("{{KEY}}", key).replace("{{TAG}}", tag).replace("{{PUBLISH}}", publish)
+        page = wtpl.replace("{{TITLE}}", title).replace("{{HOST}}", host).replace("{{KEY}}", key).replace("{{TAG}}", tag)
         wr(os.path.join(PUB, "marketing", "site", slug, "index.html"), page)
     print("площадки сайта: 2 страницы")
 

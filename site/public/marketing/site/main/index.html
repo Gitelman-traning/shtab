@@ -21,6 +21,7 @@
 .q-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
 .q-form input{font:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--page);color:var(--ink);min-width:0}
 .q-form .full{grid-column:1/-1}.q-form .row{display:flex;gap:8px;grid-column:1/-1;align-items:center}.q-err{color:var(--bad);font-size:12.5px}
+.q-msg{margin-top:10px;padding:9px 12px;border-radius:9px;background:var(--ok-bg);color:var(--ok);font-size:13px}.q-msg.err{background:var(--bad-bg);color:var(--bad);font-weight:600}
 @media (max-width:520px){.q-row{grid-template-columns:76px 1fr}.q-row .q-st{grid-column:2;justify-self:start}.q-form{grid-template-columns:1fr}}
 </style>
 </head>
@@ -42,7 +43,7 @@
 <main id="section-standard">
   <div class="kpis" id="kpis"></div>
   <p class="note" style="margin:-6px 0 0">Проценты в карточках — изменение к такому же прошлому периоду: у недели к прошлой неделе за те же дни, у месяца к прошлому месяцу по то же число.</p>
-  <div class="card" id="queue" hidden><h2>Очередь статей <small>что и когда выходит</small></h2><div id="q-list"><div class="wait">Загружаю…</div></div><div id="q-edit"></div></div>
+  <div class="card" id="queue" hidden><h2>Очередь статей <small>что и когда выходит</small></h2><div id="q-list"><div class="wait">Загружаю…</div></div><div id="q-msg" class="q-msg" hidden></div><div id="q-edit"></div></div>
   <div class="grid2">
     <div class="card srcs"><h2>Откуда пришли <small id="src-sub"></small></h2><div id="sources"></div></div>
     <div class="card srcs"><h2>Источники подробно <small>поисковики, соцсети, сайты · месяц</small></h2><div id="engines"></div></div>
@@ -174,7 +175,14 @@ function trendSvg(weeks, series){
   }
   function post(body){
     return fetch("/api/articles", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
-      .then(function(r){ return r.json(); }).then(function(d){ if (!d.ok) throw new Error(d.error || "не сохранилось"); items = d.items; editing = null; draw(); });
+      .then(function(r){ return r.json(); }).then(function(d){ if (!d.ok) throw new Error(d.error || "не сохранилось"); items = d.items; editing = null; draw(); if (body.action === "done") said(d.notify); });
+  }
+  // итог уведомления в Telegram после «Вышла»: ошибку показываем, а не глотаем
+  function said(n){
+    var el = document.getElementById("q-msg"); el.hidden = false;
+    if (!n) { el.className = "q-msg"; el.textContent = "Отмечено. Уведомление не отправлялось: у статьи нет адреса на сайте."; return; }
+    if (n.failed.length) { el.className = "q-msg err"; el.textContent = "Статья отмечена, но уведомление НЕ дошло: " + n.failed.map(function(x){ return x.name + " — " + x.error; }).join("; ") + (n.sent.length ? ". Дошло: " + n.sent.join(", ") : "") + "."; return; }
+    el.className = "q-msg"; el.textContent = n.sent.length ? "Отмечено. Уведомление в Telegram ушло: " + n.sent.join(", ") + "." : "Отмечено. Уведомление никому не ушло: никто не подписан на «Вышла статья журнала» (галочка на странице «Пользователи»).";
   }
   function fail(e){ var x = document.getElementById("q-err"); if (x) x.textContent = e.message; else alert(e.message); }
   box.addEventListener("click", function(e){

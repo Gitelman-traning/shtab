@@ -2,8 +2,9 @@
 //   GET  /api/articles                — {items:[{id,title,slug,date,time,note,status,done_at,done_by,live}]}; читают все, кто видит «Сайт»
 //   POST /api/articles {action:"save", id?, title, slug, date, time, note}   — добавить или поправить (правка раздела «Сайт»)
 //   POST /api/articles {action:"done", id} | {action:"undone", id} | {action:"del", id}
+//   «done» у статьи с адресом шлёт в Telegram «Опубликовано: <название>» + ссылку подписанным на тему journal (ответ: notify {sent, failed})
 // live — страница journal.gitelman.team/<slug>/ отвечает 200 (проверяем только у статей, чей день уже наступил).
-import { json, bad, canRead, level, audit, now, randomId } from "./_lib.js";
+import { json, bad, canRead, level, audit, now, randomId, notifyTopic } from "./_lib.js";
 
 const KEY = "articles:journal";
 const HOST = "https://journal.gitelman.team/";
@@ -43,6 +44,7 @@ export async function onRequestPost({ request, env }) {
   try { body = await request.json(); } catch (e) { return bad("тело не JSON"); }
   const items = await load(env);
   const action = String(body.action || "");
+  let notify = null;
   const it = items.find((x) => x.id === body.id);
   if (action === "save") {
     const title = String(body.title || "").trim().slice(0, 200);
@@ -58,13 +60,16 @@ export async function onRequestPost({ request, env }) {
   } else if (!it) {
     return bad("статья не найдена", 404);
   } else if (action === "done") {
+    const first = it.status !== "done";
     Object.assign(it, { status: "done", done_at: now(), done_by: user.login });
+    if (first && it.slug) notify = await notifyTopic(env, "journal", "Опубликовано: " + it.title + "\n" + HOST + it.slug + "/");
   } else if (action === "undone") {
     Object.assign(it, { status: "plan", done_at: null, done_by: null });
   } else if (action === "del") {
     items.splice(items.indexOf(it), 1);
   } else return bad("action: save, done, undone, del");
   await env.OKK_KV.put(KEY, JSON.stringify(items));
-  await audit(env, user.login, "articles." + action, String(body.title || (it && it.title) || ""));
-  return json({ ok: true, items });
+  await audit(env, user.login, "articles." + action, String(body.title || (it && it.title) || ""),
+    notify ? "Telegram: " + (notify.sent.join(", ") || "никому") + (notify.failed.length ? "; не дошло: " + notify.failed.map((x) => x.name + " (" + x.error + ")").join(", ") : "") : "");
+  return json({ ok: true, items, notify });
 }

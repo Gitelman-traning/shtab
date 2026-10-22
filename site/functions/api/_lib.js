@@ -314,6 +314,27 @@ export function notifyList(v) {
   return String(Array.isArray(v) ? v.join(",") : v || "").split(",").map((s) => s.trim()).filter((s) => NOTIFY[s]).join(",");
 }
 
+// разослать по теме всем активным с tg_id; только sendMessage (вебхук бота занят входом и задачами)
+// → {sent:[имя], failed:[{name,error}]}; пустой sent и failed = никто не подписан
+export async function notifyTopic(env, topic, text) {
+  const out = { sent: [], failed: [] };
+  const r = await env.DB.prepare(
+    "SELECT login, name, tg_id FROM users WHERE active = 1 AND tg_id IS NOT NULL AND (',' || notify || ',') LIKE ? ORDER BY login").bind("%," + topic + ",%").all();
+  for (const u of (r.results || [])) {
+    let err = "";
+    if (!env.TG_BOT_TOKEN) err = "бот Штаба не настроен";
+    else try {
+      const res = await fetch("https://api.telegram.org/bot" + env.TG_BOT_TOKEN + "/sendMessage", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: u.tg_id, text }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) err = d.description || ("HTTP " + res.status);
+    } catch (e) { err = "Telegram не ответил"; }
+    if (err) out.failed.push({ name: u.name || u.login, error: err }); else out.sent.push(u.name || u.login);
+  }
+  return out;
+}
+
 export async function tgSend(env, chatId, text) {
   if (!env.TG_BOT_TOKEN || !chatId) return false;
   try {
