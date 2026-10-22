@@ -15,7 +15,8 @@ export async function ownerMaps(env) {
   return {
     names,
     tag(row, deal) {
-      const l = by[deal != null ? deal : row.deal] || row.queued_by || "";
+      let l = by[deal != null ? deal : row.deal] || row.queued_by || "";
+      if (/^(collector|amo-hook|shared)$/.test(l)) l = "";   // служебные входы — не «чья»
       row.owner = l; row.owner_name = l ? (names[l] || l) : "";
       return row;
     },
