@@ -63,9 +63,13 @@
           <label>Текст сообщения <span class="hint" id="tlen"></span></label><textarea name="text" placeholder="Можно &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, &lt;a href=&quot;…&quot;&gt;ссылку&lt;/a&gt;"></textarea>
           <label>Файл <span class="hint" id="fname">не загружен</span></label><input type="file" id="file"><div class="hint">До 25 МБ. Загружается после сохранения материала.</div>
           <label>Кнопки под сообщением</label><div id="btns"></div><button type="button" class="btn ghost" id="addbtn">+ кнопка</button>
+          <label style="font-weight:600"><input type="checkbox" name="qual"> Блок квалификации перед файлом</label>
+          <div class="hint">Выключено — простая выдача: сразу файл, считаем забравших. Включено — сначала 3 вопроса (собственник, команда, оборот; кто уже отвечал — без вопросов), потом файл, горячим через 7 мин — приглашение, через 30 мин — бизнес-экскурсии.</div>
+          <details id="morecond" style="margin-top:8px"><summary class="hint" style="cursor:pointer">Другие условия (редко)</summary>
           <label>Когда выдавать</label><select name="condition"><option value="none">сразу</option><option value="phone">после номера</option><option value="poll">после опроса</option></select>
           <div id="pollwrap" hidden><label>Опрос</label><select name="poll_key"></select></div>
-          <div id="askwrap" hidden><label>Текст просьбы (необязательно)</label><input type="text" name="ask_text" placeholder="Оставьте номер — и гайд ваш"></div>
+          </details>
+          <div id="askwrap" hidden><label>Текст перед вопросами / просьбы номера (необязательно)</label><input type="text" name="ask_text" placeholder="Здравствуйте :) Ответьте, пожалуйста, на 3 коротких вопроса. И пришлем файл ❤️"></div>
           <label>Список <span class="hint">по умолчанию file_&lt;ключ&gt;</span></label><input type="text" name="list_key" placeholder="file_guide_team">
           <label><input type="checkbox" name="default_buttons" checked> добавить стандартные кнопки бота <span class="hint">(YouTube, журнал — настраиваются ниже)</span></label>
           <label><input type="checkbox" name="active" checked> активен (ссылка работает)</label>
@@ -116,6 +120,7 @@ function post(p, body){ return fetch(A + p, { method: "POST", credentials: "same
 function say(ok, t){ document.getElementById("msgs").innerHTML = '<div class="msg ' + (ok ? "ok" : "bad") + '">' + esc(t) + '</div>'; window.scrollTo(0, 0); }
 function d(ms){ if (!ms) return ""; var t = new Date(ms); return dmy(t) + "." + String(t.getFullYear()).slice(2); }
 var COND = { none: "сразу", phone: "после номера", poll: "после опроса" };
+function condLabel(m){ return (m.condition === "poll" && m.poll_key === "qual" ? "квалификация → файл" : (COND[m.condition] || m.condition)) + (m.sub_channel ? " · подписка" : ""); }
 
 document.querySelectorAll("#tabs button").forEach(function(b){ b.onclick = function(){
   document.querySelectorAll("#tabs button").forEach(function(x){ x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
@@ -145,8 +150,14 @@ function readButtons(){
   });
   return rows.length ? rows : null;
 }
-function syncCond(){ var c = mf.condition.value; document.getElementById("pollwrap").hidden = c !== "poll"; document.getElementById("askwrap").hidden = c === "none"; }
-mf.condition.onchange = syncCond;
+var QUAL = "qual";
+function syncCond(){
+  var q = mf.qual.checked, c = mf.condition.value;
+  document.getElementById("morecond").hidden = q;
+  document.getElementById("pollwrap").hidden = c !== "poll";
+  document.getElementById("askwrap").hidden = !q && c === "none";
+}
+mf.condition.onchange = syncCond; mf.qual.onchange = syncCond;
 mf.text.oninput = function(){ var n = mf.text.value.length, el = document.getElementById("tlen"); el.textContent = n + (n > 1024 ? " знаков — длиннее 1024: файл уйдёт без подписи, текст следом" : " / 1024 под файлом"); el.className = "hint" + (n > 4000 ? " bad" : ""); };
 function fillPolls(){
   mf.poll_key.innerHTML = polls.map(function(p){ return '<option value="' + esc(p.key) + '">' + esc(p.title || p.key) + '</option>'; }).join("") || '<option value="">сначала создайте опрос</option>';
@@ -159,7 +170,7 @@ function editMaterial(m){
   mf.key.readOnly = !!m;
   if (m) {
     mf.key.value = m.key; mf.title.value = m.title || ""; mf.text.value = m.text || ""; mf.condition.value = m.condition || "none";
-    mf.poll_key.value = m.poll_key || ""; mf.ask_text.value = m.ask_text || ""; mf.list_key.value = m.list_key || ""; mf.active.checked = !!m.active; mf.default_buttons.checked = m.default_buttons !== 0;
+    mf.qual.checked = m.condition === "poll" && m.poll_key === QUAL; mf.poll_key.value = m.poll_key || ""; mf.ask_text.value = m.ask_text || ""; mf.list_key.value = m.list_key || ""; mf.active.checked = !!m.active; mf.default_buttons.checked = m.default_buttons !== 0;
     try { (JSON.parse(m.buttons || "[]") || []).forEach(function(row){ (Array.isArray(row) ? row : [row]).forEach(btnRow); }); } catch (e) {}
     document.getElementById("fname").textContent = m.file_name ? m.file_name : "не загружен";
     document.getElementById("mlink").innerHTML = '<p class="note">Ссылка: <span class="mono">' + esc(link(m.key)) + '</span></p>';
@@ -169,8 +180,8 @@ function editMaterial(m){
 document.getElementById("mnew").onclick = function(){ editMaterial(null); };
 mf.onsubmit = function(e){
   e.preventDefault();
-  var body = { key: mf.key.value.trim(), title: mf.title.value.trim(), text: mf.text.value, buttons: readButtons(), condition: mf.condition.value,
-    poll_key: mf.condition.value === "poll" ? mf.poll_key.value : null, ask_text: mf.ask_text.value.trim() || null, list_key: mf.list_key.value.trim() || null, active: mf.active.checked, default_buttons: mf.default_buttons.checked };
+  var body = { key: mf.key.value.trim(), title: mf.title.value.trim(), text: mf.text.value, buttons: readButtons(), condition: mf.qual.checked ? "poll" : (mf.condition.value === "poll" && mf.poll_key.value === QUAL ? "none" : mf.condition.value),
+    poll_key: mf.qual.checked ? QUAL : (mf.condition.value === "poll" && mf.poll_key.value !== QUAL ? mf.poll_key.value : null), ask_text: mf.ask_text.value.trim() || null, list_key: mf.list_key.value.trim() || null, active: mf.active.checked, default_buttons: mf.default_buttons.checked };
   post("materials", body).then(function(j){
     if (!j.ok) return say(false, j.error || "не сохранилось");
     var f = document.getElementById("file").files[0];
@@ -183,7 +194,7 @@ function loadMaterials(open){
   get("materials").then(function(j){
     if (!j.rows) { document.getElementById("mlist").innerHTML = '<p class="empty">' + esc(j.error || "нет доступа") + '</p>'; return; }
     document.getElementById("mlist").innerHTML = j.rows.length ? '<table><thead><tr><th>Материал</th><th>Выдача</th><th class="num">Получили</th><th></th></tr></thead><tbody>'
-      + j.rows.map(function(m){ return '<tr><td><b>' + esc(m.title) + '</b>' + (m.active ? '' : ' <span class="pill">выключен</span>') + '<div class="mono">' + esc(link(m.key)) + '</div>' + (m.file_name ? '<div class="note">📎 ' + esc(m.file_name) + '</div>' : '') + '</td><td class="k">' + esc(COND[m.condition] || m.condition) + '</td><td class="num">' + (m.got || 0) + '</td><td><button class="btn ghost" data-k="' + esc(m.key) + '">изменить</button></td></tr>'; }).join("")
+      + j.rows.map(function(m){ return '<tr><td><b>' + esc(m.title) + '</b>' + (m.active ? '' : ' <span class="pill">выключен</span>') + '<div class="mono">' + esc(link(m.key)) + '</div>' + (m.file_name ? '<div class="note">📎 ' + esc(m.file_name) + '</div>' : '') + '</td><td class="k">' + esc(condLabel(m)) + '</td><td class="num">' + (m.got || 0) + '</td><td><button class="btn ghost" data-k="' + esc(m.key) + '">изменить</button></td></tr>'; }).join("")
       + '</tbody></table>' : '<p class="empty">материалов пока нет</p>';
     document.querySelectorAll("#mlist button[data-k]").forEach(function(b){ b.onclick = function(){ editMaterial(j.rows.find(function(m){ return m.key === b.dataset.k; })); }; });
     if (open) { var m = j.rows.find(function(x){ return x.key === open; }); if (m) editMaterial(m); }
