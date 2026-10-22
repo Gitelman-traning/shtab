@@ -162,7 +162,11 @@ mf.text.oninput = function(){ var n = mf.text.value.length, el = document.getEle
 function fillPolls(){
   mf.poll_key.innerHTML = polls.map(function(p){ return '<option value="' + esc(p.key) + '">' + esc(p.title || p.key) + '</option>'; }).join("") || '<option value="">сначала создайте опрос</option>';
 }
-function link(key){ var b = document.getElementById("botsel").value; return b ? "https://t.me/" + b + "?start=file_" + key : "(бот ещё не подключён к движку)"; }
+// У ботов с «метка = материал» (Поток, Таня) ссылка короткая, как в постах канала; у остальных — file_<ключ>.
+function link(key){
+  var b = document.getElementById("botsel").value, bot = bots.find(function(x){ return x.key === b; });
+  return b ? "https://t.me/" + b + "?start=" + (bot && bot.tag_materials ? "" : "file_") + key : "(бот ещё не подключён к движку)";
+}
 function editMaterial(m){
   editing = m ? m.key : null;
   document.getElementById("mf-title").textContent = m ? "Материал «" + m.title + "»" : "Новый материал";
@@ -275,10 +279,12 @@ function loadLists(){
 
 get("bots").then(function(j){
   bots = (j.rows || []).filter(function(b){ return b.connected && b.status === "ours"; });   // ссылки на материалы работают только у ботов на движке
-  document.getElementById("botsel").innerHTML = bots.length ? bots.map(function(b){ return '<option value="' + esc(b.key) + '">' + esc(b.title || b.key) + '</option>'; }).join("") : '<option value="">нет подключённых ботов</option>';
+  // Первым — бот Потока (основная выдача материалов), подпись «Название (@имя)».
+  bots.sort(function(a, b){ return (b.key === "PotokGitelmanabot") - (a.key === "PotokGitelmanabot") || String(a.title || a.key).localeCompare(String(b.title || b.key)); });
+  document.getElementById("botsel").innerHTML = bots.length ? bots.map(function(b){ return '<option value="' + esc(b.key) + '">' + esc((b.title || b.key) + " (@" + b.key + ")") + '</option>'; }).join("") : '<option value="">нет подключённых ботов</option>';
   document.getElementById("stamp").textContent = bots.length + " бот(ов) на движке";
   document.getElementById("botsel").onchange = function(){ loadMaterials(); };
-  document.getElementById("dbbot").innerHTML = bots.map(function(b){ return '<option value="' + esc(b.key) + '"' + (b.key === "PotokGitelmanabot" ? " selected" : "") + '>' + esc(b.title || b.key) + '</option>'; }).join("");
+  document.getElementById("dbbot").innerHTML = bots.map(function(b){ return '<option value="' + esc(b.key) + '"' + (b.key === "PotokGitelmanabot" ? " selected" : "") + '>' + esc((b.title || b.key) + " (@" + b.key + ")") + '</option>'; }).join("");
   dbLoad();
   loadPolls().then(function(){ loadMaterials(); editMaterial(null); editPoll(null); });
 });
