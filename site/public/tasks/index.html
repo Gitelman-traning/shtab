@@ -79,6 +79,11 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
 .subs{display:flex;flex-direction:column;gap:2px}
 .subs .t{padding:7px 6px}
 .pj{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.shot{position:relative;border-radius:10px;overflow:hidden;background:var(--soft);aspect-ratio:4/3;display:block}
+.shot img{width:100%;height:100%;object-fit:cover;display:block}
+.shot .x{position:absolute;top:4px;right:4px;border:0;border-radius:7px;background:rgba(0,0,0,.55);color:#fff;font:inherit;font-size:13px;line-height:1;padding:4px 7px;cursor:pointer}
+.shot.up{opacity:.5}
 @media (max-width:760px){main{padding:16px}.t{grid-template-columns:1fr auto}.t .st{display:none}.board{grid-template-columns:repeat(5,82vw)}dialog .row2{grid-template-columns:1fr}}
 </style>
 </head>
@@ -235,7 +240,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   function row(t, nested) {
     var closed = t.status === "done" || t.status === "cancelled";
     var par = t.parent && !nested ? byId(t.parent) : null;
-    var extra = (!proj && t.project && !nested ? " · " + projName(t.project) : "") + (t.watchers.length ? " · наблюдатели: " + t.watchers.length : "");
+    var extra = (!proj && t.project && !nested ? " · " + projName(t.project) : "") + (t.watchers.length ? " · наблюдатели: " + t.watchers.length : "") + (t.files ? " · скриншоты: " + t.files : "");
     return '<button type="button" class="t' + (closed ? " closed" : "") + (t.parent ? " sub" : "") + '" data-t="' + t.id + '">'
       + '<span class="ti">' + (t.important ? '<span class="imp" title="важная">!</span>' : "") + esc(t.title) + progress(t.subs)
       + (t.parent && !nested ? ' <span class="par">· к задаче «' + esc(par ? par.title : "№ " + t.parent) + '»</span>' : "") + '</span>'
@@ -322,12 +327,12 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   var cur = null;   // открытая задача {task, log, actions, can_edit}
   function showTask(id) {
     api(null, "?id=" + id).then(function (r) {
-      if (!r.ok) { open('<h3>Задача недоступна</h3><p class="err">' + esc(r.error || "") + '</p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button></div>'); return; }
+      if (!r.ok) { mode = ""; open('<h3>Задача недоступна</h3><p class="err">' + esc(r.error || "") + '</p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button></div>'); return; }
       cur = r; var t = r.task;
       if (location.search !== "?t=" + id) history.replaceState(null, "", "?t=" + id);
       var feed = r.log.map(function (e) {
         if (e.kind === "comment") return '<div class="cm"><div class="hd"><b>' + esc(nm(e.login)) + '</b> · ' + esc(when(e.at)) + '</div><div class="tx">' + esc(e.text) + '</div></div>';
-        var what = e.kind === "create" ? "поставил задачу" : e.kind === "status" ? "→ " + (D.statuses[e.text.split(">")[1]] || e.text) : e.kind === "sub" ? "добавил подзадачу «" + e.text + "»" : e.kind === "watch" ? e.text : "изменил " + e.text;
+        var what = e.kind === "create" ? "поставил задачу" : e.kind === "status" ? "→ " + (D.statuses[e.text.split(">")[1]] || e.text) : e.kind === "sub" ? "добавил подзадачу «" + e.text + "»" : e.kind === "watch" ? e.text : e.kind === "file" ? "прикрепил скриншот" : e.kind === "unfile" ? "удалил скриншот" : "изменил " + e.text;
         return '<div class="ev"><b>' + esc(short(e.login)) + '</b> ' + esc(what) + ' · ' + esc(when(e.at)) + '</div>';
       }).join("");
       var a = r.actions.map(function (x) {
@@ -349,6 +354,14 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
         + (t.watchers.length || watchBtn ? '<dt>Наблюдатели</dt><dd>' + (t.watchers.map(function (l) { return esc(nm(l)); }).join(", ") || "нет") + (watchBtn ? " · " + watchBtn : "") + '</dd>' : "")
         + '<dt>Создана</dt><dd>' + esc(when(t.created_at)) + '</dd></dl>'
         + (t.body ? '<div class="body">' + esc(t.body) + '</div>' : "")
+        + '<div class="sect">Скриншоты' + (r.files.length ? " · " + r.files.length : "") + '</div>'
+        + (r.files.length ? '<div class="shots">' + r.files.map(function (f) {
+            var mine = f.login === D.me.login || r.can_edit;
+            return '<a class="shot" href="/api/tasks/file?id=' + f.id + '" target="_blank" rel="noopener" title="' + esc(f.name + " · " + nm(f.login) + " · " + when(f.at)) + '">'
+              + '<img loading="lazy" src="/api/tasks/file?id=' + f.id + '" alt="' + esc(f.name) + '">'
+              + (mine ? '<button type="button" class="x" data-unfile="' + f.id + '" aria-label="удалить скриншот">×</button>' : "") + '</a>';
+          }).join("") + '</div>' : "")
+        + '<div class="row"><button type="button" class="btn ghost" data-pick>+ Скриншот</button><span class="hint">или вставьте из буфера: Ctrl+V</span></div>'
         + (a || r.can_edit ? '<div class="row">' + a + '<span class="sp"></span>' + (r.can_edit ? '<button type="button" class="btn ghost" data-edit>Изменить</button>' : "") + '</div>' : "")
         + (!t.parent ? '<div class="sect">Подзадачи' + (r.subtasks.length ? ' · готово ' + r.subtasks.filter(function (s) { return s.status === "done"; }).length + ' из ' + r.subtasks.filter(function (s) { return s.status !== "cancelled"; }).length : "") + '</div>'
           + (subs ? '<div class="subs">' + subs + '</div>' : '<p class="hint">Разбейте задачу на шаги: у каждой подзадачи свой исполнитель и срок.</p>')
@@ -356,7 +369,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
         + '<div class="sect">Обсуждение и история</div><div class="feed">' + feed + '</div>'
         + '<label class="f"><textarea id="f-cm" placeholder="Комментарий: вопрос, результат, ссылка" style="min-height:60px"></textarea></label>'
         + '<p class="err"></p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button><button class="btn" type="button" data-comment>Отправить</button></div>';
-      cur.openSubs = openSubs;
+      cur.openSubs = openSubs; mode = "card";
       open(h);
     });
   }
@@ -365,6 +378,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   // t — задача для правки или null; parent — задача, к которой ставим подзадачу
   function editTask(t, parent) {
     parentOf = t ? null : parent || null;
+    mode = t ? "form" : "new"; pending = [];
     var defProj = proj && proj !== "0" && myProjects().some(function (p) { return String(p.id) === proj; }) ? +proj : 0;
     t = t || { title: "", body: "", assignee: D.me.login, due: "", important: 0, own_watchers: [], project: defProj };
     watchers = (t.own_watchers || []).slice();
@@ -383,6 +397,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       + '<label class="f">Время (если важно)<input id="f-time" type="time" value="' + esc(time) + '"></label></div>'
       + '<div class="row" style="gap:6px"><span class="hint">Быстро:</span>' + [["сегодня", 0], ["завтра", 1], ["через 3 дня", 3], ["через неделю", 7]].map(function (x) { return '<button type="button" class="btn ghost" data-quick="' + x[1] + '">' + x[0] + '</button>'; }).join("") + '</div>'
       + '<label class="c"><input type="checkbox" id="f-imp"' + (t.important ? " checked" : "") + '> Важная</label>'
+      + (t.id ? "" : '<label class="f">Скриншоты</label><div class="shots" id="f-shots"></div><div class="row"><button type="button" class="btn ghost" data-pick>+ Скриншот</button><span class="hint">или вставьте из буфера: Ctrl+V</span></div>')
       + '<p class="hint">Участники проекта наблюдают за его задачами сами, добавлять их не нужно.</p>'
       + '<label class="f">Наблюдатели<select id="f-w"><option value="">+ добавить</option>' + peopleOpts("", []) + '</select></label><div class="chips" id="f-chips"></div>'
       + '<p class="err"></p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Отмена</button><button class="btn" type="button" data-save="' + (t.id || "") + '">' + (t.id ? "Сохранить" : "Поставить") + '</button></div>';
@@ -399,6 +414,14 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
     if (b.hasAttribute("data-unw")) { var l = b.getAttribute("data-unw"); watchers = watchers.filter(function (x) { return x !== l; }); chips(); return; }
     if (b.hasAttribute("data-edit")) return editTask(cur.task);
     if (b.hasAttribute("data-addsub")) return editTask(null, cur.task);
+    if (b.hasAttribute("data-pick")) return picker.click();
+    if (b.hasAttribute("data-unpend")) { pending.splice(+b.getAttribute("data-unpend"), 1); return drawPending(); }
+    if (b.hasAttribute("data-unfile")) {
+      e.preventDefault();
+      if (!confirm("Удалить скриншот?")) return;
+      return fetch("/api/tasks/file?del=" + b.getAttribute("data-unfile"), { method: "POST", credentials: "same-origin" }).then(function (r) { return r.json(); })
+        .then(function (r) { if (!r.ok) return err(r.error); load(); showTask(cur.task.id); });
+    }
     if (b.hasAttribute("data-open")) return showTask(+b.getAttribute("data-open"));
     if (b.hasAttribute("data-t")) return showTask(+b.getAttribute("data-t"));
     if (b.hasAttribute("data-unwatch") || b.hasAttribute("data-watch")) {
@@ -417,7 +440,13 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       b.disabled = true;
       return api({ action: id ? "edit" : "create", id: id || undefined, title: v("#f-title"), body: v("#f-body"), assignee: v("#f-as"), due: due, important: dIn.querySelector("#f-imp").checked, watchers: watchers,
         project: pEl ? +pEl.value : undefined, parent: !id && parentOf ? parentOf.id : undefined })
-        .then(function (r) { b.disabled = false; if (!r.ok) return err(r.error || "Не сохранилось"); load().then(function () { showTask(id || r.id); }); });
+        .then(function (r) {
+          if (!r.ok) { b.disabled = false; return err(r.error || "Не сохранилось"); }
+          var files = id ? [] : pending.slice(); pending = [];
+          if (files.length) err("Задача поставлена, загружаю скриншоты…");
+          files.reduce(function (p, f) { return p.then(function () { return upload(r.id, f); }); }, Promise.resolve())
+            .then(function () { b.disabled = false; load().then(function () { showTask(id || r.id); }); });
+        });
     }
     if (b.hasAttribute("data-to")) {
       var to = b.getAttribute("data-to"), text = dIn.querySelector("#f-cm").value;
@@ -434,9 +463,67 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
     }
   });
 
+  // ---------- скриншоты ----------
+  // в карточке задачи картинка уходит сразу; в форме новой задачи копится в pending и уходит после «Поставить»
+  var mode = "", pending = [];
+  var picker = document.createElement("input");
+  picker.type = "file"; picker.accept = "image/*"; picker.multiple = true; picker.hidden = true;
+  document.body.appendChild(picker);
+  picker.addEventListener("change", function () { addImages([].slice.call(picker.files)); picker.value = ""; });
+  // большой скриншот ужимаем до 2400 px по длинной стороне в webp, чтобы не возить мегабайты
+  function shrink(file) {
+    if (file.size <= 1200000 || file.type === "image/gif") return Promise.resolve(file);
+    return new Promise(function (ok) {
+      var img = new Image(), u = URL.createObjectURL(file);
+      img.onload = function () {
+        var k = Math.min(1, 2400 / Math.max(img.width, img.height)), c = document.createElement("canvas");
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
+        c.toBlob(function (b) { ok(b && b.size < file.size ? new File([b], file.name.replace(/\.\w+$/, "") + ".webp", { type: "image/webp" }) : file); }, "image/webp", 0.85);
+      };
+      img.onerror = function () { URL.revokeObjectURL(u); ok(file); };
+      img.src = u;
+    });
+  }
+  function upload(taskId, file) {
+    return shrink(file).then(function (f) {
+      return fetch("/api/tasks/file?task=" + taskId, { method: "POST", credentials: "same-origin",
+        headers: { "content-type": f.type, "x-name": encodeURIComponent(f.name || "скриншот") }, body: f })
+        .then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "нет связи" }; });
+    });
+  }
+  function addImages(files) {
+    files = files.filter(function (f) { return /^image\//.test(f.type); });
+    if (!files.length) return;
+    if (mode === "new") { pending = pending.concat(files); return drawPending(); }
+    if (mode !== "card" || !cur) return;
+    var id = cur.task.id, box = dIn.querySelector(".shots") || null;
+    err("Загружаю " + files.length + " " + plural(files.length, ["скриншот", "скриншота", "скриншотов"]) + "…");
+    files.reduce(function (p, f) { return p.then(function (bad) { return upload(id, f).then(function (r) { return r.ok ? bad : r.error; }); }); }, Promise.resolve(""))
+      .then(function (bad) { load(); showTask(id); if (bad) setTimeout(function () { err(bad); }, 600); });
+  }
+  function drawPending() {
+    var el = dIn.querySelector("#f-shots"); if (!el) return;
+    el.innerHTML = pending.map(function (f, i) {
+      return '<span class="shot"><img src="' + URL.createObjectURL(f) + '" alt=""><button type="button" class="x" data-unpend="' + i + '" aria-label="убрать">×</button></span>';
+    }).join("");
+  }
+  dlg.addEventListener("paste", function (e) {
+    var items = (e.clipboardData && e.clipboardData.items) || [], files = [];
+    for (var i = 0; i < items.length; i++) if (items[i].kind === "file" && /^image\//.test(items[i].type)) files.push(items[i].getAsFile());
+    if (!files.length || (mode !== "card" && mode !== "new")) return;
+    e.preventDefault(); addImages(files);
+  });
+  dlg.addEventListener("dragover", function (e) { if (mode === "card" || mode === "new") e.preventDefault(); });
+  dlg.addEventListener("drop", function (e) {
+    if (mode !== "card" && mode !== "new") return;
+    e.preventDefault(); addImages([].slice.call(e.dataTransfer.files || []));
+  });
+
   // ---------- проекты (админ) ----------
   var pjEdit = null;
   function projList() {
+    mode = "proj";
     var h = '<h3>Проекты</h3><p class="hint">Участники проекта видят все его задачи и получают по ним уведомления. Из ненужной задачи каждый выходит сам кнопкой «не наблюдать».</p>'
       + D.projects.map(function (p) {
         return '<div class="pj"><div class="row"><b>' + esc(p.name) + '</b>' + (p.archived ? '<span class="hint">в архиве</span>' : "") + '<span class="sp"></span><button type="button" class="btn ghost" data-pjedit="' + p.id + '">Изменить</button></div>'

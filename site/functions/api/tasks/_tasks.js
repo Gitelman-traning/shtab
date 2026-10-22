@@ -1,5 +1,5 @@
 // Общее для задач: люди Штаба, подчинённые по структуре HR, права на задачу, уведомления в Telegram.
-import { tgSend } from "../_lib.js";
+import { tgSend, isAdmin } from "../_lib.js";
 
 export const STATUS = { new: "Ждёт", work: "В работе", review: "На контроле", done: "Готово", deferred: "Отложена", cancelled: "Отменена" };
 export const OPEN = ["new", "work", "review", "deferred"];
@@ -93,6 +93,30 @@ export function watchersFull(t, own, members, mutes) {
   for (const l of (t.project && members[t.project]) || []) if (!off.includes(l)) out.add(l);
   out.delete(t.author); out.delete(t.assignee);
   return [...out];
+}
+
+async function byTask(env, table, ids) {
+  if (!ids.length) return {};
+  const r = await env.DB.prepare("SELECT task, login FROM " + table + " WHERE task IN (SELECT value FROM json_each(?))").bind(JSON.stringify(ids)).all();
+  const out = {}; for (const w of r.results || []) (out[w.task] = out[w.task] || []).push(w.login);
+  return out;
+}
+// наблюдатели набора задач: own — указанные вручную, all — вместе с участниками проекта (без вышедших)
+export async function watchMap(env, rows, members) {
+  const ids = rows.map((t) => t.id);
+  const own = await byTask(env, "task_watchers", ids);
+  const mutes = await byTask(env, "task_mutes", [...new Set(ids.concat(rows.map((t) => t.parent).filter(Boolean)))]);
+  const out = {};
+  for (const t of rows) out[t.id] = { own: own[t.id] || [], all: watchersFull(t, own[t.id], members, mutes) };
+  return out;
+}
+
+// роль человека в задаче для тех, кому не нужен весь список (скриншоты); null — не видит
+export async function access(env, user, t) {
+  const { hr, depts } = await loadPeople(env);
+  const { members } = await loadProjects(env);
+  const w = (await watchMap(env, [t], members))[t.id];
+  return roleIn(t, user.login, w.all, teamOf(user.login, hr, depts), isAdmin(user), members);
 }
 
 export function link(origin, id) {

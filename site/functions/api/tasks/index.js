@@ -12,7 +12,7 @@
 //     project {pid?, name, about, members[], archived}  — завести или изменить проект, только админ
 // Статусы: new ждёт → work в работе → review на контроле (если ставил другой) → done; deferred отложена; cancelled отменена.
 import { json, bad, currentUser, isAdmin, audit, now } from "../_lib.js";
-import { STATUS, OPEN, today, cleanDue, dueText, loadPeople, teamOf, roleIn, loadProjects, watchersFull, link, notify } from "./_tasks.js";
+import { STATUS, OPEN, today, cleanDue, dueText, loadPeople, teamOf, roleIn, loadProjects, watchMap, link, notify } from "./_tasks.js";
 
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 
@@ -20,22 +20,6 @@ async function who(request, env) {
   const user = await currentUser(request, env);
   if (!user) return null;
   return user;
-}
-
-async function byTask(env, table, ids) {
-  if (!ids.length) return {};
-  const r = await env.DB.prepare("SELECT task, login FROM " + table + " WHERE task IN (SELECT value FROM json_each(?))").bind(JSON.stringify(ids)).all();
-  const out = {}; for (const w of r.results || []) (out[w.task] = out[w.task] || []).push(w.login);
-  return out;
-}
-// наблюдатели набора задач: own — указанные вручную, all — вместе с участниками проекта (без вышедших)
-async function watchMap(env, rows, members) {
-  const ids = rows.map((t) => t.id);
-  const own = await byTask(env, "task_watchers", ids);
-  const mutes = await byTask(env, "task_mutes", [...new Set(ids.concat(rows.map((t) => t.parent).filter(Boolean)))]);
-  const out = {};
-  for (const t of rows) out[t.id] = { own: own[t.id] || [], all: watchersFull(t, own[t.id], members, mutes) };
-  return out;
 }
 
 // какие переходы доступны человеку; boss = постановщик или админ, doer = исполнитель
@@ -73,11 +57,12 @@ export async function onRequestGet({ request, env }) {
     const log = await env.DB.prepare("SELECT id, at, login, kind, text FROM task_log WHERE task = ? ORDER BY id").bind(id).all();
     const subs = await env.DB.prepare("SELECT id, title, author, assignee, due, important, status FROM tasks WHERE parent = ? ORDER BY id").bind(id).all();
     const parent = t.parent ? await env.DB.prepare("SELECT id, title, status FROM tasks WHERE id = ?").bind(t.parent).first() : null;
+    const files = await env.DB.prepare("SELECT id, login, at, name, size FROM task_files WHERE task = ? ORDER BY id").bind(id).all();
     const boss = t.author === user.login || admin, doer = t.assignee === user.login;
     const watching = w.all.includes(user.login);
     return json({
       ok: true, task: Object.assign(t, { watchers: w.all, own_watchers: w.own, role }), log: log.results || [],
-      actions: allowed(t, boss, doer), can_edit: boss, parent, subtasks: subs.results || [],
+      actions: allowed(t, boss, doer), can_edit: boss, parent, subtasks: subs.results || [], files: files.results || [],
       can_unwatch: watching, can_watch: !watching && t.author !== user.login && t.assignee !== user.login,
     });
   }
@@ -106,7 +91,13 @@ export async function onRequestGet({ request, env }) {
       + " WHERE parent IN (SELECT value FROM json_each(?)) AND status != 'cancelled' GROUP BY parent").bind(JSON.stringify(parents)).all();
     for (const x of r.results || []) prog[x.parent] = { n: x.n, done: x.d };
   }
-  const tasks = rows.map((t) => Object.assign(t, { watchers: w[t.id].all, role: roleIn(t, user.login, w[t.id].all, team, admin, members), subs: prog[t.id] || null }));
+  // сколько скриншотов у задачи
+  const nf = {};
+  if (rows.length) {
+    const r = await env.DB.prepare("SELECT task, COUNT(*) AS n FROM task_files WHERE task IN (SELECT value FROM json_each(?)) GROUP BY task").bind(JSON.stringify(rows.map((t) => t.id))).all();
+    for (const x of r.results || []) nf[x.task] = x.n;
+  }
+  const tasks = rows.map((t) => Object.assign(t, { watchers: w[t.id].all, role: roleIn(t, user.login, w[t.id].all, team, admin, members), subs: prog[t.id] || null, files: nf[t.id] || 0 }));
   return json({
     ok: true, me: { login: user.login, admin }, today: today(), statuses: STATUS, team,
     projects: projects.map((p) => Object.assign(p, { members: members[p.id] || [], mine: (members[p.id] || []).includes(user.login) })),
