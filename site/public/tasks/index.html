@@ -16,6 +16,8 @@
 .btn.danger{background:var(--bad-bg);color:var(--bad)}
 .btn.ok{background:var(--ok-bg);color:var(--ok)}
 .btn:hover{filter:brightness(.97)}
+.btn:disabled{opacity:.45;cursor:default;filter:none}
+.done-note{background:var(--ok-bg);color:var(--ok);font-size:13px;font-weight:600;border-radius:10px;padding:8px 12px;margin:0}
 .tabs{display:flex;gap:4px;flex-wrap:wrap}
 .tabs button{font:inherit;font-size:13px;font-weight:500;border:0;background:none;color:var(--dim);padding:6px 11px;border-radius:9px;cursor:pointer}
 .tabs button[aria-pressed=true]{background:var(--gold-soft);color:var(--gold);font-weight:600}
@@ -325,7 +327,8 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   }
 
   var cur = null;   // открытая задача {task, log, actions, can_edit}
-  function showTask(id) {
+  // note — строка подтверждения сверху карточки: «Задача поставлена», «Сохранено»
+  function showTask(id, note) {
     api(null, "?id=" + id).then(function (r) {
       if (!r.ok) { mode = ""; open('<h3>Задача недоступна</h3><p class="err">' + esc(r.error || "") + '</p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button></div>'); return; }
       cur = r; var t = r.task;
@@ -344,7 +347,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       }).join("");
       var openSubs = r.subtasks.filter(function (s) { return OPEN[s.status]; }).length;
       var watchBtn = r.can_unwatch ? '<button type="button" class="lnk" data-unwatch>не наблюдать</button>' : r.can_watch ? '<button type="button" class="lnk" data-watch>наблюдать</button>' : "";
-      var h = '<h3>' + (t.important ? '<span style="color:var(--bad)">! </span>' : "") + esc(t.title) + '</h3>'
+      var h = (note ? '<p class="done-note">✓ ' + esc(note) + '</p>' : "") + '<h3>' + (t.important ? '<span style="color:var(--bad)">! </span>' : "") + esc(t.title) + '</h3>'
         + '<div class="row"><span class="st ' + t.status + '">' + esc(D.statuses[t.status]) + '</span><span class="hint">№ ' + t.id + '</span></div>'
         + '<dl>' + (t.project ? '<dt>Проект</dt><dd>' + esc(projName(t.project)) + '</dd>' : "")
         + (r.parent ? '<dt>Входит в</dt><dd><button type="button" class="lnk" data-open="' + r.parent.id + '">' + esc(r.parent.title) + '</button></dd>' : "")
@@ -368,7 +371,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
           + '<div class="row"><button type="button" class="btn ghost" data-addsub>+ Подзадача</button></div>' : "")
         + '<div class="sect">Обсуждение и история</div><div class="feed">' + feed + '</div>'
         + '<label class="f"><textarea id="f-cm" placeholder="Комментарий: вопрос, результат, ссылка" style="min-height:60px"></textarea></label>'
-        + '<p class="err"></p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button><button class="btn" type="button" data-comment>Отправить</button></div>';
+        + '<p class="err"></p><div class="row"><button class="btn" type="button" data-comment disabled>Отправить комментарий</button><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button></div>';
       cur.openSubs = openSubs; mode = "card";
       open(h);
     });
@@ -407,6 +410,11 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   function chips() { var el = dIn.querySelector("#f-chips"); if (el) el.innerHTML = watchers.map(function (l) { return '<span class="chip">' + esc(nm(l)) + '<button type="button" data-unw="' + esc(l) + '" aria-label="убрать">×</button></span>'; }).join(""); }
   function err(m) { var e = dIn.querySelector(".err"); if (e) e.textContent = m || ""; }
 
+  // «Отправить комментарий» активна, только когда есть текст
+  dIn.addEventListener("input", function (e) {
+    if (e.target.id !== "f-cm") return;
+    var c = dIn.querySelector("[data-comment]"); if (c) c.disabled = !e.target.value.trim();
+  });
   dIn.addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
     if (b.hasAttribute("data-close")) return close();
@@ -445,7 +453,11 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
           var files = id ? [] : pending.slice(); pending = [];
           if (files.length) err("Задача поставлена, загружаю скриншоты…");
           files.reduce(function (p, f) { return p.then(function () { return upload(r.id, f); }); }, Promise.resolve())
-            .then(function () { b.disabled = false; load().then(function () { showTask(id || r.id); }); });
+            .then(function () {
+              b.disabled = false;
+              var as = person(v("#f-as")), who = !as || as.login === D.me.login ? "" : as.tg ? ", исполнитель получил уведомление в Telegram" : ", у исполнителя нет Telegram: напишите ему сами";
+              load().then(function () { showTask(id || r.id, id ? "Сохранено" : (parentOf ? "Подзадача поставлена" : "Задача поставлена") + who); });
+            });
         });
     }
     if (b.hasAttribute("data-to")) {
@@ -457,7 +469,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       return api({ action: "status", id: cur.task.id, to: to, text: text }).then(function (r) { if (!r.ok) { b.disabled = false; return err(r.error); } load(); showTask(cur.task.id); });
     }
     if (b.hasAttribute("data-comment")) {
-      var tx = dIn.querySelector("#f-cm").value.trim(); if (!tx) return;
+      var tx = dIn.querySelector("#f-cm").value.trim(); if (!tx) return err("Напишите комментарий");
       b.disabled = true;
       return api({ action: "comment", id: cur.task.id, text: tx }).then(function (r) { if (!r.ok) { b.disabled = false; return err(r.error); } showTask(cur.task.id); });
     }
