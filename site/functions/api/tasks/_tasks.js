@@ -66,14 +66,33 @@ export function teamOf(login, hr, depts) {
   return [...out];
 }
 
-// роль человека в задаче: author · assignee · watcher · lead (руководитель участника) · admin; null — не видит
-export function roleIn(task, login, watchers, team, admin) {
+// роль человека в задаче: author · assignee · watcher · member (участник проекта, вышел из наблюдения) ·
+// lead (руководитель участника) · admin; null — не видит. watchers — уже с участниками проекта (см. watchersFull)
+export function roleIn(task, login, watchers, team, admin, members) {
   if (task.author === login) return "author";
   if (task.assignee === login) return "assignee";
   if (watchers.includes(login)) return "watcher";
+  if (task.project && members && (members[task.project] || []).includes(login)) return "member";
   if (team.includes(task.assignee) || team.includes(task.author)) return "lead";
   if (admin) return "admin";
   return null;
+}
+
+// проекты и их участники: {projects, members: {id: [login]}}
+export async function loadProjects(env) {
+  const p = (await env.DB.prepare("SELECT id, name, about, archived FROM task_projects ORDER BY id").all()).results || [];
+  const m = (await env.DB.prepare("SELECT project, login FROM task_project_members").all()).results || [];
+  const members = {}; for (const r of m) (members[r.project] = members[r.project] || []).push(r.login);
+  return { projects: p, members };
+}
+
+// наблюдатели задачи целиком: указанные вручную + участники проекта, кроме вышедших из неё или из родительской задачи
+export function watchersFull(t, own, members, mutes) {
+  const out = new Set(own || []);
+  const off = (mutes[t.id] || []).concat(t.parent ? mutes[t.parent] || [] : []);
+  for (const l of (t.project && members[t.project]) || []) if (!off.includes(l)) out.add(l);
+  out.delete(t.author); out.delete(t.assignee);
+  return [...out];
 }
 
 export function link(origin, id) {

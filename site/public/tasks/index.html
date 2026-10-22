@@ -70,6 +70,15 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
 .cm .hd{font-size:11.5px;color:var(--faint);margin-bottom:2px} .cm .hd b{color:var(--dim)}
 .cm .tx{white-space:pre-wrap}
 .hint{font-size:12px;color:var(--faint);margin:0}
+.t.sub{padding-left:30px}
+.t.sub .ti::before{content:"↳ ";color:var(--faint);font-weight:400}
+.sb{font-size:11px;font-weight:600;color:var(--dim);background:var(--soft);border-radius:6px;padding:1px 6px;margin-left:6px;white-space:nowrap}
+.sb.full{background:var(--ok-bg);color:var(--ok)}
+.par{font-size:11.5px;color:var(--faint);font-weight:400}
+.lnk{border:0;background:none;padding:0;font:inherit;color:var(--gold);cursor:pointer;text-align:left}
+.subs{display:flex;flex-direction:column;gap:2px}
+.subs .t{padding:7px 6px}
+.pj{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
 @media (max-width:760px){main{padding:16px}.t{grid-template-columns:1fr auto}.t .st{display:none}.board{grid-template-columns:repeat(5,82vw)}dialog .row2{grid-template-columns:1fr}}
 </style>
 </head>
@@ -78,7 +87,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
 <aside class="side" id="side"></aside>
 <div class="pane">
 <header>
-  <div><div class="crumbs"><b>Задачи</b></div><h1>Задачи</h1><p class="sub">Ставьте задачи коллегам со сроком. Исполнитель сдаёт работу на проверку, постановщик принимает</p></div>
+  <div><div class="crumbs"><b>Задачи</b></div><h1>Задачи</h1><p class="sub">Проекты, задачи и подзадачи со сроком и исполнителем. Исполнитель сдаёт работу на проверку, постановщик принимает</p></div>
   <div class="spacer"></div>
   <div class="themer" role="group" aria-label="Тема оформления">
     <button type="button" data-set="auto" aria-pressed="true">Авто</button>
@@ -87,6 +96,11 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   </div>
 </header>
 <main>
+  <div class="card bar-top" id="projbar" hidden>
+    <div class="tabs" id="projs" role="group" aria-label="Проект"></div>
+    <span style="flex:1"></span>
+    <button class="btn ghost" type="button" id="projs-edit" hidden>Проекты</button>
+  </div>
   <div class="card bar-top">
     <div class="tabs" id="tabs" role="group" aria-label="Чьи задачи"></div>
     <span style="flex:1"></span>
@@ -109,9 +123,11 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
 <script src="/ui.js"></script>
 <script>
 (function () {
-  var D = { tasks: [], people: [], depts: [], team: [], me: {}, statuses: {} };
-  var tab = "mine", view = "list";
-  try { view = localStorage.getItem("tasks-view") || "list"; } catch (e) {}
+  var D = { tasks: [], people: [], depts: [], team: [], me: {}, statuses: {}, projects: [] };
+  var tab = "mine", view = "list", proj = "";   // proj: "" все, "0" без проекта, иначе id проекта
+  try { view = localStorage.getItem("tasks-view") || "list"; proj = localStorage.getItem("tasks-proj") || ""; } catch (e) {}
+  var pm = /[?&]p=(\d+)/.exec(location.search); if (pm) proj = pm[1];
+  if (proj && proj !== "0") tab = "proj";
   var out = document.getElementById("out"), dlg = document.getElementById("dlg"), dIn = document.getElementById("dlg-in");
   var qEl = document.getElementById("q"), whoEl = document.getElementById("who"), closedEl = document.getElementById("closed");
   var COLS = ["new", "work", "review", "deferred", "done"];
@@ -138,9 +154,18 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   function dueCls(t) { if (!t.due || !OPEN[t.status] || t.status === "review") return ""; var d = t.due.slice(0, 10); return d < D.today ? "late" : d === D.today ? "today" : ""; }
   function when(at) { var d = new Date(at); return dmy(d) + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
 
+  function project(id) { for (var i = 0; i < D.projects.length; i++) if (D.projects[i].id === id) return D.projects[i]; return null; }
+  function projName(id) { var p = project(id); return p ? p.name : ""; }
+  function byId(id) { for (var i = 0; i < D.tasks.length; i++) if (D.tasks[i].id === id) return D.tasks[i]; return null; }
+  // проекты, куда человек может ставить задачи: свои, админу — все открытые
+  function myProjects() { return D.projects.filter(function (p) { return !p.archived && (p.mine || D.me.admin); }); }
+  function inProj(t) { return !proj ? true : proj === "0" ? !t.project : t.project === +proj; }
+
   // какие задачи во вкладке
   function inTab(t) {
     var me = D.me.login;
+    if (!inProj(t)) return false;
+    if (tab === "proj") return !!proj && proj !== "0";
     if (tab === "mine") return t.assignee === me;
     if (tab === "given") return t.author === me && t.assignee !== me;
     if (tab === "watch") return t.watchers.indexOf(me) >= 0;
@@ -151,7 +176,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   function filtered() {
     var q = qEl.value.trim().toLowerCase();
     return D.tasks.filter(function (t) {
-      if (!inTab(t)) return false;
+      if (!inTab(t)) return false;   // проект проверяется внутри inTab
       if (!closedEl.checked && (t.status === "done" || t.status === "cancelled") && view === "list") return false;
       if (t.status === "cancelled" && view === "board") return false;
       if (!q) return true;
@@ -160,8 +185,25 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   }
   function count(k) { var keep = tab; tab = k; var n = D.tasks.filter(function (t) { return inTab(t) && OPEN[t.status]; }).length; tab = keep; return n; }
 
+  // переключатель проектов: видны проекты, где человек участник (админу — все) и те, чьи задачи ему видны
+  function renderProjs() {
+    var seen = {}; D.tasks.forEach(function (t) { if (t.project) seen[t.project] = 1; });
+    var list = D.projects.filter(function (p) { return !p.archived && (p.mine || D.me.admin || seen[p.id]); });
+    var bar = document.getElementById("projbar");
+    bar.hidden = !list.length && !D.me.admin;
+    if (proj && proj !== "0" && !list.some(function (p) { return String(p.id) === proj; })) proj = "";
+    var items = [["", "Все проекты"]].concat(list.map(function (p) { return [String(p.id), p.name]; }));
+    if (D.tasks.some(function (t) { return !t.project; })) items.push(["0", "Без проекта"]);
+    document.getElementById("projs").innerHTML = items.map(function (x) {
+      return '<button type="button" data-proj="' + x[0] + '" aria-pressed="' + (proj === x[0]) + '">' + esc(x[1]) + '</button>';
+    }).join("");
+    document.getElementById("projs-edit").hidden = !D.me.admin;
+  }
   function renderTabs() {
+    renderProjs();
+    if (tab === "proj" && (!proj || proj === "0")) tab = "mine";
     var list = [["mine", "Мне"], ["given", "Я поставил"], ["watch", "Наблюдаю"]];
+    if (proj && proj !== "0") list.unshift(["proj", "Весь проект"]);
     if (D.team.length) list.push(["team", "Подчинённые"]);
     if (D.me.admin) list.push(["all", "Все"]);
     document.getElementById("tabs").innerHTML = list.map(function (x) {
@@ -188,18 +230,34 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
     if (t.author === me) return "→ " + short(t.assignee);
     return short(t.author) + " → " + short(t.assignee);
   }
-  function row(t) {
+  function progress(s) { return s && s.n ? '<span class="sb' + (s.done === s.n ? " full" : "") + '" title="подзадачи: готово из всех">' + s.done + ' из ' + s.n + '</span>' : ""; }
+  // nested — подзадача показана под своей задачей; иначе у подзадачи подписан родитель
+  function row(t, nested) {
     var closed = t.status === "done" || t.status === "cancelled";
-    return '<button type="button" class="t' + (closed ? " closed" : "") + '" data-t="' + t.id + '">'
-      + '<span class="ti">' + (t.important ? '<span class="imp" title="важная">!</span>' : "") + esc(t.title) + '</span>'
+    var par = t.parent && !nested ? byId(t.parent) : null;
+    var extra = (!proj && t.project && !nested ? " · " + projName(t.project) : "") + (t.watchers.length ? " · наблюдатели: " + t.watchers.length : "");
+    return '<button type="button" class="t' + (closed ? " closed" : "") + (t.parent ? " sub" : "") + '" data-t="' + t.id + '">'
+      + '<span class="ti">' + (t.important ? '<span class="imp" title="важная">!</span>' : "") + esc(t.title) + progress(t.subs)
+      + (t.parent && !nested ? ' <span class="par">· к задаче «' + esc(par ? par.title : "№ " + t.parent) + '»</span>' : "") + '</span>'
       + '<span class="st ' + t.status + '">' + esc(D.statuses[t.status] || t.status) + '</span>'
       + '<span class="due ' + dueCls(t) + '">' + esc(dueShort(t.due)) + '</span>'
-      + '<span class="who">' + esc(whoLine(t)) + (t.watchers.length ? " · наблюдатели: " + t.watchers.length : "") + '</span></button>';
+      + '<span class="who">' + esc(whoLine(t) + extra) + '</span></button>';
   }
   // список: по срокам, «на контроле» отдельно — там ход за постановщиком
   function renderList(list) {
     var g = { late: [], today: [], tomorrow: [], week: [], later: [], none: [], review: [], deferred: [], closed: [] };
     var week = shift(D.today, 7);
+    // подзадачи, чья задача тоже в списке, идут сразу под ней, а не в своей группе по сроку
+    var shown = {}, kids = {};
+    list.forEach(function (t) { shown[t.id] = 1; });
+    list = list.filter(function (t) {
+      if (t.parent && shown[t.parent]) { (kids[t.parent] = kids[t.parent] || []).push(t); return false; }
+      return true;
+    });
+    var rowK = function (t) {
+      return row(t) + (kids[t.id] || []).sort(function (a, b) { return (a.due || "9999").localeCompare(b.due || "9999") || a.id - b.id; })
+        .map(function (k) { return row(k, true); }).join("");
+    };
     list.forEach(function (t) {
       if (t.status === "done" || t.status === "cancelled") return g.closed.push(t);
       if (t.status === "review") return g.review.push(t);
@@ -211,7 +269,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
     var by = function (a, b) { return (a.due || "9999").localeCompare(b.due || "9999") || b.important - a.important || a.id - b.id; };
     var names = [["late", "Просрочено"], ["today", "Сегодня"], ["tomorrow", "Завтра"], ["week", "На неделе"], ["later", "Позже"], ["none", "Без срока"], ["review", "На контроле"], ["deferred", "Отложены"], ["closed", "Закрытые"]];
     var html = names.filter(function (x) { return g[x[0]].length; }).map(function (x) {
-      return '<div class="grp' + (x[0] === "late" ? " late" : "") + '">' + x[1] + ' · ' + g[x[0]].length + '</div><div class="rows">' + g[x[0]].sort(by).map(row).join("") + '</div>';
+      return '<div class="grp' + (x[0] === "late" ? " late" : "") + '">' + x[1] + ' · ' + g[x[0]].length + '</div><div class="rows">' + g[x[0]].sort(by).map(rowK).join("") + '</div>';
     }).join("");
     return '<div class="card">' + (html || '<div class="empty">' + emptyText() + '</div>') + '</div>';
   }
@@ -220,14 +278,16 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       var items = list.filter(function (t) { return t.status === s; }).sort(function (a, b) { return (a.due || "9999").localeCompare(b.due || "9999"); });
       if (s === "done") items = items.sort(function (a, b) { return (b.done_at || "").localeCompare(a.done_at || ""); }).slice(0, 30);
       return '<div class="col"><h3>' + esc(D.statuses[s]) + '<span class="n">' + items.length + '</span></h3>' + items.map(function (t) {
-        return '<button type="button" class="kc" data-t="' + t.id + '"><span class="ti">' + (t.important ? '<span style="color:var(--bad)">! </span>' : "") + esc(t.title) + '</span>'
+        var par = t.parent ? byId(t.parent) : null;
+        return '<button type="button" class="kc" data-t="' + t.id + '">' + (t.parent ? '<span class="par">↳ ' + esc(par ? par.title : "№ " + t.parent) + '</span>' : "")
+          + '<span class="ti">' + (t.important ? '<span style="color:var(--bad)">! </span>' : "") + esc(t.title) + progress(t.subs) + '</span>'
           + '<span class="mt"><span>' + esc(whoLine(t)) + '</span><span class="' + dueCls(t) + '">' + esc(dueShort(t.due)) + '</span></span></button>';
       }).join("") + '</div>';
     }).join("") + '</div>';
   }
   function emptyText() {
     if (qEl.value.trim()) return "Ничего не нашлось.";
-    return { mine: "Вам задач нет.", given: "Вы пока никому не ставили задач. Нажмите «+ Задача».", watch: "Вы ни за чем не наблюдаете.", team: "У подчинённых открытых задач нет.", all: "Задач пока нет." }[tab] || "";
+    return { proj: "В проекте пока нет задач. Нажмите «+ Задача».", mine: "Вам задач нет.", given: "Вы пока никому не ставили задач. Нажмите «+ Задача».", watch: "Вы ни за чем не наблюдаете.", team: "У подчинённых открытых задач нет.", all: "Задач пока нет." }[tab] || "";
   }
   function render() {
     renderTabs();
@@ -267,35 +327,55 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       if (location.search !== "?t=" + id) history.replaceState(null, "", "?t=" + id);
       var feed = r.log.map(function (e) {
         if (e.kind === "comment") return '<div class="cm"><div class="hd"><b>' + esc(nm(e.login)) + '</b> · ' + esc(when(e.at)) + '</div><div class="tx">' + esc(e.text) + '</div></div>';
-        var what = e.kind === "create" ? "поставил задачу" : e.kind === "status" ? "→ " + (D.statuses[e.text.split(">")[1]] || e.text) : "изменил " + e.text;
+        var what = e.kind === "create" ? "поставил задачу" : e.kind === "status" ? "→ " + (D.statuses[e.text.split(">")[1]] || e.text) : e.kind === "sub" ? "добавил подзадачу «" + e.text + "»" : e.kind === "watch" ? e.text : "изменил " + e.text;
         return '<div class="ev"><b>' + esc(short(e.login)) + '</b> ' + esc(what) + ' · ' + esc(when(e.at)) + '</div>';
       }).join("");
       var a = r.actions.map(function (x) {
         var cls = x.to === "done" ? "btn ok" : x.to === "cancelled" ? "btn danger" : x.to === "work" && t.status === "review" ? "btn ghost" : "btn";
         return '<button type="button" class="' + cls + '" data-to="' + x.to + '">' + esc(x.label) + '</button>';
       }).join("");
+      var subs = r.subtasks.map(function (s) {
+        return row({ id: s.id, title: s.title, status: s.status, due: s.due, important: s.important, assignee: s.assignee, author: s.author, parent: t.id, watchers: [] }, true);
+      }).join("");
+      var openSubs = r.subtasks.filter(function (s) { return OPEN[s.status]; }).length;
+      var watchBtn = r.can_unwatch ? '<button type="button" class="lnk" data-unwatch>не наблюдать</button>' : r.can_watch ? '<button type="button" class="lnk" data-watch>наблюдать</button>' : "";
       var h = '<h3>' + (t.important ? '<span style="color:var(--bad)">! </span>' : "") + esc(t.title) + '</h3>'
         + '<div class="row"><span class="st ' + t.status + '">' + esc(D.statuses[t.status]) + '</span><span class="hint">№ ' + t.id + '</span></div>'
-        + '<dl><dt>Срок</dt><dd class="' + dueCls(t) + '"' + (dueCls(t) === "late" ? ' style="color:var(--bad);font-weight:600"' : "") + '>' + esc(dueShort(t.due)) + '</dd>'
+        + '<dl>' + (t.project ? '<dt>Проект</dt><dd>' + esc(projName(t.project)) + '</dd>' : "")
+        + (r.parent ? '<dt>Входит в</dt><dd><button type="button" class="lnk" data-open="' + r.parent.id + '">' + esc(r.parent.title) + '</button></dd>' : "")
+        + '<dt>Срок</dt><dd class="' + dueCls(t) + '"' + (dueCls(t) === "late" ? ' style="color:var(--bad);font-weight:600"' : "") + '>' + esc(dueShort(t.due)) + '</dd>'
         + '<dt>Постановщик</dt><dd>' + esc(nm(t.author)) + '</dd>'
         + '<dt>Исполнитель</dt><dd>' + esc(nm(t.assignee)) + (person(t.assignee) && !person(t.assignee).tg ? ' <span class="hint" style="display:inline">· нет Telegram, уведомления не придут</span>' : "") + '</dd>'
-        + (t.watchers.length ? '<dt>Наблюдатели</dt><dd>' + t.watchers.map(function (l) { return esc(nm(l)); }).join(", ") + '</dd>' : "")
+        + (t.watchers.length || watchBtn ? '<dt>Наблюдатели</dt><dd>' + (t.watchers.map(function (l) { return esc(nm(l)); }).join(", ") || "нет") + (watchBtn ? " · " + watchBtn : "") + '</dd>' : "")
         + '<dt>Создана</dt><dd>' + esc(when(t.created_at)) + '</dd></dl>'
         + (t.body ? '<div class="body">' + esc(t.body) + '</div>' : "")
         + (a || r.can_edit ? '<div class="row">' + a + '<span class="sp"></span>' + (r.can_edit ? '<button type="button" class="btn ghost" data-edit>Изменить</button>' : "") + '</div>' : "")
+        + (!t.parent ? '<div class="sect">Подзадачи' + (r.subtasks.length ? ' · готово ' + r.subtasks.filter(function (s) { return s.status === "done"; }).length + ' из ' + r.subtasks.filter(function (s) { return s.status !== "cancelled"; }).length : "") + '</div>'
+          + (subs ? '<div class="subs">' + subs + '</div>' : '<p class="hint">Разбейте задачу на шаги: у каждой подзадачи свой исполнитель и срок.</p>')
+          + '<div class="row"><button type="button" class="btn ghost" data-addsub>+ Подзадача</button></div>' : "")
         + '<div class="sect">Обсуждение и история</div><div class="feed">' + feed + '</div>'
         + '<label class="f"><textarea id="f-cm" placeholder="Комментарий: вопрос, результат, ссылка" style="min-height:60px"></textarea></label>'
         + '<p class="err"></p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button><button class="btn" type="button" data-comment>Отправить</button></div>';
+      cur.openSubs = openSubs;
       open(h);
     });
   }
 
-  var watchers = [];
-  function editTask(t) {
-    t = t || { title: "", body: "", assignee: D.me.login, due: "", important: 0, watchers: [] };
-    watchers = t.watchers.slice();
+  var watchers = [], parentOf = null;
+  // t — задача для правки или null; parent — задача, к которой ставим подзадачу
+  function editTask(t, parent) {
+    parentOf = t ? null : parent || null;
+    var defProj = proj && proj !== "0" && myProjects().some(function (p) { return String(p.id) === proj; }) ? +proj : 0;
+    t = t || { title: "", body: "", assignee: D.me.login, due: "", important: 0, own_watchers: [], project: defProj };
+    watchers = (t.own_watchers || []).slice();
     var due = t.due || "", date = due.slice(0, 10), time = due.length > 10 ? due.slice(11, 16) : "";
-    var h = '<h3>' + (t.id ? "Изменить задачу" : "Новая задача") + '</h3>'
+    var pickable = myProjects();
+    if (t.project && !pickable.some(function (p) { return p.id === t.project; }) && project(t.project)) pickable = pickable.concat([project(t.project)]);
+    var projField = parentOf ? '<p class="hint">Подзадача к «' + esc(parentOf.title) + '»' + (parentOf.project ? ", проект «" + esc(projName(parentOf.project)) + "»" : "") + '</p>'
+      : t.parent ? "" : pickable.length ? '<label class="f">Проект<select id="f-proj"><option value="0">без проекта</option>' + pickable.map(function (p) {
+        return '<option value="' + p.id + '"' + (p.id === t.project ? " selected" : "") + '>' + esc(p.name) + '</option>';
+      }).join("") + '</select></label>' : "";
+    var h = '<h3>' + (t.id ? "Изменить задачу" : parentOf ? "Новая подзадача" : "Новая задача") + '</h3>' + projField
       + '<label class="f">Что сделать<input id="f-title" maxlength="200" value="' + esc(t.title) + '"></label>'
       + '<label class="f">Подробности<textarea id="f-body" maxlength="5000" placeholder="Что нужно получить в итоге, ссылки, материалы">' + esc(t.body) + '</textarea></label>'
       + '<label class="f">Исполнитель<select id="f-as">' + peopleOpts(t.assignee) + '</select></label>'
@@ -303,6 +383,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       + '<label class="f">Время (если важно)<input id="f-time" type="time" value="' + esc(time) + '"></label></div>'
       + '<div class="row" style="gap:6px"><span class="hint">Быстро:</span>' + [["сегодня", 0], ["завтра", 1], ["через 3 дня", 3], ["через неделю", 7]].map(function (x) { return '<button type="button" class="btn ghost" data-quick="' + x[1] + '">' + x[0] + '</button>'; }).join("") + '</div>'
       + '<label class="c"><input type="checkbox" id="f-imp"' + (t.important ? " checked" : "") + '> Важная</label>'
+      + '<p class="hint">Участники проекта наблюдают за его задачами сами, добавлять их не нужно.</p>'
       + '<label class="f">Наблюдатели<select id="f-w"><option value="">+ добавить</option>' + peopleOpts("", []) + '</select></label><div class="chips" id="f-chips"></div>'
       + '<p class="err"></p><div class="row"><span class="sp"></span><button class="btn ghost" type="button" data-close>Отмена</button><button class="btn" type="button" data-save="' + (t.id || "") + '">' + (t.id ? "Сохранить" : "Поставить") + '</button></div>';
     open(h); chips(); dIn.querySelector("#f-title").focus();
@@ -317,18 +398,32 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
     if (b.hasAttribute("data-quick")) { dIn.querySelector("#f-date").value = shift(D.today, +b.getAttribute("data-quick")); return; }
     if (b.hasAttribute("data-unw")) { var l = b.getAttribute("data-unw"); watchers = watchers.filter(function (x) { return x !== l; }); chips(); return; }
     if (b.hasAttribute("data-edit")) return editTask(cur.task);
+    if (b.hasAttribute("data-addsub")) return editTask(null, cur.task);
+    if (b.hasAttribute("data-open")) return showTask(+b.getAttribute("data-open"));
+    if (b.hasAttribute("data-t")) return showTask(+b.getAttribute("data-t"));
+    if (b.hasAttribute("data-unwatch") || b.hasAttribute("data-watch")) {
+      b.disabled = true;
+      return api({ action: b.hasAttribute("data-watch") ? "watch" : "unwatch", id: cur.task.id }).then(function (r) { if (!r.ok) { b.disabled = false; return err(r.error); } load(); showTask(cur.task.id); });
+    }
+    if (b.hasAttribute("data-pjsave")) return saveProject(b);
+    if (b.hasAttribute("data-pjadd")) { pjEdit = { id: 0, name: "", about: "", members: [D.me.login], archived: 0 }; return projDialog(); }
+    if (b.hasAttribute("data-pjedit")) { var pp = project(+b.getAttribute("data-pjedit")); pjEdit = { id: pp.id, name: pp.name, about: pp.about, members: pp.members.slice(), archived: pp.archived }; return projDialog(); }
+    if (b.hasAttribute("data-pjunm")) { var u = b.getAttribute("data-pjunm"); pjEdit.members = pjEdit.members.filter(function (x) { return x !== u; }); return pjChips(); }
     if (b.hasAttribute("data-save")) {
       var id = b.getAttribute("data-save"), v = function (s) { return dIn.querySelector(s).value; };
       var due = v("#f-date") ? v("#f-date") + (v("#f-time") ? "T" + v("#f-time") : "") : "";
       if (!v("#f-title").trim()) return err("Напишите, что сделать");
+      var pEl = dIn.querySelector("#f-proj");
       b.disabled = true;
-      return api({ action: id ? "edit" : "create", id: id || undefined, title: v("#f-title"), body: v("#f-body"), assignee: v("#f-as"), due: due, important: dIn.querySelector("#f-imp").checked, watchers: watchers })
+      return api({ action: id ? "edit" : "create", id: id || undefined, title: v("#f-title"), body: v("#f-body"), assignee: v("#f-as"), due: due, important: dIn.querySelector("#f-imp").checked, watchers: watchers,
+        project: pEl ? +pEl.value : undefined, parent: !id && parentOf ? parentOf.id : undefined })
         .then(function (r) { b.disabled = false; if (!r.ok) return err(r.error || "Не сохранилось"); load().then(function () { showTask(id || r.id); }); });
     }
     if (b.hasAttribute("data-to")) {
       var to = b.getAttribute("data-to"), text = dIn.querySelector("#f-cm").value;
       if (to === "work" && cur.task.status === "review" && !text.trim()) return err("Напишите в комментарии, что доделать");
       if (to === "cancelled" && !confirm("Отменить задачу?")) return;
+      if ((to === "done" || to === "review") && cur.openSubs && !confirm("Открытых подзадач: " + cur.openSubs + ". Всё равно " + (to === "review" ? "сдать задачу на проверку" : "закрыть задачу") + "?")) return;
       b.disabled = true;
       return api({ action: "status", id: cur.task.id, to: to, text: text }).then(function (r) { if (!r.ok) { b.disabled = false; return err(r.error); } load(); showTask(cur.task.id); });
     }
@@ -337,6 +432,47 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       b.disabled = true;
       return api({ action: "comment", id: cur.task.id, text: tx }).then(function (r) { if (!r.ok) { b.disabled = false; return err(r.error); } showTask(cur.task.id); });
     }
+  });
+
+  // ---------- проекты (админ) ----------
+  var pjEdit = null;
+  function projList() {
+    var h = '<h3>Проекты</h3><p class="hint">Участники проекта видят все его задачи и получают по ним уведомления. Из ненужной задачи каждый выходит сам кнопкой «не наблюдать».</p>'
+      + D.projects.map(function (p) {
+        return '<div class="pj"><div class="row"><b>' + esc(p.name) + '</b>' + (p.archived ? '<span class="hint">в архиве</span>' : "") + '<span class="sp"></span><button type="button" class="btn ghost" data-pjedit="' + p.id + '">Изменить</button></div>'
+          + (p.about ? '<span class="hint">' + esc(p.about) + '</span>' : "")
+          + '<span class="hint">Участники: ' + (p.members.map(function (l) { return esc(nm(l)); }).join(", ") || "нет") + '</span></div>';
+      }).join("")
+      + '<div class="row"><button type="button" class="btn" data-pjadd>+ Проект</button><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button></div>';
+    open(h);
+  }
+  function projDialog() {
+    var p = pjEdit;
+    var h = '<h3>' + (p.id ? "Проект" : "Новый проект") + '</h3>'
+      + '<label class="f">Название<input id="pj-name" maxlength="80" value="' + esc(p.name) + '"></label>'
+      + '<label class="f">О чём проект<input id="pj-about" maxlength="300" value="' + esc(p.about) + '"></label>'
+      + '<label class="f">Участники<select id="pj-m"><option value="">+ добавить</option>' + peopleOpts("", []) + '</select></label><div class="chips" id="pj-chips"></div>'
+      + (p.id ? '<label class="c"><input type="checkbox" id="pj-arch"' + (p.archived ? " checked" : "") + '> В архиве (задачи остаются, новые в проект не ставятся)</label>' : "")
+      + '<p class="err"></p><div class="row"><button class="btn ghost" type="button" data-projs>← Все проекты</button><span class="sp"></span><button class="btn" type="button" data-pjsave>Сохранить</button></div>';
+    open(h); pjChips();
+    dIn.querySelector("#pj-m").addEventListener("change", function (e) { var l = e.target.value; if (l && pjEdit.members.indexOf(l) < 0) pjEdit.members.push(l); e.target.value = ""; pjChips(); });
+  }
+  function pjChips() { var el = dIn.querySelector("#pj-chips"); if (el) el.innerHTML = pjEdit.members.map(function (l) { return '<span class="chip">' + esc(nm(l)) + '<button type="button" data-pjunm="' + esc(l) + '" aria-label="убрать">×</button></span>'; }).join(""); }
+  function saveProject(b) {
+    var name = dIn.querySelector("#pj-name").value.trim(); if (!name) return err("Нужно название");
+    var arch = dIn.querySelector("#pj-arch");
+    b.disabled = true;
+    api({ action: "project", pid: pjEdit.id || undefined, name: name, about: dIn.querySelector("#pj-about").value, members: pjEdit.members, archived: arch ? arch.checked : false })
+      .then(function (r) { b.disabled = false; if (!r.ok) return err(r.error || "Не сохранилось"); load().then(projList); });
+  }
+  dIn.addEventListener("click", function (e) { if (e.target.closest("[data-projs]")) projList(); });
+  document.getElementById("projs-edit").addEventListener("click", projList);
+  document.getElementById("projs").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-proj]"); if (!b) return;
+    proj = b.getAttribute("data-proj");
+    try { localStorage.setItem("tasks-proj", proj); } catch (x) {}
+    if (proj && proj !== "0") tab = "proj"; else if (tab === "proj") tab = "mine";
+    render();
   });
 
   out.addEventListener("click", function (e) { var t = e.target.closest("[data-t]"); if (t) showTask(+t.getAttribute("data-t")); });
@@ -349,7 +485,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   load().then(function () {
     var m = /[?&]t=(\d+)/.exec(location.search);
     if (m) showTask(+m[1]);
-    else if (!count("mine") && count("given")) { tab = "given"; render(); }
+    else if (tab === "mine" && !count("mine") && count("given")) { tab = "given"; render(); }
   });
 })();
 </script>
