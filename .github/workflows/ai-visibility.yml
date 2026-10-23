@@ -12,6 +12,10 @@ on:
         description: 'Only first N questions (empty = all)'
         required: false
         default: ''
+      dry:
+        description: 'Do not write to Shtab (test run)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,9 +32,10 @@ jobs:
       - run: pip install requests
       - run: |
           mkdir -p out
-          python collector/ai_visibility.py --out out ${LIMIT:+--limit $LIMIT}
+          python collector/ai_visibility.py --out out ${LIMIT:+--limit $LIMIT} ${DRY:+--dry}
         env:
           LIMIT: ${{ github.event.inputs.limit }}
+          DRY: ${{ github.event.inputs.dry == 'true' && '1' || '' }}
           PROXYAPI_KEY_TRACKER: ${{ secrets.PROXYAPI_KEY_TRACKER }}
           YANDEX_SEARCH_API_KEY: ${{ secrets.YANDEX_SEARCH_API_KEY }}
           BUDGET_RUB: '150'
