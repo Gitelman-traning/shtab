@@ -291,7 +291,7 @@ function live(){
       + (off.some(function(f){ return f; }) ? '<p class="note">Без сравнения с прошлыми 28 днями: ' + LIVE.map(function(x, i){ return off[i] ? x.name.toLowerCase() + " (данные с " + (off[i] === "—" ? "—" : dmy(new Date(off[i] + "T00:00:00"))) + ")" : ""; }).filter(Boolean).join(", ") + ' — прошлый период покрыт не целиком.</p>' : "")
       + (lag ? '<p class="warn"><b>Лиды отстают.</b> В витрине лиды из amo есть только по ' + (lastLead ? dmy(lTo) : "—") + ': выгрузка amo в таблицу «маркетинг» не обновлялась. Конверсия посчитана по визитам до этой даты, сравнение лидов скрыто.</p>' : "")
       + adsNote(ads, tot, from, to, pFrom, pTo, partial)
-      + '<p class="note">Обновляется каждую ночь. Визиты — Яндекс Метрика; лиды — amo: лендинг по тегу tilda, журнал по тегу «журнал», поток по utm_source=potok. Подробно по площадкам — в пунктах «Сайт gitelman.team» и «Журнал».</p>';
+      + '<p class="note">Обновляется каждую ночь. Визиты — Яндекс Метрика; лиды — amo: лендинг по тегу tilda (с переезда — landing), журнал по тегу «журнал», поток по utm_source=potok. Подробно по площадкам — в пунктах «Сайт gitelman.team» и «Журнал».</p>';
   });
 }
 </script>

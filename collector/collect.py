@@ -28,6 +28,8 @@ import requests
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
+TAG_ALIAS = {"landing": "tilda"}   # новый тег → ряд, в который он считается (лиды лендинга)
+
 SA_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
 SA_FILE = os.environ.get("GOOGLE_SA_FILE", "").strip()
 LAYOUT = json.loads(os.environ.get("LAYOUT_JSON") or "{}")
@@ -152,6 +154,8 @@ def deal_points(values, day_from, day_to):
                 if "tags" in c:
                     # лиды площадок сайта: тег «tilda» = основной сайт, «журнал» = журнал (список в раскладке lead_tags)
                     row_tags = [x.strip() for x in cell(r, c["tags"]).split(",") if x.strip()]
+                    # после переезда лендинга с Тильды (до 26.10.2026) заявки приходят с тегом «landing»: считаем их в тот же ряд «tilda»
+                    row_tags += [TAG_ALIAS[x] for x in row_tags if x in TAG_ALIAS and TAG_ALIAS[x] not in row_tags]
                     for tg in L.get("lead_tags", []):
                         if tg in row_tags:
                             add("mkt.leads", lead_d, "tag:" + tg)
