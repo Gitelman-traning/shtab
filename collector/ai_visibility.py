@@ -109,17 +109,24 @@ def main():
     ap.add_argument("--limit", type=int, help="только первые N вопросов (проба)")
     ap.add_argument("--dry", action="store_true", help="не писать в витрину")
     ap.add_argument("--out", default="", help="папка для полного JSON с ответами")
+    ap.add_argument("--from", dest="src", default="", help="записать прошлый прогон из его JSON, не спрашивая ИИ заново")
     args = ap.parse_args()
-    qs = queries()[: args.limit or None]
-    day = dt.datetime.now(MSK).date().isoformat()
-    rows, spent = run(qs)
+    total = len(queries())
+    if args.src:
+        with open(args.src, encoding="utf-8") as f:
+            saved = json.load(f)
+        day, rows, spent = saved["day"], saved["results"], saved["cost_rub"]
+    else:
+        qs = queries()[: args.limit or None]
+        day = dt.datetime.now(MSK).date().isoformat()
+        rows, spent = run(qs)
     if not rows:
         sys.exit("нет ни одного ответа: проверьте ключи PROXYAPI_KEY_TRACKER и YANDEX_SEARCH_API_KEY")
     for eng in sorted({r["engine"] for r in rows}):
         rs = [r for r in rows if r["engine"] == eng]
         print("%s: нас называют в %d из %d" % (NAMES.get(eng, eng), sum(r["hit"] for r in rs), len(rs)))
     print("потрачено ~%.2f ₽" % spent)
-    if args.out:
+    if args.out and not args.src:
         with open(os.path.join(args.out, "ai-visibility-%s.json" % day), "w", encoding="utf-8") as f:
             json.dump({"day": day, "cost_rub": round(spent, 2), "results": rows}, f, ensure_ascii=False, indent=1)
     pts = points(rows, day)
@@ -128,8 +135,9 @@ def main():
         amt = round(sum(r["cost"] for r in rows if r["engine"] == eng), 2)
         n = sum(1 for r in rows if r["engine"] == eng)
         if n:
+            trial = "" if n >= total else "проба: %d вопр. из %d, " % (n, total)
             exp.append({"day": day, "service": svc, "kind": "spend", "amount": amt, "qty": n, "item": "трекер видимости в ИИ · " + NAMES[eng],
-                        "note": "ответов: %d, оценка по тарифу" % n, "ref": "ai-visibility:%s:%s" % (eng, day)})
+                        "note": trial + "ответов: %d, оценка по тарифу" % n, "ref": "ai-visibility:%s:%s" % (eng, day)})
     if args.dry:
         print(json.dumps({"points": len(pts), "expenses": exp}, ensure_ascii=False))
         return

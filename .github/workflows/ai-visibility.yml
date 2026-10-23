@@ -16,9 +16,14 @@ on:
         description: 'Do not write to Shtab (test run)'
         type: boolean
         default: false
+      from_run:
+        description: 'Record an earlier run (its run id) instead of asking the AI again'
+        required: false
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   track:
@@ -30,9 +35,17 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install requests
+      - uses: actions/download-artifact@v4
+        if: github.event.inputs.from_run != ''
+        with:
+          name: ai-visibility
+          path: in/
+          run-id: ${{ github.event.inputs.from_run }}
+          github-token: ${{ github.token }}
       - run: |
           mkdir -p out
-          python collector/ai_visibility.py --out out ${LIMIT:+--limit $LIMIT} ${DRY:+--dry}
+          SRC=$(ls in/ai-visibility-*.json 2>/dev/null | head -1)
+          python collector/ai_visibility.py --out out ${LIMIT:+--limit $LIMIT} ${DRY:+--dry} ${SRC:+--from $SRC}
         env:
           LIMIT: ${{ github.event.inputs.limit }}
           DRY: ${{ github.event.inputs.dry == 'true' && '1' || '' }}
