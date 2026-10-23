@@ -86,6 +86,11 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
 .shot img{width:100%;height:100%;object-fit:cover;display:block}
 .shot .x{position:absolute;top:4px;right:4px;border:0;border-radius:7px;background:rgba(0,0,0,.55);color:#fff;font:inherit;font-size:13px;line-height:1;padding:4px 7px;cursor:pointer}
 .shot.up{opacity:.5}
+.cm .shots{margin-top:6px;grid-template-columns:repeat(auto-fill,minmax(90px,1fr))}
+.fls{display:flex;flex-direction:column;gap:4px;margin-top:6px;align-items:flex-start}
+.fl{display:inline-flex;gap:8px;align-items:center;font-size:12.5px;color:var(--gold);text-decoration:none;background:var(--page);border-radius:8px;padding:5px 9px;max-width:100%}
+.fl .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .fl .sz{color:var(--faint);white-space:nowrap}
+.fl .x{border:0;background:none;color:var(--faint);cursor:pointer;font:inherit;padding:0 2px}
 @media (max-width:760px){main{padding:16px}.t{grid-template-columns:1fr auto}.t .st{display:none}.board{grid-template-columns:repeat(5,82vw)}dialog .row2{grid-template-columns:1fr}}
 </style>
 </head>
@@ -242,7 +247,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   function row(t, nested) {
     var closed = t.status === "done" || t.status === "cancelled";
     var par = t.parent && !nested ? byId(t.parent) : null;
-    var extra = (!proj && t.project && !nested ? " · " + projName(t.project) : "") + (t.watchers.length ? " · наблюдатели: " + t.watchers.length : "") + (t.files ? " · скриншоты: " + t.files : "");
+    var extra = (!proj && t.project && !nested ? " · " + projName(t.project) : "") + (t.watchers.length ? " · наблюдатели: " + t.watchers.length : "") + (t.files ? " · файлы: " + t.files : "");
     return '<button type="button" class="t' + (closed ? " closed" : "") + (t.parent ? " sub" : "") + '" data-t="' + t.id + '">'
       + '<span class="ti">' + (t.important ? '<span class="imp" title="важная">!</span>' : "") + esc(t.title) + progress(t.subs)
       + (t.parent && !nested ? ' <span class="par">· к задаче «' + esc(par ? par.title : "№ " + t.parent) + '»</span>' : "") + '</span>'
@@ -334,7 +339,8 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       cur = r; var t = r.task;
       if (location.search !== "?t=" + id) history.replaceState(null, "", "?t=" + id);
       var feed = r.log.map(function (e) {
-        if (e.kind === "comment") return '<div class="cm"><div class="hd"><b>' + esc(nm(e.login)) + '</b> · ' + esc(when(e.at)) + '</div><div class="tx">' + esc(e.text) + '</div></div>';
+        if (e.kind === "comment") return '<div class="cm"><div class="hd"><b>' + esc(nm(e.login)) + '</b> · ' + esc(when(e.at)) + '</div>' + (e.text ? '<div class="tx">' + esc(e.text) + '</div>' : "")
+          + filesHtml(r.files.filter(function (f) { return f.comment === e.id; }), r.can_edit) + '</div>';
         var what = e.kind === "create" ? "поставил задачу" : e.kind === "status" ? "→ " + (D.statuses[e.text.split(">")[1]] || e.text) : e.kind === "sub" ? "добавил подзадачу «" + e.text + "»" : e.kind === "watch" ? e.text : e.kind === "file" ? "прикрепил скриншот" : e.kind === "unfile" ? "удалил скриншот" : "изменил " + e.text;
         return '<div class="ev"><b>' + esc(short(e.login)) + '</b> ' + esc(what) + ' · ' + esc(when(e.at)) + '</div>';
       }).join("");
@@ -342,6 +348,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
         var cls = x.to === "done" ? "btn ok" : x.to === "cancelled" ? "btn danger" : x.to === "work" && t.status === "review" ? "btn ghost" : "btn";
         return '<button type="button" class="' + cls + '" data-to="' + x.to + '">' + esc(x.label) + '</button>';
       }).join("");
+      var shots = r.files.filter(function (f) { return !f.comment; });
       var subs = r.subtasks.map(function (s) {
         return row({ id: s.id, title: s.title, status: s.status, due: s.due, important: s.important, assignee: s.assignee, author: s.author, parent: t.id, watchers: [] }, true);
       }).join("");
@@ -357,13 +364,7 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
         + (t.watchers.length || watchBtn ? '<dt>Наблюдатели</dt><dd>' + (t.watchers.map(function (l) { return esc(nm(l)); }).join(", ") || "нет") + (watchBtn ? " · " + watchBtn : "") + '</dd>' : "")
         + '<dt>Создана</dt><dd>' + esc(when(t.created_at)) + '</dd></dl>'
         + (t.body ? '<div class="body">' + esc(t.body) + '</div>' : "")
-        + '<div class="sect">Скриншоты' + (r.files.length ? " · " + r.files.length : "") + '</div>'
-        + (r.files.length ? '<div class="shots">' + r.files.map(function (f) {
-            var mine = f.login === D.me.login || r.can_edit;
-            return '<a class="shot" href="/api/tasks/file?id=' + f.id + '" target="_blank" rel="noopener" title="' + esc(f.name + " · " + nm(f.login) + " · " + when(f.at)) + '">'
-              + '<img loading="lazy" src="/api/tasks/file?id=' + f.id + '" alt="' + esc(f.name) + '">'
-              + (mine ? '<button type="button" class="x" data-unfile="' + f.id + '" aria-label="удалить скриншот">×</button>' : "") + '</a>';
-          }).join("") + '</div>' : "")
+        + '<div class="sect">Скриншоты' + (shots.length ? " · " + shots.length : "") + '</div>' + filesHtml(shots, r.can_edit)
         + '<div class="row"><button type="button" class="btn ghost" data-pick>+ Скриншот</button><span class="hint">или вставьте из буфера: Ctrl+V</span></div>'
         + (a || r.can_edit ? '<div class="row">' + a + '<span class="sp"></span>' + (r.can_edit ? '<button type="button" class="btn ghost" data-edit>Изменить</button>' : "") + '</div>' : "")
         + (!t.parent ? '<div class="sect">Подзадачи' + (r.subtasks.length ? ' · готово ' + r.subtasks.filter(function (s) { return s.status === "done"; }).length + ' из ' + r.subtasks.filter(function (s) { return s.status !== "cancelled"; }).length : "") + '</div>'
@@ -371,7 +372,9 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
           + '<div class="row"><button type="button" class="btn ghost" data-addsub>+ Подзадача</button></div>' : "")
         + '<div class="sect">Обсуждение и история</div><div class="feed">' + feed + '</div>'
         + '<label class="f"><textarea id="f-cm" placeholder="Комментарий: вопрос, результат, ссылка" style="min-height:60px"></textarea></label>'
-        + '<p class="err"></p><div class="row"><button class="btn" type="button" data-comment disabled>Отправить комментарий</button><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button></div>';
+        + '<div class="chips" id="cm-files"></div>'
+        + '<p class="err"></p><div class="row"><button class="btn" type="button" data-comment disabled>Отправить комментарий</button><button class="btn ghost" type="button" data-cmpick title="md, pdf, docx, таблица, картинка — до 10 МБ">📎 Файл</button><span class="sp"></span><button class="btn ghost" type="button" data-close>Закрыть</button></div>';
+      cmFiles = [];
       cur.openSubs = openSubs; mode = "card";
       open(h);
     });
@@ -410,11 +413,12 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
   function chips() { var el = dIn.querySelector("#f-chips"); if (el) el.innerHTML = watchers.map(function (l) { return '<span class="chip">' + esc(nm(l)) + '<button type="button" data-unw="' + esc(l) + '" aria-label="убрать">×</button></span>'; }).join(""); }
   function err(m) { var e = dIn.querySelector(".err"); if (e) e.textContent = m || ""; }
 
-  // «Отправить комментарий» активна, только когда есть текст
-  dIn.addEventListener("input", function (e) {
-    if (e.target.id !== "f-cm") return;
-    var c = dIn.querySelector("[data-comment]"); if (c) c.disabled = !e.target.value.trim();
-  });
+  // «Отправить комментарий» активна, когда есть текст или файл
+  function cmReady() {
+    var c = dIn.querySelector("[data-comment]"), ta = dIn.querySelector("#f-cm");
+    if (c && ta) c.disabled = !ta.value.trim() && !cmFiles.length;
+  }
+  dIn.addEventListener("input", function (e) { if (e.target.id === "f-cm") cmReady(); });
   dIn.addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
     if (b.hasAttribute("data-close")) return close();
@@ -423,10 +427,12 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
     if (b.hasAttribute("data-edit")) return editTask(cur.task);
     if (b.hasAttribute("data-addsub")) return editTask(null, cur.task);
     if (b.hasAttribute("data-pick")) return picker.click();
+    if (b.hasAttribute("data-cmpick")) return cmPicker.click();
+    if (b.hasAttribute("data-uncm")) { cmFiles.splice(+b.getAttribute("data-uncm"), 1); return drawCmFiles(); }
     if (b.hasAttribute("data-unpend")) { pending.splice(+b.getAttribute("data-unpend"), 1); return drawPending(); }
     if (b.hasAttribute("data-unfile")) {
       e.preventDefault();
-      if (!confirm("Удалить скриншот?")) return;
+      if (!confirm("Удалить файл?")) return;
       return fetch("/api/tasks/file?del=" + b.getAttribute("data-unfile"), { method: "POST", credentials: "same-origin" }).then(function (r) { return r.json(); })
         .then(function (r) { if (!r.ok) return err(r.error); load(); showTask(cur.task.id); });
     }
@@ -469,9 +475,15 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       return api({ action: "status", id: cur.task.id, to: to, text: text }).then(function (r) { if (!r.ok) { b.disabled = false; return err(r.error); } load(); showTask(cur.task.id); });
     }
     if (b.hasAttribute("data-comment")) {
-      var tx = dIn.querySelector("#f-cm").value.trim(); if (!tx) return err("Напишите комментарий");
+      var tx = dIn.querySelector("#f-cm").value.trim(), add = cmFiles.slice(), tid = cur.task.id;
+      if (!tx && !add.length) return err("Напишите комментарий или прикрепите файл");
       b.disabled = true;
-      return api({ action: "comment", id: cur.task.id, text: tx }).then(function (r) { if (!r.ok) { b.disabled = false; return err(r.error); } showTask(cur.task.id); });
+      return api({ action: "comment", id: tid, text: tx, files: add.length }).then(function (r) {
+        if (!r.ok) { b.disabled = false; return err(r.error); }
+        if (add.length) err("Загружаю " + add.length + " " + plural(add.length, ["файл", "файла", "файлов"]) + "…");
+        add.reduce(function (p, f) { return p.then(function (bad) { return upload(tid, f, r.id).then(function (x) { return x.ok ? bad : f.name + ": " + x.error; }); }); }, Promise.resolve(""))
+          .then(function (bad) { if (add.length) load(); showTask(tid); if (bad) setTimeout(function () { err(bad); }, 600); });
+      });
     }
   });
 
@@ -497,10 +509,11 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       img.src = u;
     });
   }
-  function upload(taskId, file) {
-    return shrink(file).then(function (f) {
-      return fetch("/api/tasks/file?task=" + taskId, { method: "POST", credentials: "same-origin",
-        headers: { "content-type": f.type, "x-name": encodeURIComponent(f.name || "скриншот") }, body: f })
+  // comment — id комментария: тогда файл любого типа уходит к нему
+  function upload(taskId, file, comment) {
+    return (/^image\//.test(file.type) ? shrink(file) : Promise.resolve(file)).then(function (f) {
+      return fetch("/api/tasks/file?task=" + taskId + (comment ? "&comment=" + comment : ""), { method: "POST", credentials: "same-origin",
+        headers: { "content-type": f.type || "application/octet-stream", "x-name": encodeURIComponent(f.name || "файл") }, body: f })
         .then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "нет связи" }; });
     });
   }
@@ -520,17 +533,55 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
       return '<span class="shot"><img src="' + URL.createObjectURL(f) + '" alt=""><button type="button" class="x" data-unpend="' + i + '" aria-label="убрать">×</button></span>';
     }).join("");
   }
+  // в поле комментария вставленное или брошенное уходит в файлы комментария, в остальном окне — в скриншоты задачи
   dlg.addEventListener("paste", function (e) {
-    var items = (e.clipboardData && e.clipboardData.items) || [], files = [];
-    for (var i = 0; i < items.length; i++) if (items[i].kind === "file" && /^image\//.test(items[i].type)) files.push(items[i].getAsFile());
+    var items = (e.clipboardData && e.clipboardData.items) || [], files = [], toCm = mode === "card" && e.target.id === "f-cm";
+    for (var i = 0; i < items.length; i++) if (items[i].kind === "file" && (toCm || /^image\//.test(items[i].type))) files.push(items[i].getAsFile());
     if (!files.length || (mode !== "card" && mode !== "new")) return;
-    e.preventDefault(); addImages(files);
+    e.preventDefault();
+    if (toCm) addCmFiles(files); else addImages(files);
   });
   dlg.addEventListener("dragover", function (e) { if (mode === "card" || mode === "new") e.preventDefault(); });
   dlg.addEventListener("drop", function (e) {
     if (mode !== "card" && mode !== "new") return;
-    e.preventDefault(); addImages([].slice.call(e.dataTransfer.files || []));
+    e.preventDefault();
+    var files = [].slice.call(e.dataTransfer.files || []);
+    if (mode === "card" && e.target.closest && e.target.closest("#f-cm, #cm-files, [data-comment], [data-cmpick]")) addCmFiles(files); else addImages(files);
   });
+
+  // ---------- файлы комментария ----------
+  var cmFiles = [];
+  var cmPicker = document.createElement("input");
+  cmPicker.type = "file"; cmPicker.multiple = true; cmPicker.hidden = true;
+  document.body.appendChild(cmPicker);
+  cmPicker.addEventListener("change", function () { addCmFiles([].slice.call(cmPicker.files)); cmPicker.value = ""; });
+  function addCmFiles(files) {
+    var big = files.filter(function (f) { return f.size > 10485760 && !/^image\//.test(f.type); });
+    cmFiles = cmFiles.concat(files.filter(function (f) { return big.indexOf(f) < 0; })).slice(0, 20);
+    drawCmFiles();
+    if (big.length) err("Больше 10 МБ, не прикреплено: " + big.map(function (f) { return f.name; }).join(", "));
+  }
+  function drawCmFiles() {
+    var el = dIn.querySelector("#cm-files"); if (!el) return;
+    el.innerHTML = cmFiles.map(function (f, i) { return '<span class="chip">📎 ' + esc(f.name) + ' · ' + kb(f.size) + '<button type="button" data-uncm="' + i + '" aria-label="убрать">×</button></span>'; }).join("");
+    cmReady();
+  }
+  function kb(n) { return n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " КБ" : (n / 1048576).toFixed(1).replace(".", ",") + " МБ"; }
+  // файлы под комментарием или в «Скриншотах»: картинки превью, остальное — строкой со ссылкой
+  function filesHtml(list, canEdit) {
+    if (!list.length) return "";
+    var del = function (f) { return f.login === D.me.login || canEdit; };
+    var img = list.filter(function (f) { return /^image\/(png|jpeg|webp|gif)$/.test(f.type); }), other = list.filter(function (f) { return img.indexOf(f) < 0; });
+    return (img.length ? '<div class="shots">' + img.map(function (f) {
+        return '<a class="shot" href="/api/tasks/file?id=' + f.id + '" target="_blank" rel="noopener" title="' + esc(f.name + " · " + nm(f.login) + " · " + when(f.at)) + '">'
+          + '<img loading="lazy" src="/api/tasks/file?id=' + f.id + '" alt="' + esc(f.name) + '">'
+          + (del(f) ? '<button type="button" class="x" data-unfile="' + f.id + '" aria-label="удалить файл">×</button>' : "") + '</a>';
+      }).join("") + '</div>' : "")
+      + (other.length ? '<div class="fls">' + other.map(function (f) {
+        return '<a class="fl" href="/api/tasks/file?id=' + f.id + '" target="_blank" rel="noopener" title="' + esc(nm(f.login) + " · " + when(f.at)) + '">📄 <span class="nm">' + esc(f.name) + '</span><span class="sz">' + kb(f.size) + '</span>'
+          + (del(f) ? '<button type="button" class="x" data-unfile="' + f.id + '" aria-label="удалить файл">×</button>' : "") + '</a>';
+      }).join("") + '</div>' : "");
+  }
 
   // ---------- проекты (админ) ----------
   var pjEdit = null;

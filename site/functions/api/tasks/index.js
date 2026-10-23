@@ -57,7 +57,7 @@ export async function onRequestGet({ request, env }) {
     const log = await env.DB.prepare("SELECT id, at, login, kind, text FROM task_log WHERE task = ? ORDER BY id").bind(id).all();
     const subs = await env.DB.prepare("SELECT id, title, author, assignee, due, important, status FROM tasks WHERE parent = ? ORDER BY id").bind(id).all();
     const parent = t.parent ? await env.DB.prepare("SELECT id, title, status FROM tasks WHERE id = ?").bind(t.parent).first() : null;
-    const files = await env.DB.prepare("SELECT id, login, at, name, size FROM task_files WHERE task = ? ORDER BY id").bind(id).all();
+    const files = await env.DB.prepare("SELECT id, login, at, name, type, size, comment FROM task_files WHERE task = ? ORDER BY id").bind(id).all();
     const boss = t.author === user.login || admin, doer = t.assignee === user.login;
     const watching = w.all.includes(user.login);
     return json({
@@ -220,13 +220,16 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: true });
   }
 
+  // комментарий; files — сколько файлов к нему сейчас догрузит страница (тогда текст можно не писать)
   if (b.action === "comment") {
+    const nf = Math.max(0, Math.min(20, Number(b.files) || 0));
     const text = str(b.text, 3000);
-    if (!text) return bad("пустой комментарий");
-    await log(id, "comment", text);
+    if (!text && !nf) return bad("пустой комментарий");
+    const cid = (await log(id, "comment", text)).meta.last_row_id;
     await env.DB.prepare("UPDATE tasks SET updated_at = ? WHERE id = ?").bind(at, id).run();
-    await notify(env, people, others(), `${nm(user.login)} в задаче ${head}:\n${text.slice(0, 600)}\n${link(origin, id)}`);
-    return json({ ok: true });
+    const att = nf ? (text ? "\n" : "") + "Прикреплено файлов: " + nf : "";
+    await notify(env, people, others(), `${nm(user.login)} в задаче ${head}:\n${text.slice(0, 600)}${att}\n${link(origin, id)}`);
+    return json({ ok: true, id: cid });
   }
 
   if (b.action === "status") {
