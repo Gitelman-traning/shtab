@@ -29,7 +29,7 @@ NAMES = {"chatgpt": "ChatGPT", "yandex": "Яндекс"}
 
 def queries():
     with open(os.path.join(HERE, "ai_queries.txt"), encoding="utf-8") as f:
-        return [l.strip() for l in f if l.strip() and not l.startswith("#")]
+        return [l.strip() for l in f if l.strip() and not l.startswith(("#", "["))]
 
 
 def shtab(method, path, **kw):

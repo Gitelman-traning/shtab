@@ -9,6 +9,7 @@
 Результат — в site/public (страницы с данными клиентов в git не попадают, см. .gitignore).
 """
 import io
+import json
 import os
 import re
 import shutil
@@ -171,8 +172,16 @@ def build_sources():
     print("источники маркетинга: %d страниц" % len(SOURCES))
     # площадки сайта: Метрика + лиды по тегу
     wtpl = rd(os.path.join(HERE, "site", "src", "web.tpl.html"))
-    for slug, key, title, host, tag in [("main", "site", "Сайт", "gitelman.team", "tilda"), ("journal", "journal", "Журнал", "журнала", "журнал")]:
+    aiq, part = {}, None  # вопросы трекера ИИ-ответов по площадкам (collector/ai_queries.txt)
+    for l in rd(os.path.join(HERE, "collector", "ai_queries.txt")).splitlines():
+        l = l.strip()
+        if l.startswith("[") and l.endswith("]"):
+            part = l[1:-1]
+        elif l and not l.startswith("#"):
+            aiq.setdefault(part, []).append(l)
+    for slug, key, title, host, tag, ai in [("main", "site", "Сайт", "gitelman.team", "tilda", "landing"), ("journal", "journal", "Журнал", "журнала", "журнал", "journal")]:
         page = wtpl.replace("{{TITLE}}", title).replace("{{HOST}}", host).replace("{{KEY}}", key).replace("{{TAG}}", tag)
+        page = page.replace("{{AIQ}}", json.dumps(aiq.get(ai, []), ensure_ascii=False).replace("</", "<\\/"))
         wr(os.path.join(PUB, "marketing", "site", slug, "index.html"), page)
     print("площадки сайта: 2 страницы")
 

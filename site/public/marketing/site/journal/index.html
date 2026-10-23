@@ -23,6 +23,19 @@
 .q-form .full{grid-column:1/-1}.q-form .row{display:flex;gap:8px;grid-column:1/-1;align-items:center}.q-err{color:var(--bad);font-size:12.5px}
 .q-msg{margin-top:10px;padding:9px 12px;border-radius:9px;background:var(--ok-bg);color:var(--ok);font-size:13px}.q-msg.err{background:var(--bad-bg);color:var(--bad);font-weight:600}
 @media (max-width:520px){.q-row{grid-template-columns:76px 1fr}.q-row .q-st{grid-column:2;justify-self:start}.q-form{grid-template-columns:1fr}}
+.ai-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.ai-tile{background:var(--soft);border-radius:12px;padding:12px 14px}.ai-tile span{font-size:12.5px;color:var(--dim)}.ai-tile b{display:block;font-size:24px;margin-top:4px}.ai-tile b em{font-style:normal;font-size:13px;font-weight:500;color:var(--dim)}
+.ai-tile b i{font-style:normal;font-size:13px;font-weight:600;margin-left:4px;color:var(--dim)}.ai-tile b i.up{color:var(--ok)}.ai-tile b i.dn{color:var(--bad)}.ai-tile small{display:block;font-size:12px;color:var(--dim);margin-top:4px}
+.ai-foot{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-top:12px;font-size:12.5px;color:var(--dim)}.ai-foot a{color:var(--gold)}
+dialog.ai-dlg{border:0;border-radius:16px;padding:0;width:min(640px,calc(100vw - 24px));max-height:calc(100vh - 48px);background:var(--card,var(--page));color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog.ai-dlg::backdrop{background:rgba(0,0,0,.45)}
+.ai-dh{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:inherit}.ai-dh h3{margin:0;font-size:15px}
+.ai-db{padding:4px 16px 14px;overflow:auto}
+.ai-q{display:grid;grid-template-columns:22px 1fr 58px 58px;gap:8px;align-items:baseline;padding:9px 0;border-top:1px solid var(--line);font-size:13.5px}.ai-q:first-child{border-top:0}.ai-q .n{color:var(--dim);font-size:12px}
+.ai-q .v{font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:7px;background:var(--soft);color:var(--dim);white-space:nowrap}.ai-q .v.yes{background:var(--ok-bg);color:var(--ok)}
+.ai-qh{display:grid;grid-template-columns:22px 1fr 58px 58px;gap:8px;text-align:center;font-size:11.5px;color:var(--dim);padding:10px 0 2px}
+.ai-qh span:nth-child(2){text-align:left}.ai-q .v{justify-self:center}
+@media (max-width:520px){.ai-q,.ai-qh{grid-template-columns:18px 1fr 54px 50px;gap:6px}}
 </style>
 </head>
 <body>
@@ -44,6 +57,7 @@
   <div class="kpis" id="kpis"></div>
   <p class="note" style="margin:-6px 0 0">Проценты в карточках — изменение к такому же прошлому периоду: у недели к прошлой неделе за те же дни, у месяца к прошлому месяцу по то же число.</p>
   <div class="card" id="queue" hidden><h2>Очередь статей <small>что и когда выходит</small></h2><div id="q-list"><div class="wait">Загружаю…</div></div><div id="q-msg" class="q-msg" hidden></div><div id="q-edit"></div></div>
+  <div class="card" id="aiw" hidden></div>
   <div class="grid2">
     <div class="card srcs"><h2>Откуда пришли <small id="src-sub"></small></h2><div id="sources"></div></div>
     <div class="card srcs"><h2>Источники подробно <small>поисковики, соцсети, сайты · месяц</small></h2><div id="engines"></div></div>
@@ -198,6 +212,48 @@ function trendSvg(weeks, series){
   fetch("/api/articles", { credentials: "same-origin" }).then(function(r){ return r.json(); }).then(function(d){
     if (!d.ok) throw new Error(d.error || "нет данных"); items = d.items; canEdit = !!d.can_edit; draw();
   }).catch(function(e){ document.getElementById("q-list").innerHTML = '<div class="wait">Очередь не загрузилась: ' + esc(e.message) + '</div>'; });
+})();
+</script>
+<script>
+// Видимость в ИИ-ответах по вопросам этой площадки (collector/ai_visibility.py, раз в неделю; список — collector/ai_queries.txt)
+(function(){
+  var AIQ = ["Как масштабировать бизнес через команду, а не через себя", "Как передать управление и не потерять контроль над бизнесом", "Как нанять операционного директора, который снимет с собственника операционку", "Как делегировать руководителям так, чтобы не переделывать за ними", "Как контролировать топ-менеджеров без микроменеджмента", "Как удержать сильных сотрудников, которые хотят открыть своё", "Как выстроить оргструктуру, когда компания выросла из собственника", "Как мотивировать руководителей отвечать за результат, а не за процесс", "Как составить профиль должности перед наймом руководителя", "Как собственнику внедрить ИИ в бизнес и где он реально даёт эффект", "Как использовать ИИ в HR и найме", "Как нанять директора по маркетингу и понять, что он сильный"], box = document.getElementById("aiw"); if (!AIQ.length || !box) return;
+  var ENG = [["chatgpt", "ChatGPT"], ["yandex", "Яндекс"]];
+  function e(x){ return String(x).replace(/[&<>"]/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function dmy(p){ return p.slice(8, 10) + "." + p.slice(5, 7); }
+  var keys = AIQ.map(function(q){ return q.slice(0, 180); });
+  box.hidden = false;
+  box.innerHTML = '<h2>Видимость в ИИ-ответах <small>загрузка…</small></h2>';
+  var from = new Date(Date.now() - 120 * 864e5).toISOString().slice(0, 10), to = new Date().toISOString().slice(0, 10);
+  api("metric=web.ai.q&ptype=day&from=" + from + "&to=" + to).then(function(d){
+    var res = {}, runs = {};  // res[period][engine][вопрос] = 1/0
+    (d.rows || []).forEach(function(r){
+      var k = r.dim.split("|"), eng = k.shift(), q = k.join("|"); if (keys.indexOf(q) < 0) return;
+      runs[r.period] = 1; ((res[r.period] = res[r.period] || {})[eng] = res[r.period][eng] || {})[q] = r.value;
+    });
+    runs = Object.keys(runs).sort();
+    var last = runs[runs.length - 1], prev = runs.length > 1 ? runs[runs.length - 2] : null;
+    function cnt(p, eng){ var m = (res[p] || {})[eng]; if (!m) return null; var h = 0, t = 0; for (var q in m) { t++; h += m[q] ? 1 : 0; } return [h, t]; }
+    var head = '<h2>Видимость в ИИ-ответах <small>' + AIQ.length + ' вопросов · ChatGPT и Яндекс · раз в неделю' + (last ? ' · прогон ' + dmy(last) : '') + '</small></h2>';
+    var tiles = !last ? '<p class="empty">Первый полный прогон — в ночь на понедельник 26.10.</p>' : '<div class="ai-tiles">' + ENG.map(function(g){
+      var c = cnt(last, g[0]); if (!c) return '<div class="ai-tile"><span>' + g[1] + '</span><b>—</b><small>нет ответа в прогоне</small></div>';
+      var p = prev && cnt(prev, g[0]), ch = !p ? "" : c[0] - p[0] > 0 ? '<i class="up">+' + (c[0] - p[0]) + '</i>' : c[0] - p[0] < 0 ? '<i class="dn">' + (c[0] - p[0]) + '</i>' : '<i>±0</i>';
+      var hist = runs.slice(-8).map(function(x){ var y = cnt(x, g[0]); return y ? y[0] : ""; }).join(" · ");
+      return '<div class="ai-tile"><span>' + g[1] + ' называет нас</span><b>' + c[0] + ' <em>из ' + c[1] + '</em>' + ch + '</b><small>по неделям: ' + hist + '</small></div>';
+    }).join("") + '</div>';
+    box.innerHTML = head + tiles + '<div class="ai-foot"><button type="button" class="q-btn" id="ai-open">Вопросы (' + AIQ.length + ')</button>'
+      + '<span>«Нас называют» — ИИ упомянул Гительмана или тренинг «Команда» либо дал ссылку на *.gitelman.team.</span>'
+      + '<a href="/marketing/site/svodka/">Кого ИИ цитирует вместо нас →</a></div>'
+      + '<dialog class="ai-dlg" id="ai-dlg"><div class="ai-dh"><h3>Вопросы трекера' + (last ? ' · прогон ' + dmy(last) : '') + '</h3><button type="button" class="q-btn ghost" id="ai-close">Закрыть</button></div><div class="ai-db">'
+      + '<div class="ai-qh"><span></span><span>Вопрос</span>' + ENG.map(function(g){ return '<span>' + g[1] + '</span>'; }).join("") + '</div>'
+      + AIQ.map(function(q, i){ var k = keys[i]; return '<div class="ai-q"><span class="n">' + (i + 1) + '</span><span>' + e(q) + '</span>' + ENG.map(function(g){
+          var v = last && res[last][g[0]] ? res[last][g[0]][k] : undefined; return '<span class="v' + (v ? ' yes' : '') + '" title="' + g[1] + '">' + (v == null ? '—' : v ? 'да' : 'нет') + '</span>'; }).join("") + '</div>'; }).join("")
+      + '</div></dialog>';
+    var dlg = document.getElementById("ai-dlg");
+    document.getElementById("ai-open").onclick = function(){ dlg.showModal(); };
+    document.getElementById("ai-close").onclick = function(){ dlg.close(); };
+    dlg.addEventListener("click", function(ev){ if (ev.target === dlg) dlg.close(); });
+  }).catch(function(){ box.innerHTML = '<h2>Видимость в ИИ-ответах</h2><p class="empty">Не загрузилось.</p>'; });
 })();
 </script>
 <script src="/section-editor.js"></script>
