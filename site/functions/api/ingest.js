@@ -170,6 +170,8 @@ export async function onRequestPost({ request, env }) {
     }
     for (let i = 0; i < batch.length; i += 20) { await env.DB.batch(batch.slice(i, i + 20)); written += Math.min(20, batch.length - i); }
   }
+  // короткое уведомление админу в Telegram от сборщика (collector/ai_visibility.py: появились / пропали в ИИ-ответах)
+  if (body.notify && env.TG_ADMIN_CHAT) await tgSend(env, env.TG_ADMIN_CHAT, String(body.notify).slice(0, 3500));
   // диагност, определённый сборщиком позже (копия на Второй линии появилась после подготовки)
   const pm = Array.isArray(body.prep_manager) ? body.prep_manager : [];
   for (const r of pm.slice(0, 50)) {
