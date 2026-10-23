@@ -33,7 +33,12 @@
 .kl .v{font-weight:600;white-space:nowrap}.kl .s{display:block;font-size:11.5px;color:var(--faint)}
 .goal{background:var(--soft);border-radius:12px;padding:12px 14px;margin-top:16px;font-size:13px}.goal .gm{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .goal .mo{background:var(--card);border-radius:9px;padding:7px 10px;font-size:12px;min-width:92px}.goal .mo b{display:block;font-size:18px;font-weight:600}
-.beh .fn{display:grid;gap:8px;margin:4px 0 14px}.beh .fs{display:grid;grid-template-columns:150px 1fr 70px;gap:10px;align-items:center;font-size:13px}
+.beh .bgrid{display:grid;grid-template-columns:1fr 1fr;gap:28px}@media(max-width:900px){.beh .bgrid{grid-template-columns:1fr}}
+.beh h3{margin:0 0 10px;font-size:14px;font-weight:600}.beh h4{margin:14px 0 4px;font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.beh ol.fx.td{list-style:decimal;padding-left:20px}.beh .td li{padding-left:2px}
+.beh .blive{background:var(--soft);border-radius:10px;padding:9px 12px;font-size:12.5px;margin:-4px 0 10px}.beh .blive b{font-weight:600}
+.beh .bfreq{margin:16px 0 0;font-size:12.5px;color:var(--dim)}.beh .bfreq b{color:var(--ink);font-weight:600}
+.beh .fn{display:grid;gap:8px;margin:4px 0 14px}.beh .fs{display:grid;grid-template-columns:130px 1fr 60px;gap:10px;align-items:center;font-size:13px}
 .beh .fb{height:22px;background:var(--soft);border-radius:6px;overflow:hidden}.beh .fb i{display:block;height:100%;background:var(--gold-b);border-radius:6px}
 .beh .fs .n{text-align:right}.beh .fs .n b{font-weight:600}.beh .fs .n small{display:block;color:var(--dim);font-size:11.5px}
 .beh .fx{list-style:none;margin:0;padding:0;font-size:13px}.beh .fx li{padding:8px 0;border-top:1px solid var(--line)}.beh .fx li:first-child{border-top:0}
@@ -73,7 +78,7 @@ getJson("index.json").then(function(l){ list = l; return show(location.hash.slic
     // файлов сводки нет (сборка не достала shtab-docs) — живые цифры витрины всё равно показываем
     document.getElementById("out").innerHTML = '<div class="card live" id="live"><h2>Сейчас в витрине <small>загрузка…</small></h2></div>' + KPI_BOX
       + '<p class="empty">Сводок пока нет: сборка не получила файлы из shtab-docs.</p>';
-    live(); kpi();
+    live(); kpi(); behLive();
   });
 
 function show(date){
@@ -102,34 +107,79 @@ function render(s, date){
       + '</tbody></table></div><p class="note">' + esc(s.months.note) + "</p></div>";
   }
   document.getElementById("out").innerHTML = h;
-  live(); kpi();
+  live(); kpi(); behLive();
   var a = document.getElementById("arch");
   if (a) a.onchange = function(){ location.hash = a.value; show(a.value); };
 }
 // ключевые показатели эффективности — только то, что уже считается в витрине; остальное списком «пока не считаем»
 
-// Разбор поведения на лендинге по сырым логам Метрики (тред «Поведение посетителей по логам Метрики»,
-// отчёт metrics/landing/povedenie-logi-2026-10-23.md). Разовый разбор, повтор через месяц: обновить BEH.
+// Поведение посетителей по сырым логам Метрики (тред «Поведение посетителей по логам Метрики»,
+// отчёт metrics/landing/povedenie-logi-2026-10-23.md). Разбор логов — раз в месяц, при повторе обновить BEH;
+// строка «с 19.10 по целям» у журнала считается каждую ночь из web.goal.
 var BEH = {
-  period: "21.09–20.10", next: "конец ноября",
-  steps: [["Открыли лендинг", 1135], ["Открыли форму", 183], ["Отправили заявку", 48]],
-  note: "Считали по людям, а не по визитам. Сверка с amo: 48 заявок в логах против 47 сделок с тегом tilda за те же дни.",
-  finds: [
-    ["Главный обрыв — первый экран: 84% не нажимают ни одну кнопку, 42% визитов короче 15 секунд, а форму открывают в среднем на 46-й секунде.", ""],
-    ["Попап удержания всплывал поверх открытой формы: на ПК из 21 человека заявку не отправил никто, без попапа отправили 21%.", "wait", "исправлено, выйдет с переездом с Тильды до 26.10"],
-    ["ПК конвертирует в 2,4 раза хуже телефона: 2,3% против 5,4% заявок.", ""],
-    ["Автоцель заявки в Метрике ловит только 18 из 48 заявок, поэтому для заявок смотрим amo, а не автоцель.", ""]
+  period: "21.09–20.10", next: "около 20.11, через 3 недели после переезда лендинга",
+  sites: [
+    { name: "Лендинг gitelman.team",
+      steps: [["Открыли лендинг", 1135], ["Открыли форму", 183], ["Отправили заявку", 48]],
+      finds: [
+        "Главный обрыв — первый экран: 84% не нажимают ни одну кнопку, 42% визитов короче 15 секунд, форму открывают в среднем на 46-й секунде.",
+        "ПК конвертирует в 2,4 раза хуже телефона: 2,3% против 5,4% людей с заявкой.",
+        "38% открывших форму выбирают нишу «Другое» из 13 вариантов.",
+        "Автоцель заявки в Метрике ловит 18 заявок из 48."
+      ],
+      todo: [
+        ["Не показывать попап удержания поверх открытой формы: на ПК из 21 такого человека заявку не отправил никто.", "wait", "сделано, выйдет с переездом до 26.10"],
+        ["После переезда включить Вебвизор и карту скроллинга, чтобы увидеть, где на первом экране уходят 84%."],
+        ["Пройти форму на ПК своими руками: там отправляют 16% открывших, на телефоне 32%."],
+        ["Поставить на новый лендинг цель lead_success, тогда Метрика будет видеть все заявки, а не 18 из 48."],
+        ["Сократить выбор ниши в форме: «Другое» выбирает каждый третий, 26 отдельных форм можно свести к одной."]
+      ],
+      note: "Считали по людям. Сверка с amo: 48 заявок в логах против 47 сделок с тегом tilda." },
+    { name: "Журнал", live: true,
+      steps: [["Пришли в журнал", 667], ["Перешли на лендинг", 55], ["Оставили заявку на лендинге", 4]],
+      finds: [
+        "78% заходов прямые, это анонсы в Телеграме. Из поиска 10%: Яндекс 59 визитов, Google 40.",
+        "Входы по статьям: Лебедев 347, Бухкалов 117, Острягина 98. У Острягиной 34 входа из поиска, это лучшая поисковая статья.",
+        "Заявка через форму журнала (тег «журнал») за период одна.",
+        "В счётчик пишет и локальная разработка (localhost:3111), это мусор в данных."
+      ],
+      todo: [
+        ["Растить поиск: выпускать обычные SEO-статьи по ключевым запросам и обновлять статьи, которые уже приходят из поиска (Острягина, Baden Land)."],
+        ["Поднять кнопку заявки выше в тексте статьи: пока её почти не нажимают."],
+        ["Сделать тестовую заявку с ?lf_test=1, чтобы проверить цель lead_success и сделку в amo."],
+        ["Отфильтровать localhost в счётчике 111291594."]
+      ],
+      note: "Строка «по целям» обновляется каждую ночь, остальное — из разбора логов." }
   ]
 };
-function behBox() {
-  var top = BEH.steps[0][1];
-  var fn = BEH.steps.map(function (s, i) {
-    var pr = i ? Math.round(s[1] / BEH.steps[i - 1][1] * 100) + "%" : "";
+function behSite(st) {
+  var top = st.steps[0][1];
+  var fn = st.steps.map(function (s, i) {
+    var pr = i ? (Math.round(s[1] / st.steps[i - 1][1] * 1000) / 10).toString().replace(".", ",") + "%" : "";
     return '<div class="fs"><span>' + s[0] + '</span><div class="fb"><i style="width:' + Math.max(2, s[1] / top * 100).toFixed(1) + '%"></i></div><span class="n"><b>' + s[1] + '</b>' + (pr ? '<small>' + pr + '</small>' : '') + '</span></div>';
   }).join("");
-  var fx = BEH.finds.map(function (f) { return '<li>' + f[0] + (f[1] ? '<span class="tag ' + f[1] + '">' + f[2] + '</span>' : '') + '</li>'; }).join("");
-  return '<div class="card beh"><h2>Лендинг: что делают посетители <small>разбор логов Метрики · ' + BEH.period + ' · следующий — ' + BEH.next + '</small></h2>'
-    + '<div class="fn">' + fn + '</div><ul class="fx">' + fx + '</ul><p class="empty" style="margin:10px 0 0">' + BEH.note + '</p></div>';
+  var fx = st.finds.map(function (f) { return '<li>' + f + '</li>'; }).join("");
+  var td = st.todo.map(function (t) { return '<li>' + t[0] + (t[1] ? '<span class="tag ' + t[1] + '">' + t[2] + '</span>' : '') + '</li>'; }).join("");
+  return '<div class="bsite"><h3>' + st.name + '</h3><div class="fn">' + fn + '</div>' + (st.live ? '<div class="blive" id="beh-live">По целям Метрики с 19.10: загрузка…</div>' : '')
+    + '<ul class="fx">' + fx + '</ul><h4>Что предлагаем</h4><ol class="fx td">' + td + '</ol><p class="empty" style="margin:10px 0 0">' + st.note + '</p></div>';
+}
+function behBox() {
+  return '<div class="card beh"><h2>Что делают посетители <small>разбор логов Метрики · ' + BEH.period + '</small></h2>'
+    + '<div class="bgrid">' + BEH.sites.map(behSite).join("") + '</div>'
+    + '<p class="bfreq"><b>Как часто обновляем.</b> Строка «по целям» у журнала — каждую ночь вместе со сбором Метрики. Полный разбор логов по обоим сайтам — раз в месяц, следующий ' + BEH.next + '.</p></div>';
+}
+// живая строка журнала: визиты → дочитали → нажали кнопку → открыли форму → заявка, с 19.10 (когда появились цели)
+function behLive() {
+  var el = document.getElementById("beh-live"); if (!el) return;
+  var from = "2026-10-19", to = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+  function get(q) { return fetch("/api/points?" + q + "&from=" + from + "&to=" + to, { credentials: "same-origin" }).then(function (r) { return r.json(); }); }
+  Promise.all([get("metric=web.visits&ptype=day&dim=journal"), get("metric=web.goal&ptype=day")]).then(function (d) {
+    var v = 0, g = {};
+    (d[0].rows || []).forEach(function (r) { v += r.value || 0; });
+    (d[1].rows || []).forEach(function (r) { var k = String(r.dim).split("|"); if (k[0] === "journal") g[k[1]] = (g[k[1]] || 0) + (r.value || 0); });
+    el.innerHTML = 'По целям Метрики с 19.10: визитов <b>' + v + '</b> → дочитали <b>' + (g.article_read || 0) + '</b> → нажали кнопку <b>' + (g.article_cta_click || 0)
+      + '</b> → открыли форму <b>' + (g.lead_form_start || 0) + '</b> → заявка <b>' + (g.lead_success || 0) + '</b>';
+  }).catch(function () { el.textContent = "По целям Метрики: нет данных."; });
 }
 var KPI_BOX = '<div class="card" id="kpi"><h2>Ключевые показатели <small>загрузка…</small></h2></div>' + behBox();
 var SALES_GOAL = "15–20";   // вызов: продаж в месяц с сайта и телеграм-канала
