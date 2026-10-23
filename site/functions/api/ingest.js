@@ -174,7 +174,7 @@ export async function onRequestPost({ request, env }) {
   const pm = Array.isArray(body.prep_manager) ? body.prep_manager : [];
   for (const r of pm.slice(0, 50)) {
     if (!r || !Number(r.deal) || !r.manager) continue;
-    await env.DB.prepare("UPDATE prep SET manager = ?, updated_at = ? WHERE deal = ? AND manager = ''").bind(String(r.manager).slice(0, 80), stamp, Number(r.deal)).run();
+    await env.DB.prepare("UPDATE prep SET manager = ?, updated_at = ? WHERE deal = ? AND manager IN ('', 'Администратор')").bind(String(r.manager).slice(0, 80), stamp, Number(r.deal)).run();
     written++;
   }
   // стиль вопросов диагноста (prep.py style)

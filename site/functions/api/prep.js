@@ -81,7 +81,7 @@ export async function onRequestGet(context) {
     }
     const q = await env.DB.prepare("SELECT deal FROM prep WHERE status = 'queued'").all();
     const k = await env.DB.prepare("SELECT deal FROM prep WHERE status != 'queued'").all();
-    const nm = await env.DB.prepare("SELECT deal FROM prep WHERE manager = '' AND status = 'ready' AND updated_at > ?").bind(new Date(Date.now() - 14 * 864e5).toISOString()).all();
+    const nm = await env.DB.prepare("SELECT deal FROM prep WHERE manager IN ('', 'Администратор') AND status = 'ready' AND updated_at > ?").bind(new Date(Date.now() - 14 * 864e5).toISOString()).all();
     const today = new Date().toISOString().slice(0, 10);
     const dt = await env.DB.prepare("SELECT COUNT(*) AS n FROM prep WHERE status = 'ready' AND created_at >= ?").bind(today).first();
     const c = await env.DB.prepare("SELECT deal, pipeline, name, company, niche, sphere, turn, staff, site, role, city, country, paid_at, result, checked_at, source FROM prep_cases").all();
@@ -142,13 +142,13 @@ export async function onRequestGet(context) {
     rows.sort((a, b) => String(b.meet_at || "").localeCompare(String(a.meet_at || "")));
   } catch (e) { /* таблицы разборов может ещё не быть */ }
   // диагност не определён — копия на Второй линии могла появиться позже; дотягиваем прямо здесь, не дожидаясь сборщика
-  const pending = rows.filter((r) => !r.manager && r.status === "ready").slice(0, 3);
+  const pending = rows.filter((r) => (!r.manager || r.manager === "Администратор") && r.status === "ready").slice(0, 3);   // 23.10: «Администратор» — копия ещё не распределена
   if (pending.length && amoToken(env)) {
     const work = (async () => {
       for (const r of pending) {
         try {
           const m = await findManager(env, r.deal);
-          if (m) { await env.DB.prepare("UPDATE prep SET manager = ?, updated_at = ? WHERE deal = ? AND manager = ''").bind(m, now(), r.deal).run(); r.manager = m; }
+          if (m && m !== "Администратор") { await env.DB.prepare("UPDATE prep SET manager = ?, updated_at = ? WHERE deal = ? AND manager IN ('', 'Администратор')").bind(m, now(), r.deal).run(); r.manager = m; }
         } catch (e) { /* в следующий раз */ }
       }
     })();

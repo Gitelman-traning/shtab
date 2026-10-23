@@ -1416,7 +1416,7 @@ def resolve_managers(deals):
         except Exception as e:
             log("диагност по сделке %d не определён: %s" % (d, str(e)[:80]))
             continue
-        if m:
+        if m and m != "Администратор":      # 23.10: копия ещё на админе — диагноста пока нет
             rows.append({"deal": d, "manager": m})
     if rows:
         shtab("POST", "/api/ingest", {"collector": "prep", "prep_manager": rows})
