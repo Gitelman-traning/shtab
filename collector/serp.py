@@ -16,7 +16,8 @@ import os
 
 import requests
 
-HOSTS = {"gitelman.team": "site", "journal.gitelman.team": "journal", "potok.gitelman.team": "potok"}
+# potok.gitelman.team заморожен 23.10.2026 — его показы и запросы не считаем (вернуть: "potok.gitelman.team": "potok")
+HOSTS = {"gitelman.team": "site", "journal.gitelman.team": "journal"}
 WM = "https://api.webmaster.yandex.net/v4"
 
 
