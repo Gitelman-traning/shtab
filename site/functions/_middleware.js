@@ -195,6 +195,8 @@ export async function onRequest(context) {
   if (url.pathname.startsWith("/api/")) return next();
   // иконка вкладки — без входа, иначе на странице входа её нет
   if (/^\/(favicon(-\d+)?\.(ico|png)|apple-touch-icon\.png)$/.test(url.pathname)) return next();
+  // проверка связи с АТС — скрытая страница без входа (23.10.2026): сотрудник открывает её по прямой ссылке
+  if (/^\/pbx-check(\.html)?\/?$/.test(url.pathname)) return next();
 
   const stored = await env.OKK_KV.get(KEY);
   // тело читаем только у форм входа: иначе запрос уйдёт дальше уже «пустым»
