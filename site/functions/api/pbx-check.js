@@ -1,11 +1,11 @@
 // Проверка связи с АТС (onlinePBX), страница /pbx-check — открыта без входа (23.10.2026).
-// GET  /api/pbx-check                 — журнал проверок (последние 200).
+// GET  /api/pbx-check                 — журнал проверок (последние 200), только со входом в Штаб: страница /pbx-check-log.
 // GET  /api/pbx-check?mode=ping       — пустой ответ для замера задержки до Штаба.
 // GET  /api/pbx-check?mode=bytes&n=N  — N случайных байт (до 2 МБ) для замера скорости загрузки.
 // POST /api/pbx-check?mode=sink       — принимает тело и отвечает размером (замер скорости отдачи).
 // GET  /api/pbx-check?mode=whoami     — какой адрес и провайдера видит Cloudflare, и отвечает ли АТС из облака.
 // POST /api/pbx-check {name, verdict, summary, details} — сохранить результат в журнал.
-import { json, bad, now } from "./_lib.js";
+import { json, bad, now, canRead } from "./_lib.js";
 
 const PBX = "pbx20965.onpbx.ru";
 const TABLE = "CREATE TABLE IF NOT EXISTS pbx_checks (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, name TEXT, verdict TEXT, summary TEXT, details TEXT, ip TEXT, place TEXT, ua TEXT)";
@@ -40,6 +40,7 @@ export async function onRequestGet({ request, env }) {
     const [web, rtc] = await Promise.all([probe(`https://${PBX}/`), probe(`https://${PBX}:8082/`)]);
     return json({ ok: true, ip: request.headers.get("CF-Connecting-IP") || "", place: place(request), colo: cf.colo || "", tz: cf.timezone || "", pbx: { web, rtc } });
   }
+  if (!(await canRead(request, env))) return bad("нужен вход в Штаб", 401);
   await env.DB.prepare(TABLE).run();
   const rows = (await env.DB.prepare("SELECT id, at, name, verdict, summary, details, ip, place FROM pbx_checks ORDER BY id DESC LIMIT 200").all()).results || [];
   // адрес в журнале показываем без последней части: для сравнения провайдеров хватает

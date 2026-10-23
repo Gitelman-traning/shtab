@@ -7,7 +7,7 @@
 <link rel="icon" href="/favicon.ico" sizes="any">
 <title>Проверка связи с АТС</title>
 <!-- Скрытая страница Штаба (не в меню, открыта без входа): сотрудник проверяет своё подключение к АТС onlinePBX.
-     Результаты пишутся в общий журнал внизу страницы (/api/pbx-check). 23.10.2026 -->
+     Результаты пишутся в журнал (/api/pbx-check), он на отдельной странице /pbx-check-log (со входом). 23.10.2026 -->
 <style>
 :root{
   --page:#faf8f4; --card:#ffffff; --soft:#f3f1ec; --line:#f1eee8; --line-2:#e7e3da;
@@ -46,16 +46,7 @@ button:disabled{opacity:.55;cursor:default}
 .meter{grid-column:2;height:8px;border-radius:4px;background:var(--soft);overflow:hidden;margin-top:6px;display:none}
 .meter i{display:block;height:100%;width:0;background:var(--ok-bar);transition:width .08s}
 .tools{margin-top:14px;display:none}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;font-weight:500;color:var(--faint);padding:6px 8px;border-bottom:1px solid var(--line-2)}
-td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
-tr.r{cursor:pointer} tr.r:hover td{background:var(--soft)}
-.chip{display:inline-block;padding:1px 8px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
-.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.warn{background:var(--mid-bg);color:var(--mid)} .chip.bad{background:var(--bad-bg);color:var(--bad)}
-.det td{background:var(--soft);font-size:12.5px;color:var(--dim)}
-.det div{margin:2px 0} .det b{color:var(--ink);font-weight:500}
 .nowrap{white-space:nowrap} .muted{color:var(--faint)}
-@media (max-width:600px){ .hide-m{display:none} }
 </style>
 </head>
 <body>
@@ -77,13 +68,6 @@ tr.r{cursor:pointer} tr.r:hover td{background:var(--soft)}
     </div>
   </div>
 
-  <h2>Журнал проверок</h2>
-  <div class="card" style="padding:8px 8px 4px">
-    <table>
-      <thead><tr><th>Когда (МСК)</th><th>Кто</th><th>Итог</th><th class="hide-m">Коротко</th></tr></thead>
-      <tbody id="log"><tr><td colspan="4" class="muted">Загружаю…</td></tr></tbody>
-    </table>
-  </div>
 </main>
 
 <script>
@@ -400,7 +384,7 @@ $("go").onclick = async () => {
   try {
     await fetch("/api/pbx-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, verdict: v, summary, details: R }) });
   } catch (e) {}
-  loadLog();
+  $("copied").textContent = "Результат сохранён";
 };
 
 $("beep").onclick = () => {
@@ -416,33 +400,6 @@ $("copy").onclick = async () => {
   catch (e) { prompt("Скопируйте отчёт:", lastReport); }
 };
 
-// ---------- журнал ----------
-const fmt = (iso) => new Date(iso).toLocaleString("ru-RU", { timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-const VTXT = { ok: "в порядке", warn: "есть сбои", bad: "проблема" };
-function detailsHtml(r) {
-  let d = {}; try { d = JSON.parse(r.details || "{}"); } catch (e) {}
-  const b = d.browser || {}, n = d.net || {}, p = d.pbx || {}, w = (d.wss && d.wss.tried) || [], i = d.ice || {}, m = d.mic || {};
-  const lw = w[w.length - 1] || {};
-  const line = (k, v) => `<div><b>${k}:</b> ${v}</div>`;
-  return [
-    line("Браузер", esc(`${b.name || "—"} ${b.ver || ""}, ${b.os || ""}, пояс ${b.tz || "—"}`)),
-    line("Сеть", esc(`${r.place || "—"}, адрес ${r.ip || "—"}; задержка до Штаба ${n.ping ?? "—"} мс ±${n.jitter ?? "—"}, потери ${n.lost ?? "—"}/10, загрузка ${n.down ?? "—"} / отдача ${n.up ?? "—"} Мбит/с`)),
-    line("Сервер АТС", esc(p.times && p.times.length ? `отвечает, ${p.ping} мс, без ответа ${p.fails} из 4` : "недоступен") + (p.cloud && p.cloud.web ? esc(` (из облака: ${p.cloud.web.ok ? "отвечает" : "нет"})`) : "")),
-    line("WebRTC (WSS)", esc(lw.open ? `открыто за ${lw.openMs} мс, SIP: ${lw.sipStatus || "нет ответа"}${lw.sip && lw.sip.length ? ", " + median(lw.sip) + " мс" : ""}` : `не открылось (код ${lw.closeCode || "—"})`)),
-    line("UDP / STUN", esc(i.ips && i.ips.length ? `внешний адрес ${i.ips.join(", ")}${i.symmetric ? ", NAT строгого типа" : ""}${i.vpn ? ", похоже на VPN" : ""}` : "не проходит")),
-    line("Микрофон", esc(m.error ? `ошибка ${m.error}` : `${m.label || "—"}, до ${m.peakDb ?? "—"} дБ, разрешение: ${m.perm || "—"}`)),
-  ].join("");
-}
-async function loadLog() {
-  let rows = [];
-  try { rows = (await (await fetch("/api/pbx-check", { cache: "no-store" })).json()).rows || []; } catch (e) {}
-  if (!rows.length) { $("log").innerHTML = '<tr><td colspan="4" class="muted">Проверок ещё не было</td></tr>'; return; }
-  $("log").innerHTML = rows.map((r) =>
-    `<tr class="r" data-id="${r.id}"><td class="nowrap">${fmt(r.at)}</td><td>${esc(r.name || "—")}</td><td><span class="chip ${r.verdict}">${VTXT[r.verdict] || r.verdict}</span></td><td class="hide-m muted">${esc(r.summary)}</td></tr>` +
-    `<tr class="det" id="det-${r.id}" hidden><td colspan="4">${detailsHtml(r)}</td></tr>`).join("");
-  $("log").querySelectorAll("tr.r").forEach((tr) => tr.onclick = () => { const d = $("det-" + tr.dataset.id); d.hidden = !d.hidden; });
-}
-loadLog();
 </script>
 </body>
 </html>

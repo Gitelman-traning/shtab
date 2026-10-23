@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<title>Журнал проверок АТС</title>
+<!-- Журнал страницы «Проверка связи с АТС» (/pbx-check). Не в меню, нужен вход в Штаб. 23.10.2026 -->
+<style>
+:root{
+  --page:#faf8f4; --card:#ffffff; --soft:#f3f1ec; --line:#f1eee8; --line-2:#e7e3da;
+  --ink:#2b2721; --dim:#7b766f; --faint:#a29d95; --gold:#8a6f3d; --gold-soft:#efe7d6; --gold-b:#b59f76;
+  --ok:#38765a; --ok-bg:#e8f2ec; --mid:#8d6a17; --mid-bg:#fbf1de; --bad:#ad4636; --bad-bg:#fbe9e6; --ok-bar:#6aa87f;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --page:#161718; --card:#1e2021; --soft:#232526; --line:#282a2b; --line-2:#333637;
+    --ink:#eceae5; --dim:#9a958d; --faint:#75716a; --gold:#c9b487; --gold-soft:#2a2721; --gold-b:#b59f76;
+    --ok:#7cc396; --ok-bg:#1b2b23; --mid:#dcb463; --mid-bg:#2c2617; --bad:#e58975; --bad-bg:#2f1e1a;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font-family:Inter,Arial,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--gold)}
+main{max-width:860px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:28px 0 10px}
+.sub{color:var(--dim);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line-2);border-radius:14px;padding:16px}
+input[type=text]{font:inherit;padding:8px 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--card);color:var(--ink);min-width:220px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-weight:500;color:var(--faint);padding:6px 8px;border-bottom:1px solid var(--line-2)}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+tr.r{cursor:pointer} tr.r:hover td{background:var(--soft)}
+.chip{display:inline-block;padding:1px 8px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.warn{background:var(--mid-bg);color:var(--mid)} .chip.bad{background:var(--bad-bg);color:var(--bad)}
+.det td{background:var(--soft);font-size:12.5px;color:var(--dim)}
+.det div{margin:2px 0} .det b{color:var(--ink);font-weight:500}
+.nowrap{white-space:nowrap} .muted{color:var(--faint)}
+@media (max-width:600px){ .hide-m{display:none} }
+</style>
+</head>
+<body>
+<main>
+  <h1>Журнал проверок АТС</h1>
+  <p class="sub">Кто и когда проверял связь на странице <a href="/pbx-check">«Проверка связи с АТС»</a>. Нажмите на строку, чтобы увидеть подробности. Сравнивайте с проверкой коллеги, у которой телефония работает.</p>
+  <div class="row" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input type="text" id="q" placeholder="Найти по имени" aria-label="Найти по имени">
+    <span class="muted" id="count"></span>
+  </div>
+  <div class="card" style="padding:8px 8px 4px">
+    <table>
+      <thead><tr><th>Когда (МСК)</th><th>Кто</th><th>Итог</th><th class="hide-m">Коротко</th></tr></thead>
+      <tbody id="log"><tr><td colspan="4" class="muted">Загружаю…</td></tr></tbody>
+    </table>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const median = (a) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+// ---------- журнал ----------
+const fmt = (iso) => new Date(iso).toLocaleString("ru-RU", { timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const VTXT = { ok: "в порядке", warn: "есть сбои", bad: "проблема" };
+function detailsHtml(r) {
+  let d = {}; try { d = JSON.parse(r.details || "{}"); } catch (e) {}
+  const b = d.browser || {}, n = d.net || {}, p = d.pbx || {}, w = (d.wss && d.wss.tried) || [], i = d.ice || {}, m = d.mic || {};
+  const lw = w[w.length - 1] || {};
+  const line = (k, v) => `<div><b>${k}:</b> ${v}</div>`;
+  return [
+    line("Браузер", esc(`${b.name || "—"} ${b.ver || ""}, ${b.os || ""}, пояс ${b.tz || "—"}`)),
+    line("Сеть", esc(`${r.place || "—"}, адрес ${r.ip || "—"}; задержка до Штаба ${n.ping ?? "—"} мс ±${n.jitter ?? "—"}, потери ${n.lost ?? "—"}/10, загрузка ${n.down ?? "—"} / отдача ${n.up ?? "—"} Мбит/с`)),
+    line("Сервер АТС", esc(p.times && p.times.length ? `отвечает, ${p.ping} мс, без ответа ${p.fails} из 4` : "недоступен") + (p.cloud && p.cloud.web ? esc(` (из облака: ${p.cloud.web.ok ? "отвечает" : "нет"})`) : "")),
+    line("WebRTC (WSS)", esc(lw.open ? `открыто за ${lw.openMs} мс, SIP: ${lw.sipStatus || "нет ответа"}${lw.sip && lw.sip.length ? ", " + median(lw.sip) + " мс" : ""}` : `не открылось (код ${lw.closeCode || "—"})`)),
+    line("UDP / STUN", esc(i.ips && i.ips.length ? `внешний адрес ${i.ips.join(", ")}${i.symmetric ? ", NAT строгого типа" : ""}${i.vpn ? ", похоже на VPN" : ""}` : "не проходит")),
+    line("Микрофон", esc(m.error ? `ошибка ${m.error}` : `${m.label || "—"}, до ${m.peakDb ?? "—"} дБ, разрешение: ${m.perm || "—"}`)),
+  ].join("");
+}
+async function loadLog() {
+  let rows = [];
+  try {
+    const r = await fetch("/api/pbx-check", { cache: "no-store" });
+    if (r.status === 401) { $("log").innerHTML = '<tr><td colspan="4" class="muted">Нужен вход в Штаб</td></tr>'; return; }
+    rows = (await r.json()).rows || [];
+  } catch (e) {}
+  ROWS = rows; draw();
+}
+let ROWS = [];
+function draw() {
+  const q = $("q").value.trim().toLowerCase();
+  const rows = ROWS.filter((r) => !q || String(r.name || "").toLowerCase().includes(q));
+  if (!rows.length) { $("log").innerHTML = '<tr><td colspan="4" class="muted">' + (ROWS.length ? "Никого не нашлось" : "Проверок ещё не было") + '</td></tr>'; return; }
+  $("count").textContent = `Проверок: ${rows.length}`;
+  $("log").innerHTML = rows.map((r) =>
+    `<tr class="r" data-id="${r.id}"><td class="nowrap">${fmt(r.at)}</td><td>${esc(r.name || "—")}</td><td><span class="chip ${r.verdict}">${VTXT[r.verdict] || r.verdict}</span></td><td class="hide-m muted">${esc(r.summary)}</td></tr>` +
+    `<tr class="det" id="det-${r.id}" hidden><td colspan="4">${detailsHtml(r)}</td></tr>`).join("");
+  $("log").querySelectorAll("tr.r").forEach((tr) => tr.onclick = () => { const d = $("det-" + tr.dataset.id); d.hidden = !d.hidden; });
+}
+loadLog();
+$("q").oninput = draw;
+</script>
+</body>
+</html>
