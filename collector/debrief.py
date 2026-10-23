@@ -150,6 +150,8 @@ def process(base, l2id, z, dry, retry_note):
     prep.log("сделка %d (Вторая линия %d): есть запись — разбираю" % (base["deal"], l2id))
     try:
         text, minutes, fresh = recording.zoom_to_text(*z, deal=l2id)
+    except recording.NoFunds:
+        raise
     except Exception as e:
         prep.log("  запись не получилась: %s" % str(e)[:160])
         return dict(base, status="retry", note=retry_note)
@@ -218,7 +220,13 @@ def auto(dry):
             continue
         post_status(st, dry)
         st = []
-        r = process(base, rec, z, dry, "запись не скачалась или не распозналась — повторю через 30 минут")
+        try:
+            r = process(base, rec, z, dry, "запись не скачалась или не распозналась — повторю через 30 минут")
+        except recording.NoFunds:
+            st.append(dict(base, status="wait", note="расшифровка стоит: на Deepgram нет денег — продолжу после пополнения"))
+            post_status(st, dry)
+            prep.log("Deepgram без баланса — останавливаюсь, Apify не трогаю")
+            return
         if r["status"] == "retry":
             r["status"] = "error"
         st.append(r)
@@ -237,7 +245,12 @@ def held(deal, dry, wait_min=100, every=300):
         if l2id:
             base["l2"] = l2id
         if z:
-            r = process(base, rec, z, dry, "запись в Zoom ещё готовится — проверяю раз в 5 минут")
+            try:
+                r = process(base, rec, z, dry, "запись в Zoom ещё готовится — проверяю раз в 5 минут")
+            except recording.NoFunds:
+                post_status([dict(base, status="wait", note="расшифровка стоит: на Deepgram нет денег — продолжу после пополнения")], dry)
+                prep.log("сделка %d: Deepgram без баланса" % deal)
+                return
             if r["status"] != "retry":
                 post_status([r], dry)
                 prep.log("сделка %d: %s %s" % (deal, r["status"], r["note"]))

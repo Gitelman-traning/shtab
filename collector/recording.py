@@ -60,9 +60,28 @@ def download(item):
     return tmp.name
 
 
+class NoFunds(RuntimeError):
+    """Deepgram без баланса (402): дальше не идём, чтобы не тратить Apify на записи, которые не расшифруются."""
+
+
+def deepgram_ok():
+    """Проверка перед Apify: полсекунды тишины в Deepgram (стоит доли копейки). 402 → баланса нет."""
+    import io as _io, wave as _wave
+    buf = _io.BytesIO()
+    w = _wave.open(buf, "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000); w.writeframes(bytes(8000)); w.close()
+    try:
+        r = requests.post("https://api.deepgram.com/v1/listen?model=nova-3&language=ru", headers={"Content-Type": "audio/wav", "Authorization": "Token " + DEEPGRAM_TOKEN},
+                          data=buf.getvalue(), timeout=60)
+    except requests.RequestException:
+        return True          # сеть — не повод останавливаться, разберётся основной запрос
+    return r.status_code != 402
+
+
 def transcribe(path):
     with open(path, "rb") as f:
         r = requests.post(DEEPGRAM_URL, headers={"Content-Type": "video/mp4", "Authorization": "Token " + DEEPGRAM_TOKEN}, data=f, timeout=2400)
+    if r.status_code == 402:
+        raise NoFunds("Deepgram: нет баланса (402)")
     r.raise_for_status()
     return r.json()
 
@@ -132,6 +151,8 @@ def zoom_to_text(share_url, passcode, deal=None, source="debrief"):
         return labeled_text(rec) + (False,)
     if not (APIFY_TOKEN and DEEPGRAM_TOKEN):
         raise RuntimeError("нет APIFY_TOKEN / DEEPGRAM_TOKEN")
+    if not deepgram_ok():
+        raise NoFunds("Deepgram: нет баланса (402)")
     path = download(apify_audio(share_url, passcode))
     try:
         rec = compact(transcribe(path))
