@@ -55,7 +55,9 @@
         { name: "Менеджеры", href: "/marketing/influence/managers/", sec: "marketing.influence" },
         { name: "Генератор ссылок", href: "/marketing/influence/links/", sec: "marketing.influence" }
       ] },
-      { name: "YouTube", href: "/marketing/youtube/", sec: "marketing.youtube" },
+      { name: "YouTube", href: "/marketing/youtube/", sec: "marketing.youtube", children: [
+        { name: "Генератор ссылок", href: "/marketing/youtube/links/", sec: "marketing.youtube" }
+      ] },
       { name: "Реклама FB", href: "/marketing/fb/", sec: "marketing.fb" },
       { name: "Чат на сайте", href: "/marketing/sitechat/", sec: "marketing.sitechat" },
       { name: "Сайт", href: "/marketing/site/", sec: "marketing.site", children: [

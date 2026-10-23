@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · YouTube · Генератор ссылок</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.grid{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:1100px){.grid{grid-template-columns:1fr}}
+.f label{display:block;font-size:12px;font-weight:600;color:var(--dim);margin:14px 0 5px}
+.f input[type=text],.f input[type=url]{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.req{font-size:10px;font-weight:700;color:var(--bad);text-transform:uppercase;letter-spacing:.04em;margin-left:6px}
+.hint{font-size:12px;color:var(--dim);margin-top:5px}
+.res{margin-top:10px;padding:11px 13px;border-radius:10px;background:var(--soft)}
+.res .k{font-size:11.5px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin-top:10px}.res .k:first-child{margin-top:0}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+.short{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;font-weight:600;color:var(--ink);word-break:break-all}
+.btn{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:9px;padding:9px 16px;cursor:pointer;background:linear-gradient(135deg,var(--gold-a),var(--gold-b));color:#151616}
+.btn.ghost{background:var(--card);border:1px solid var(--line);color:var(--ink);font-weight:600;padding:5px 11px;font-size:12px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.msg{padding:11px 14px;border-radius:10px;margin:0 0 14px;font-size:13px;word-break:break-word}.msg.ok{background:var(--ok-bg);color:var(--ok)}.msg.bad{background:var(--bad-bg);color:var(--bad)}
+.tabs{display:flex;gap:4px;background:var(--soft);border-radius:12px;padding:4px;margin:0 0 6px}
+.tabs button{flex:1;font:inherit;font-size:14px;font-weight:600;background:none;border:0;color:var(--dim);padding:10px 8px;border-radius:9px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.it{padding:12px 0;border-top:1px solid var(--line)}.it:first-child{border-top:0;padding-top:0}
+.sub{font-size:12px;color:var(--dim);margin-top:3px;word-break:break-word}
+.pill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;background:var(--gold-soft);color:var(--gold);margin-left:6px;vertical-align:1px}
+#q{width:100%;font:inherit;font-size:13px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:9px;padding:7px 10px;margin:0 0 12px}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · YouTube · <b>Генератор ссылок</b></div><h1>Короткие ссылки для YouTube</h1><p class="sub">Как было на Тильде: короткий адрес на нашем домене перекидывает на длинную ссылку. Вводите метку канала — получаете две короткие ссылки: на сайт с utm и на бота. Или сокращаете любую длинную ссылку.</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div id="msgs"></div>
+  <div class="grid">
+    <div class="card">
+      <h2>Новая ссылка</h2>
+      <form class="f" id="f" autocomplete="off">
+        <div class="tabs" role="tablist" aria-label="Что сократить">
+          <button type="button" role="tab" data-mode="channel" aria-selected="true">Канал YouTube</button>
+          <button type="button" role="tab" data-mode="custom" aria-selected="false">Любая ссылка</button>
+        </div>
+
+        <div id="b-channel">
+          <label for="label">Метка канала <span class="req">обязательно</span></label>
+          <input id="label" type="text" maxlength="47" placeholder="StanislavKim1">
+          <div class="hint">Латиница и цифры, без пробелов. Цифра в конце — номер видео или размещения у этого канала: StanislavKim1, StanislavKim2.</div>
+          <div class="res" id="preview">
+            <div class="k">Сайт</div><div class="mono" id="p-site">—</div>
+            <div class="k">Бот</div><div class="mono" id="p-bot">—</div>
+          </div>
+        </div>
+
+        <div id="b-custom" hidden>
+          <label for="url">Длинная ссылка <span class="req">обязательно</span></label>
+          <input id="url" type="url" placeholder="https://…">
+          <label for="code">Короткий код</label>
+          <input id="code" type="text" maxlength="60" placeholder="пусто — придумаем сами">
+          <div class="hint">Латиница, цифры и дефис. Получится <span class="mono" id="p-code">…/yt/код</span></div>
+          <label for="note">Подпись для себя</label>
+          <input id="note" type="text" maxlength="80" placeholder="Для кого и где размещаем">
+        </div>
+
+        <div class="acts"><button class="btn" type="submit" id="save">Создать короткую ссылку</button></div>
+      </form>
+      <div id="made"></div>
+    </div>
+    <div class="card">
+      <h2>Выпущенные ссылки <small id="cnt"></small></h2>
+      <input id="q" type="search" placeholder="Поиск по метке, коду или ссылке" aria-label="Поиск">
+      <div id="list"><p class="note">Загружаю…</p></div>
+      <p class="note">Ссылка начинает работать в течение минуты после создания. Переадресация временная (302): если адрес назначения поменяется, короткую ссылку можно будет перенаправить. Старые короткие ссылки Тильды (gitelman.team/page…html) продолжают работать после переезда сайта.</p>
+    </div>
+  </div>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+(function(){
+var $ = function(id){ return document.getElementById(id); };
+var BOT = 'Pavel_Gitelman_Traning2_bot', BASE = '', ME = '', CAN_EDIT = false, ITEMS = [], MODE = 'channel';
+var KIND = { site: 'сайт', bot: 'бот', custom: 'ссылка' };
+function siteUrl(l){ return 'https://gitelman.team/?utm_source=organic&utm_medium=youtube&utm_campaign=' + l; }
+function botUrl(l){ return 'https://telegram.me/' + BOT + '?start=gitelman_youtube_' + l; }
+function msg(kind, html){ $('msgs').innerHTML = html ? '<div class="msg ' + kind + '">' + html + '</div>' : ''; }
+function api(method, body){ return fetch('/api/short-links', { method: method, credentials: 'same-origin', headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+  .then(function(r){ return r.json().then(function(j){ if (!j.ok) throw new Error(j.error || ('ошибка ' + r.status)); return j; }); }); }
+function copy(btn, v){ var label = btn.textContent; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(function(){ btn.textContent = 'Скопировано'; setTimeout(function(){ btn.textContent = label; }, 1500); }, function(){ window.prompt('Скопируйте', v); }); }
+function dt(s){ return s ? String(s).slice(8,10) + '.' + String(s).slice(5,7) + '.' + String(s).slice(0,4) : ''; }
+function label(){ return $('label').value.trim().replace(/\s+/g, ''); }
+
+function setMode(m){ MODE = m; document.querySelectorAll('.tabs button').forEach(function(b){ b.setAttribute('aria-selected', b.dataset.mode === m ? 'true' : 'false'); });
+  $('b-channel').hidden = m !== 'channel'; $('b-custom').hidden = m !== 'custom'; }
+function preview(){ var l = label(), ok = /^[A-Za-z0-9_]{2,47}$/.test(l);
+  $('p-site').textContent = ok ? siteUrl(l) : '—'; $('p-bot').textContent = ok ? botUrl(l) : (l ? 'только латиница, цифры и «_»' : '—');
+  $('p-code').textContent = BASE + ($('code').value.trim().toLowerCase() || 'код'); }
+
+function card(it){ return '<div class="it"><div class="row"><span class="short">' + esc(it.short) + '</span><span class="pill">' + KIND[it.kind] + '</span>'
+  + '<button class="btn ghost cp" type="button" data-v="' + esc(it.short) + '">Копировать</button>'
+  + ((it.by === ME || CAN_EDIT) ? '<button class="btn ghost del" type="button" data-code="' + esc(it.code) + '">Удалить</button>' : '') + '</div>'
+  + '<div class="sub mono">→ ' + esc(it.url) + '</div><div class="sub">' + esc([it.label, dt(it.at), it.by].filter(Boolean).join(' · ')) + '</div></div>'; }
+function render(){ var q = $('q').value.trim().toLowerCase();
+  var list = ITEMS.filter(function(it){ return !q || (it.code + ' ' + it.url + ' ' + (it.label || '')).toLowerCase().indexOf(q) >= 0; });
+  $('cnt').textContent = ITEMS.length ? ITEMS.length : '';
+  $('list').innerHTML = list.length ? list.map(card).join('') : '<p class="note">' + (ITEMS.length ? 'Ничего не нашлось' : 'Пока ни одной ссылки') + '</p>';
+  bind($('list')); }
+function bind(root){
+  root.querySelectorAll('.cp').forEach(function(b){ b.onclick = function(){ copy(b, b.getAttribute('data-v')); }; });
+  root.querySelectorAll('.del').forEach(function(b){ b.onclick = function(){ var c = b.getAttribute('data-code');
+    if (!window.confirm('Удалить ' + BASE + c + '?\n\nЕсли ссылка уже стоит в описании видео, она перестанет работать.')) return;
+    api('POST', { action: 'del', code: c }).then(function(j){ ITEMS = j.items; render(); }).catch(function(e){ msg('bad', esc(e.message)); }); }; }); }
+
+document.querySelectorAll('.tabs button').forEach(function(b){ b.onclick = function(){ setMode(b.dataset.mode); }; });
+['label', 'code'].forEach(function(id){ $(id).addEventListener('input', preview); });
+$('q').addEventListener('input', render);
+$('f').onsubmit = function(e){ e.preventDefault(); msg('', '');
+  var body = MODE === 'channel' ? { action: 'channel', label: label() } : { action: 'custom', url: $('url').value, code: $('code').value, label: $('note').value };
+  $('save').disabled = true;
+  api('POST', body).then(function(j){ ITEMS = j.items; render();
+    $('made').innerHTML = '<div class="res" style="margin-top:16px">' + j.made.map(function(it){ return '<div class="k">' + KIND[it.kind] + '</div><div class="row"><span class="short">' + esc(it.short) + '</span><button class="btn ghost cp" type="button" data-v="' + esc(it.short) + '">Копировать</button></div><div class="sub mono">→ ' + esc(it.url) + '</div>'; }).join('') + '</div>';
+    bind($('made'));
+    $('label').value = ''; $('url').value = ''; $('code').value = ''; $('note').value = ''; preview();
+  }).catch(function(e){ msg('bad', esc(e.message)); }).then(function(){ $('save').disabled = false; });
+};
+
+api('GET').then(function(j){ BASE = j.base; ME = j.me; CAN_EDIT = j.can_edit; ITEMS = j.items;
+  $('stamp').textContent = 'домен ' + BASE.replace(/^https:\/\//, '').replace(/\/yt\/$/, '');
+  if (!j.can_create) { $('save').disabled = true; msg('bad', 'Выпускать ссылки может только именной пользователь Штаба. Войдите под своим логином.'); }
+  render(); preview();
+}).catch(function(e){ $('list').innerHTML = '<p class="note">Нет доступа: ' + esc(e.message) + '</p>'; $('save').disabled = true; });
+})();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>
