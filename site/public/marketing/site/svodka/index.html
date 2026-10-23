@@ -158,7 +158,7 @@ function kpi(){
       if (!has) return line(LIVE_NAME[key] + " · дочитали", "—", "цели в Метрике ещё нет");
       return line(LIVE_NAME[key] + " · дочитали", fmtPct(pct(rd, v)), "" + rd + " из " + v + " визитов; кликнули на диагностику " + cta + (rd ? " (" + fmtPct(pct(cta, rd)) + " дочитавших)" : ""));
     }
-    if (!goals.some(function(r){ return /\|article_read$/.test(r.dim); })) todo.push("<li><b>Дочитывания и конверсия открывших в дочитавших</b> — цель article_read: код журнала делает тред «ТЗ по целям Метрики», затем цель заводится в настройках счётчиков журнала и потока. Штаб подхватит её сам.</li>");
+    if (!goals.some(function(r){ return /\|article_read$/.test(r.dim); })) todo.push("<li><b>Дочитывания и конверсия открывших в дочитавших</b> — цель article_read: код журнала делает тред «ТЗ по целям Метрики», затем цель заводится в настройках счётчика журнала. Штаб подхватит её сам.</li>");
 
     // 3. поиск: показы, клики, CTR, позиция; запросы в топ-10 (Search Console и Вебмастер, collector/serp.py)
     var serp = res[7].rows || [], snaps = res[8].rows || [];
@@ -171,7 +171,7 @@ function kpi(){
         "CTR: " + cl + " кликов из " + im + " показов" + (im ? ", позиция " + (Math.round(10 * ps / im) / 10).toString().replace(".", ",") : "") + (q ? "; в топ-10 " + (q10 ? q10.value : 0) + " из " + q.value + " запросов" : ""));
     }
     var search = "";
-    [["google", "Google"], ["yandex", "Яндекс"]].forEach(function(e){ ["site", "journal", "potok"].forEach(function(k){ search += serpOf(k, e[0], e[1]); }); });
+    [["google", "Google"], ["yandex", "Яндекс"]].forEach(function(e){ ["site", "journal"].forEach(function(k){ search += serpOf(k, e[0], e[1]); }); });
     var kws = {}; snaps.forEach(function(r){ if (r.metric !== "web.kw") return; var p = r.dim.split("|"); if (!kws[p[1]] || r.value < kws[p[1]]) kws[p[1]] = r.value; });
     var kwn = Object.keys(kws).length, kw10 = Object.keys(kws).filter(function(q){ return kws[q] <= 10; }).length;
     if (kwn) search += line("Ключевые запросы", kw10 + " из " + kwn, "в топ-10 Google или Яндекса (список — collector/keywords.txt)");
@@ -191,9 +191,9 @@ function kpi(){
       return '<div class="mo">' + MN[+k.slice(5) - 1] + (cur ? " (идёт)" : "") + "<b>" + (stale ? "—" : s + t) + "</b>" + (stale ? "нет данных amo" : "сайт " + s + " · канал " + t) + "</div>";
     }).join("");
     box.innerHTML = '<h2>Ключевые показатели <small>последние 28 дней, ' + dmy(from) + "–" + dmy(to) + "</small></h2>"
-      + '<div class="kgrid"><div><h3>Статьи</h3>' + artOf("journal") + artOf("potok") + "</div>"
-      + "<div><h3>Связка сайт + Telegram + Instagram</h3>" + bundle("site") + bundle("journal") + bundle("potok") + "</div>"
-      + "<div><h3>Посетители статей и дочитывания</h3>" + ["journal", "potok"].map(function(k){ return line(LIVE_NAME[k], visits(k), "визитов за 28 дней"); }).join("") + readOf("journal") + readOf("potok") + "</div></div>"
+      + '<div class="kgrid"><div><h3>Статьи</h3>' + artOf("journal") + "</div>"
+      + "<div><h3>Связка сайт + Telegram + Instagram</h3>" + bundle("site") + bundle("journal") + "</div>"
+      + "<div><h3>Посетители статей и дочитывания</h3>" + ["journal"].map(function(k){ return line(LIVE_NAME[k], visits(k), "визитов за 28 дней"); }).join("") + readOf("journal") + "</div></div>"
       + (search ? '<div class="kgrid one"><div><h3>Поиск: клики на заголовок и позиции</h3>' + search + "</div></div>" : "")
       + '<div class="goal"><b>Вызов: ' + SALES_GOAL + " продаж в месяц с сайта и телеграм-канала.</b> Продажи — сделки с чеком по источнику «Сайт» и «Телеграм канал» в amo." + '<div class="gm">' + goal + "</div></div>"
       + (todo.length ? '<div class="knot"><h3>Пока не считаем — что нужно</h3><ul>' + todo.join("") + "</ul></div>" : "");
@@ -202,8 +202,8 @@ function kpi(){
 // живые цифры из витрины Штаба: Метрика (collector/metrika.py, ключи площадок в секрете METRIKA_COUNTERS) и лиды amo
 var LIVE = [
   { name: "Лендинг", key: "site", tag: "tilda" },
-  { name: "Журнал", key: "journal", tag: "журнал", since: "2026-09-19" },   // свой счётчик журнала шлёт хиты только с 19.09
-  { name: "Поток", key: "potok", utm: "potok" }
+  { name: "Журнал", key: "journal", tag: "журнал", since: "2026-09-19" }   // свой счётчик журнала шлёт хиты только с 19.09
+  // поток заморожен 23.10.2026 — не показываем; вернуть: { name: "Поток", key: "potok", utm: "potok" }
 ];
 var LIVE_NAME = { site: "Лендинг", journal: "Журнал", potok: "Поток" };
 function pts(q){ return fetch("/api/points?" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }).catch(function(){ return { ok: false, rows: [] }; }); }
@@ -261,7 +261,7 @@ function live(){
       + (off.some(function(f){ return f; }) ? '<p class="note">Без сравнения с прошлыми 28 днями: ' + LIVE.map(function(x, i){ return off[i] ? x.name.toLowerCase() + " (данные с " + (off[i] === "—" ? "—" : dmy(new Date(off[i] + "T00:00:00"))) + ")" : ""; }).filter(Boolean).join(", ") + ' — прошлый период покрыт не целиком.</p>' : "")
       + (lag ? '<p class="warn"><b>Лиды отстают.</b> В витрине лиды из amo есть только по ' + (lastLead ? dmy(lTo) : "—") + ': выгрузка amo в таблицу «маркетинг» не обновлялась. Конверсия посчитана по визитам до этой даты, сравнение лидов скрыто.</p>' : "")
       + adsNote(ads, tot, from, to, pFrom, pTo, partial)
-      + '<p class="note">Обновляется каждую ночь. Визиты — Яндекс Метрика; лиды — amo: лендинг по тегу tilda, журнал по тегу «журнал», поток по utm_source=potok. Подробно по площадкам — в пунктах «Сайт gitelman.team» и «Журнал».</p>';
+      + '<p class="note">Обновляется каждую ночь. Визиты — Яндекс Метрика; лиды — amo: лендинг по тегу tilda, журнал по тегу «журнал». Поток на паузе с 23.10.2026 и не считается. Подробно по площадкам — в пунктах «Сайт gitelman.team» и «Журнал».</p>';
   });
 }
 </script>

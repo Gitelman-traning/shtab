@@ -18,7 +18,10 @@ import time
 import requests
 
 API = "https://api-metrika.yandex.net/stat/v1/data"
-DEFAULT_COUNTERS = {"potok": 111555446}   # potok.gitelman.team
+DEFAULT_COUNTERS = {}
+# Площадки на паузе: не собираем, даже если остались в секрете. Поток заморожен 23.10.2026 (Никита);
+# счётчик 111555446 не удалён — разморозить = убрать отсюда и вернуть {"potok": 111555446} в DEFAULT_COUNTERS.
+FROZEN = {"potok"}
 DEFAULT_FILTERS = {"site": "ym:s:startURLDomain=='gitelman.team'"}
 # JS-цели (reachGoal), которые забираем в витрину. Номер цели не нужен: ищем её в настройках счётчика по идентификатору.
 GOALS = ["article_read", "article_cta_click", "lead_form_start", "lead_success"]
@@ -68,6 +71,8 @@ def metrika_points(day_from, day_to, log=print):
     filters = dict(DEFAULT_FILTERS, **json.loads(os.environ.get("METRIKA_FILTERS", "").strip() or "{}"))
     points = []
     for key, cid in counters.items():
+        if key in FROZEN:
+            continue
         try:
             points.extend(_counter_points(token, key, cid, day_from, day_to, log, filters.get(key, "")))
         except Exception as e:      # один недоступный счётчик не роняет остальные
