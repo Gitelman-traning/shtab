@@ -16,10 +16,9 @@ import { json, bad, canRead, level, audit, now } from "./_lib.js";
 
 const SECTION = "marketing.youtube";
 const KEY = "shortlinks";
-// Домен коротких ссылок. До переключения DNS gitelman.team на свой хостинг — журнал
-// (то же приложение, что и стенд в Нидерландах). После переключения поменять на
-// https://gitelman.team: старые ссылки журнала продолжат работать, маршрут не зависит от домена.
-const BASE = "https://journal.gitelman.team";
+// Домен коротких ссылок — gitelman.team (с 24.10.2026 на своём хостинге в Нидерландах).
+// Маршрут /yt/ не зависит от домена: работает и на journal.gitelman.team.
+const BASE = "https://gitelman.team";
 const PREFIX = "/yt/";
 const BOT = "Pavel_Gitelman_Traning2_bot";
 const BOT_PREFIX = "gitelman_youtube_";
