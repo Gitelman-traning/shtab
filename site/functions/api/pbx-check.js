@@ -4,7 +4,7 @@
 // GET  /api/pbx-check?mode=bytes&n=N  — N случайных байт (до 2 МБ) для замера скорости загрузки.
 // POST /api/pbx-check?mode=sink       — принимает тело и отвечает размером (замер скорости отдачи).
 // GET  /api/pbx-check?mode=whoami     — какой адрес и провайдера видит Cloudflare, и отвечает ли АТС из облака.
-// POST /api/pbx-check {name, verdict, summary, details} — сохранить результат в журнал.
+// POST /api/pbx-check {name, verdict, summary, details[, via:"journal", ip, ua]} — сохранить результат в журнал.
 import { json, bad, now, canRead, level } from "./_lib.js";
 
 const PBX = "pbx20965.onpbx.ru";
@@ -60,9 +60,14 @@ export async function onRequestPost({ request, env }) {
   const s = (v, n) => String(v == null ? "" : v).slice(0, n);
   const verdict = ["ok", "warn", "bad"].includes(d.verdict) ? d.verdict : "warn";
   const details = s(typeof d.details === "string" ? d.details : JSON.stringify(d.details || {}), 30000);
+  // с журнала (journal.gitelman.team/pbx/ — вход для тех, у кого не открывается Cloudflare) запрос пересылает сервер журнала:
+  // адрес и браузер сотрудника он передаёт в теле, иначе в журнал попал бы сервер Timeweb
+  const relay = d.via === "journal";
+  const ip = relay ? s(d.ip, 60) : request.headers.get("CF-Connecting-IP") || "";
+  const where = relay ? "через журнал" : place(request);
   await env.DB.prepare(TABLE).run();
   await env.DB.prepare("INSERT INTO pbx_checks (at, name, verdict, summary, details, ip, place, ua) VALUES (?,?,?,?,?,?,?,?)")
-    .bind(now(), s(d.name, 80).trim(), verdict, s(d.summary, 500), details, request.headers.get("CF-Connecting-IP") || "", place(request), s(request.headers.get("User-Agent"), 300))
+    .bind(now(), s(d.name, 80).trim(), verdict, s(d.summary, 500), details, ip, where, s(d.ua || request.headers.get("User-Agent"), 300))
     .run();
   return json({ ok: true });
 }

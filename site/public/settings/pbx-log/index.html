@@ -59,6 +59,7 @@ function detailsHtml(r) {
   return [
     line("Браузер", esc(`${b.name || "—"} ${b.ver || ""}, ${b.os || ""}, пояс ${b.tz || "—"}`)),
     line("Сеть", esc(`${r.place || "—"}, адрес ${r.ip || "—"}; задержка до Штаба ${n.ping ?? "—"} мс ±${n.jitter ?? "—"}, потери ${n.lost ?? "—"}/10, загрузка ${n.down ?? "—"} / отдача ${n.up ?? "—"} Мбит/с`)),
+    d.cf ? line("Штаб (Cloudflare)", esc(d.cf.ok ? "открывается" : "не открывается")) : "",
     line("Сервер АТС", esc(p.times && p.times.length ? `отвечает, ${p.ping} мс, без ответа ${p.fails} из 4` : "недоступен") + (p.cloud && p.cloud.web ? esc(` (из облака: ${p.cloud.web.ok ? "отвечает" : "нет"})`) : "")),
     line("WebRTC (WSS)", esc(lw.open ? `открыто за ${lw.openMs} мс, SIP: ${lw.sipStatus || "нет ответа"}${lw.sip && lw.sip.length ? ", " + median(lw.sip) + " мс" : ""}` : `не открылось (код ${lw.closeCode || "—"})`)),
     line("UDP / STUN", esc(i.ips && i.ips.length ? `внешний адрес ${i.ips.join(", ")}${i.symmetric ? ", NAT строгого типа" : ""}${i.vpn ? ", похоже на VPN" : ""}` : "не проходит")),

@@ -19,6 +19,10 @@ try { $("name").value = localStorage.getItem("pbxcheck.name") || ""; } catch (e)
 // в Штабе со входом (Первая линия) подставляем имя из профиля
 if (!$("name").value && window.PBX_ME) fetch("/api/me").then((r) => r.ok ? r.json() : null).then((d) => { if (d && d.user && d.user.name && !$("name").value) $("name").value = d.user.name; }).catch(() => {});
 
+// Адрес API: в Штабе — /api/pbx-check; на журнале (российский вход, если Cloudflare недоступен) — /pbx/api.
+const API = window.PBX_API || "/api/pbx-check";
+const SHTAB = "https://shtab-20v.pages.dev";
+
 // ---------- шаги проверки ----------
 const STEPS = [
   ["browser", "Браузер"],
@@ -28,6 +32,8 @@ const STEPS = [
   ["ice", "Прохождение голоса (UDP / STUN)"],
   ["mic", "Микрофон"],
 ];
+// с журнала проверяем ещё, открывается ли у сотрудника Штаб (Cloudflare)
+if (window.PBX_SHTAB_PROBE) STEPS.splice(2, 0, ["cf", "Доступ к Штабу (Cloudflare)"]);
 let R = {};
 function drawSteps() {
   $("steps").innerHTML = STEPS.map(([id, title]) =>
@@ -66,7 +72,7 @@ async function checkBrowser() {
   const missing = Object.entries({ "WebRTC": feats.webrtc, "доступ к микрофону": feats.media, "WebSocket": feats.ws }).filter(([, v]) => !v).map(([k]) => k);
   const txt = `<b>${esc(b.name)} ${b.ver || ""}</b>, ${esc(b.os)} · часовой пояс ${esc(R.browser.tz)}`;
   const old = (b.name === "Chrome" || b.name === "Edge" || b.name === "Яндекс Браузер") ? b.ver && b.ver < 110 : b.name === "Firefox" ? b.ver < 110 : b.name === "Safari" ? b.ver < 16 : false;
-  if (missing.length) return setStep("browser", "bad", txt + ` · нет: ${missing.join(", ")}`, "Браузер не умеет звонить. Откройте Штаб в Google Chrome последней версии."), "bad";
+  if (missing.length) return setStep("browser", "bad", txt + ` · нет: ${missing.join(", ")}`, "Браузер не умеет звонить. Откройте эту страницу в Google Chrome последней версии."), "bad";
   if (b.name === "Safari" || b.name === "Firefox" || b.name === "Неизвестный")
     return setStep("browser", "warn", txt, "Телефония лучше всего работает в Google Chrome. Если звонки сбоят, попробуйте его."), "warn";
   if (old) return setStep("browser", "warn", txt + " · версия устарела", "Обновите браузер: меню → Справка → О браузере."), "warn";
@@ -79,25 +85,25 @@ async function checkNet() {
   const pings = [];
   for (let i = 0; i < 10; i++) {
     const t = performance.now();
-    try { await fetch("/api/pbx-check?mode=ping&r=" + Math.random(), { cache: "no-store" }); pings.push(Math.round(performance.now() - t)); } catch (e) {}
+    try { await fetch(API + "?mode=ping&r=" + Math.random(), { cache: "no-store" }); pings.push(Math.round(performance.now() - t)); } catch (e) {}
   }
   let down = 0, up = 0;
   try {
-    const t = performance.now(); const r = await fetch("/api/pbx-check?mode=bytes&n=2000000&r=" + Math.random(), { cache: "no-store" });
+    const t = performance.now(); const r = await fetch(API + "?mode=bytes&n=2000000&r=" + Math.random(), { cache: "no-store" });
     const b = await r.arrayBuffer(); down = +(b.byteLength * 8 / ((performance.now() - t) / 1000) / 1e6).toFixed(1);
   } catch (e) {}
   try {
     const body = new Uint8Array(1000000); const t = performance.now();
-    await fetch("/api/pbx-check?mode=sink", { method: "POST", body }); up = +(8 / ((performance.now() - t) / 1000)).toFixed(1);
+    await fetch(API + "?mode=sink", { method: "POST", body }); up = +(8 / ((performance.now() - t) / 1000)).toFixed(1);
   } catch (e) {}
   let who = {};
-  try { who = await (await fetch("/api/pbx-check?mode=whoami", { cache: "no-store" })).json(); } catch (e) {}
+  try { who = await (await fetch(API + "?mode=whoami", { cache: "no-store" })).json(); } catch (e) {}
   const c = navigator.connection || {};
   const p = pings.slice(1);  // первый запрос — с установкой соединения
   R.net = { online: true, ping: median(p), jitter: Math.round(jitter(p)), lost: 10 - pings.length, down, up, type: c.effectiveType || "", saveData: !!c.saveData, ip: who.ip || "", place: who.place || "", colo: who.colo || "", cloudPbx: who.pbx || null };
-  const txt = `Задержка до Штаба <b>${R.net.ping} мс</b> (разброс ±${R.net.jitter}) · загрузка <b>${down} Мбит/с</b> · отдача <b>${up} Мбит/с</b>` +
+  const txt = `Задержка до сервера проверки <b>${R.net.ping} мс</b> (разброс ±${R.net.jitter}) · загрузка <b>${down} Мбит/с</b> · отдача <b>${up} Мбит/с</b>` +
     (R.net.place ? ` · ${esc(R.net.place)}` : "");
-  if (!pings.length) return setStep("net", "bad", "Штаб не отвечает", "Похоже, интернет не работает или его режет VPN/антивирус."), "bad";
+  if (!pings.length) return setStep("net", "bad", "Сервер проверки не отвечает", "Похоже, интернет не работает или его режет VPN/антивирус."), "bad";
   const problems = [];
   if (R.net.ping > 150) problems.push("большая задержка");
   if (R.net.jitter > 30) problems.push("нестабильная задержка");
@@ -106,6 +112,20 @@ async function checkNet() {
   if (down && down < 2) problems.push("медленная загрузка");
   if (problems.length) return setStep("net", "warn", txt + ` · ${problems.join(", ")}`, "Интернет нестабильный: голос может прерываться или пропадать. Подключите компьютер к роутеру кабелем или сядьте ближе к Wi‑Fi, выключите загрузки и видео на время звонков."), "warn";
   setStep("net", "ok", txt); return "ok";
+}
+
+// ---------- Штаб на Cloudflare (только на журнале) ----------
+async function checkShtab() {
+  const t = performance.now();
+  let ok = false;
+  try {
+    await Promise.race([fetch(SHTAB + "/favicon-32.png?r=" + Math.random(), { mode: "no-cors", cache: "no-store" }), sleep(7000).then(() => { throw new Error("timeout"); })]);
+    ok = true;
+  } catch (e) {}
+  R.cf = { ok, ms: Math.round(performance.now() - t) };
+  if (!ok) return setStep("cf", "warn", "Штаб (shtab-20v.pages.dev) у вас не открывается",
+    "Ваш провайдер ограничивает Cloudflare, на котором работает Штаб. На саму АТС это напрямую не влияет, но часть сервисов тоже может не открываться. Помогает другой интернет (например, раздача с телефона) или обращение к провайдеру."), "warn";
+  setStep("cf", "ok", `Штаб открывается, ${R.cf.ms} мс`); return "ok";
 }
 
 // ---------- 3. сервер АТС по HTTPS ----------
@@ -120,7 +140,7 @@ async function checkPbx() {
   }
   const cloud = R.net && R.net.cloudPbx;
   R.pbx = { times, fails, cloud };
-  const cloudTxt = cloud && cloud.web ? ` · из облака Штаба АТС ${cloud.web.ok ? "отвечает" : "не отвечает"}` : "";
+  const cloudTxt = cloud && cloud.web ? ` · с нашего сервера АТС ${cloud.web.ok ? "отвечает" : "не отвечает"}` : "";
   if (!times.length) return setStep("pbx", "bad", `${PBX} недоступен из вашего браузера${cloudTxt}`,
     "Компьютер не может достучаться до АТС. Частые причины: VPN, антивирус или «защита сети» у провайдера. Выключите VPN и проверьте ещё раз; если не поможет, перезагрузите роутер."), "bad";
   const p = median(times.slice(1).length ? times.slice(1) : times);
@@ -274,6 +294,7 @@ const RANK = { ok: 0, warn: 1, bad: 2 };
 function summaryLine(st) {
   const n = R.net || {}, mark = (k) => ({ ok: "✓", warn: "!", bad: "✕" }[st[k]] || "·");
   return [
+    st.cf ? `Штаб ${mark("cf")}` : "",
     `АТС ${mark("pbx")}${R.pbx && R.pbx.ping ? " " + R.pbx.ping + " мс" : ""}`,
     `WebRTC ${mark("wss")}`, `UDP ${mark("ice")}`, `микрофон ${mark("mic")}`,
     n.ping != null ? `интернет ${mark("net")} ${n.ping}±${n.jitter} мс, ${n.down}/${n.up} Мбит/с` : `интернет ${mark("net")}`,
@@ -300,6 +321,7 @@ $("go").onclick = async () => {
   const run = async (id, fn) => { setStep(id, "run", "Проверяю…"); try { st[id] = await fn(); } catch (e) { st[id] = "warn"; setStep(id, "warn", "Проверка не удалась: " + esc(e.message || e)); } };
   await run("browser", checkBrowser);
   await run("net", checkNet);
+  if (window.PBX_SHTAB_PROBE) await run("cf", checkShtab);
   await run("pbx", checkPbx);
   await run("wss", checkWss);
   await run("ice", checkIce);
@@ -314,10 +336,12 @@ $("go").onclick = async () => {
     STEPS.map(([id, t]) => `${{ ok: "✓", warn: "!", bad: "✕" }[st[id]] || "·"} ${t}: ${$("s-" + id).querySelector(".d").textContent}`).join("\n");
   $("tools").style.display = "flex";
   $("go").disabled = false; $("go").textContent = "Проверить ещё раз";
+  let saved = false;
   try {
-    await fetch("/api/pbx-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, verdict: v, summary, details: R }) });
+    const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, verdict: v, summary, details: R }) });
+    saved = r.ok;
   } catch (e) {}
-  $("copied").textContent = "Результат сохранён";
+  $("copied").textContent = saved ? "Результат сохранён" : "Сохранить результат не удалось — нажмите «Скопировать отчёт» и пришлите его руководителю";
 };
 
 $("beep").onclick = () => {
