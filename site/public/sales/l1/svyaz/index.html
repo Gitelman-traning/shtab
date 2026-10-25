@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Первая линия · Проверка связи</title>
+<!-- Копия /pbx-check для Первой линии (25.10.2026): та же проверка из /pbx-check.js, результат в тот же журнал (Настройки → Журнал проверок АТС). -->
+<link rel="stylesheet" href="/ui.css">
+<link rel="stylesheet" href="/pbx-check.css">
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Отдел продаж · Первая линия · <b>Проверка связи</b></div><h1>Проверка связи с АТС</h1><p class="sub">Интернет, сервер АТС, голосовое соединение и микрофон — около 20 секунд. Перед проверкой закройте вкладку с телефоном, если микрофон занят</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+</header>
+<main>
+  <div class="card pbx" style="max-width:860px">
+    <div class="row">
+      <input type="text" id="name" placeholder="Ваше имя и фамилия" maxlength="80" autocomplete="name" aria-label="Имя">
+      <button class="main" id="go">Проверить соединение с АТС</button>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <ul class="steps" id="steps"></ul>
+    <div class="row tools" id="tools">
+      <button id="beep">Проверить динамики</button>
+      <button id="copy">Скопировать отчёт</button>
+      <span class="muted" id="copied"></span>
+    </div>
+  </div>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>window.PBX_ME = true;</script>
+<script src="/pbx-check.js"></script>
+<script src="/nav.js"></script>
+</body>
+</html>

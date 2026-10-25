@@ -152,6 +152,7 @@ export function sectionOf(pathname) {
   if (p === "/tags") return "tags";
   if (p === "/budget") return "budget";
   if (p.startsWith("/settings/dashboard")) return "dashboard";
+  if (p.startsWith("/settings/pbx-log")) return "users";   // журнал проверок АТС — тем, кто управляет пользователями
   return null;
 }
 

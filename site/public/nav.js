@@ -30,7 +30,8 @@
       { name: "Сводка отдела", href: "/sales/", sec: "sales" },
       { name: "Первая линия", href: "/sales/l1/", sec: "sales.l1", children: [
         { name: "Менеджеры", href: "/sales/l1/managers", sec: "sales.l1" },
-        { name: "Окна на день", href: "/sales/l1/okno/", sec: "sales.l1" }
+        { name: "Окна на день", href: "/sales/l1/okno/", sec: "sales.l1" },
+        { name: "Проверка связи", href: "/sales/l1/svyaz/", sec: "sales.l1" }
       ] },
       { name: "Вторая линия", href: "/sales/l2/", sec: "sales.l2", children: [
         { name: "Встречи", href: "/sales/l2/meetings", sec: "sales.l2.okk" },
@@ -81,7 +82,8 @@
       { name: "Пользователи", href: "/users", icon: I.users, admin: true, sec: "users" },
       { name: "Теги", href: "/tags", icon: I.tag, admin: true, sec: "tags" },
       { name: "Бюджет и расходы", href: "/budget", icon: I.coin, admin: true, sec: "budget" },
-      { name: "Дашборд проектов", href: "/settings/dashboard/", icon: I.hub, admin: true, sec: "dashboard" }
+      { name: "Дашборд проектов", href: "/settings/dashboard/", icon: I.hub, admin: true, sec: "dashboard" },
+      { name: "Журнал проверок АТС", href: "/settings/pbx-log/", icon: I.db, admin: true, sec: "users" }
     ] }
   ];
 
