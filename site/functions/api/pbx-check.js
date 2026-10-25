@@ -60,11 +60,11 @@ export async function onRequestPost({ request, env }) {
   const s = (v, n) => String(v == null ? "" : v).slice(0, n);
   const verdict = ["ok", "warn", "bad"].includes(d.verdict) ? d.verdict : "warn";
   const details = s(typeof d.details === "string" ? d.details : JSON.stringify(d.details || {}), 30000);
-  // с журнала (journal.gitelman.team/pbx/ — вход для тех, у кого не открывается Cloudflare) запрос пересылает сервер журнала:
+  // с gitelman.team/pbx/ (вход для тех, у кого не открывается Cloudflare; приложение репо journal) запрос пересылает тот сервер:
   // адрес и браузер сотрудника он передаёт в теле, иначе в журнал попал бы сервер Timeweb
   const relay = d.via === "journal";
   const ip = relay ? s(d.ip, 60) : request.headers.get("CF-Connecting-IP") || "";
-  const where = relay ? "через журнал" : place(request);
+  const where = relay ? "через gitelman.team" : place(request);
   await env.DB.prepare(TABLE).run();
   await env.DB.prepare("INSERT INTO pbx_checks (at, name, verdict, summary, details, ip, place, ua) VALUES (?,?,?,?,?,?,?,?)")
     .bind(now(), s(d.name, 80).trim(), verdict, s(d.summary, 500), details, ip, where, s(d.ua || request.headers.get("User-Agent"), 300))

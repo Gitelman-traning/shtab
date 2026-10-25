@@ -19,7 +19,7 @@ try { $("name").value = localStorage.getItem("pbxcheck.name") || ""; } catch (e)
 // в Штабе со входом (Первая линия) подставляем имя из профиля
 if (!$("name").value && window.PBX_ME) fetch("/api/me").then((r) => r.ok ? r.json() : null).then((d) => { if (d && d.user && d.user.name && !$("name").value) $("name").value = d.user.name; }).catch(() => {});
 
-// Адрес API: в Штабе — /api/pbx-check; на журнале (российский вход, если Cloudflare недоступен) — /pbx/api.
+// Адрес API: в Штабе — /api/pbx-check; на gitelman.team/pbx/ (если у сотрудника не открывается Cloudflare) — /pbx/api.
 const API = window.PBX_API || "/api/pbx-check";
 const SHTAB = "https://shtab-20v.pages.dev";
 
@@ -32,7 +32,7 @@ const STEPS = [
   ["ice", "Прохождение голоса (UDP / STUN)"],
   ["mic", "Микрофон"],
 ];
-// с журнала проверяем ещё, открывается ли у сотрудника Штаб (Cloudflare)
+// с gitelman.team проверяем ещё, открывается ли у сотрудника Штаб (Cloudflare)
 if (window.PBX_SHTAB_PROBE) STEPS.splice(2, 0, ["cf", "Доступ к Штабу (Cloudflare)"]);
 let R = {};
 function drawSteps() {
@@ -114,7 +114,7 @@ async function checkNet() {
   setStep("net", "ok", txt); return "ok";
 }
 
-// ---------- Штаб на Cloudflare (только на журнале) ----------
+// ---------- Штаб на Cloudflare (только на gitelman.team) ----------
 async function checkShtab() {
   const t = performance.now();
   let ok = false;
