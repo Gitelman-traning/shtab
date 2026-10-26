@@ -1,0 +1,36 @@
+name: YouTube deals
+
+# Маркетинг → YouTube → Сделки и выручка: YouTube-сделки и оплаты Второй линии из amo (только чтение) → yt_leads / yt_paid.
+# Ночью — сделки, изменённые за 3 дня; вручную можно перезалить всё (mode=full, ~25 минут).
+on:
+  schedule:
+    - cron: '30 2 * * *'     # 05:30 МСК
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'inc = changed in last N days, full = all deals since 2025-07-26'
+        required: false
+        default: 'inc'
+      days:
+        description: 'Days back for inc mode'
+        required: false
+        default: '3'
+
+jobs:
+  youtube:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests
+      - run: python collector/youtube.py
+        env:
+          AMO_TOKEN: ${{ secrets.AMO_TOKEN }}
+          AMO_TOKEN_REPORTS: ${{ secrets.AMO_TOKEN_REPORTS }}
+          SHTAB_URL: ${{ secrets.SHTAB_URL }}
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
+          MODE: ${{ inputs.mode || 'inc' }}
+          DAYS: ${{ inputs.days || '3' }}

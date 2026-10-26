@@ -59,7 +59,8 @@
         { name: "Генератор ссылок", href: "/marketing/influence/links/", sec: "marketing.influence" }
       ] },
       { name: "YouTube", href: "/marketing/youtube/", sec: "marketing.youtube", children: [
-        { name: "Генератор ссылок", href: "/marketing/youtube/links/", sec: "marketing.youtube" }
+        { name: "Генератор ссылок", href: "/marketing/youtube/links/", sec: "marketing.youtube" },
+        { name: "Сделки и выручка", href: "/marketing/youtube/deals/", sec: "marketing.youtube.deals" }
       ] },
       { name: "Реклама FB", href: "/marketing/fb/", sec: "marketing.fb" },
       { name: "Чат на сайте", href: "/marketing/sitechat/", sec: "marketing.sitechat" },
