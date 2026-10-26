@@ -11,7 +11,7 @@ const CORE = "https://tg-bots-core.gitelmanteam.workers.dev";
 const WRITE = new Set(["materials", "material-file", "polls", "delete",
   "broadcasts", "broadcasts/count", "broadcasts/test", "broadcasts/start", "broadcasts/stop", "broadcasts/resume",
   "templates", "templates/preview", "launches", "launch-circle", "launch-circle-request", "broadcast-photo", "bot-buttons"]);
-const READ = new Set(["materials", "polls", "lists", "bots", "broadcasts", "templates", "launches"]);
+const READ = new Set(["materials", "polls", "lists", "bots", "broadcasts", "templates", "launches", "analytics"]);
 
 async function forward(request, env, path, user) {
   const url = new URL(request.url);

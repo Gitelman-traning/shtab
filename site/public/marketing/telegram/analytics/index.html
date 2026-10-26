@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Телеграм-канал · Аналитика материалов</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.flt{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.flt label{display:block;font-size:11.5px;font-weight:600;color:var(--dim);margin-bottom:4px}
+.flt input,.flt select{width:100%;font:inherit;font-size:13px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:9px;padding:7px 9px}
+.acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 0}
+.btn{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:9px;padding:8px 14px;cursor:pointer;background:linear-gradient(135deg,var(--gold-a),var(--gold-b));color:#151616;text-decoration:none}
+.btn.ghost{background:var(--card);border:1px solid var(--line);color:var(--ink);font-weight:600}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.tabs button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--card);color:var(--dim);border-radius:8px;padding:5px 10px;cursor:pointer}
+.tabs button[aria-pressed=true]{color:var(--ink);border-color:var(--gold-b);font-weight:600}
+.wrap{overflow-x:auto}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}td{white-space:nowrap}th{white-space:normal;vertical-align:bottom;min-width:56px}
+td.lbl{white-space:normal;max-width:260px}td .p{color:var(--dim);font-size:11.5px;margin-left:4px}
+tr.tot td{font-weight:600;border-top:2px solid var(--line)}
+.msg{padding:11px 14px;border-radius:10px;margin:0 0 14px;font-size:13px}.msg.bad{background:var(--bad-bg);color:var(--bad)}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · Телеграм-канал · <b>Аналитика материалов</b></div><h1>Аналитика материалов</h1><p class="sub">Кто забрал материал, прошёл квалификацию, получил приглашение и стал лидом highpriority; кто ответил на опрос «Прочитали?». Считается по журналу ботов с 26.10.2026, история до переезда — в Salebot и старых таблицах.</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div id="msgs"></div>
+  <div class="card">
+    <form class="flt" id="flt" autocomplete="off">
+      <div><label>Забрали с</label><input name="from" type="date"></div>
+      <div><label>по</label><input name="to" type="date"></div>
+      <div><label>Бот</label><select name="bot" id="bot"><option value="">все боевые</option></select></div>
+    </form>
+    <div class="acts"><button class="btn" id="apply" type="button">Показать</button><button class="btn ghost" id="csv" type="button">⬇ CSV этой вкладки</button></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="tabs" id="tabs">
+      <button type="button" data-t="funnel" aria-pressed="true">Воронка</button>
+      <button type="button" data-t="qual" aria-pressed="false">Квалификация</button>
+      <button type="button" data-t="poll" aria-pressed="false">Опрос</button>
+      <button type="button" data-t="base" aria-pressed="false">База</button>
+    </div>
+    <div class="wrap" id="out"><p class="empty">загрузка…</p></div>
+    <p class="note" id="note"></p>
+  </div>
+  <footer>Данные — журнал ядра ботов (tg-bots-core, таблица events). «Впервые в боте» — человек зашёл в этого бота впервые этой ссылкой; остальные — повторно. Лид — сделка amo, заведённая номером или кнопкой «Да, пришлите детали» после выдачи. CSV открывается в Google Таблицах: Файл → Импорт.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var A = "/api/tgbots-admin/", data = null, tab = "funnel";
+var TEAM = ["НЕ КВАЛ. Собственник до 5 чел. в команде", "Собственник 6-20 чел. в команде", "Собственник 21-60 чел. в команде", "Собственник 61-300 чел. в команде", "Собственник 301-1000 чел. в команде", "Собственник больше 1000 чел. в команде"];
+var TURN = ["Не квал. Собственник оборот до $400 тыс.", "Собственник оборот $400 тыс. - $1,3 млн", "Собственник оборот $1,3 - $9 млн.", "Собственник оборот от $9 млн."];
+var READ = ["1. Не открывал", "2. Прочитал по диагонали", "3. Начал читать, не дочитал", "4. Прочитал внимательно"];
+var HOW = ["5. Не понял как применить", "6. Применимо частично", "7. Класс! Иду применять"];
+var SEG = { hot: "горячий", mid: "средний", no: "не ЦА" };
+
+function n(x){ return (x || 0).toLocaleString("ru-RU"); }
+function pc(a, b){ return b ? Math.round(100 * a / b) + "%" : "—"; }
+function ymd(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function dt(ms){ var t = new Date(ms); return dmy(t) + "." + t.getFullYear() + " " + String(t.getHours()).padStart(2,"0") + ":" + String(t.getMinutes()).padStart(2,"0"); }
+function err(m){ document.getElementById("msgs").innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; }
+
+// Каждая вкладка — заголовок и строки значений; одна и та же модель для таблицы и CSV.
+function sum(rows, f){ return rows.reduce(function(s, r){ return s + f(r); }, 0); }
+function total(rows){
+  var t = { material: "ИТОГО", title: "", tags: "", team: [0,0,0,0,0,0], turn: [0,0,0,0], read: [0,0,0,0], how: [0,0,0] };
+  ["took","first","repeat","qual","qual_first","owner","not_owner","top_qual","hot","mid","no","offer","hot_request","hp_leads","reviews","reviews_repeat","leads"].forEach(function(k){ t[k] = sum(rows, function(r){ return r[k]; }); });
+  ["team","turn","read","how"].forEach(function(k){ t[k] = t[k].map(function(_, i){ return sum(rows, function(r){ return r[k][i]; }); }); });
+  return t;
+}
+function cell(v, of){ return { v: v, p: of === undefined ? null : pc(v, of) }; }
+function model(){
+  var rows = data.rows, all = rows.length > 1 ? rows.concat([total(rows)]) : rows;
+  if (tab === "funnel") return {
+    head: ["Материал", "Забрали", "Впервые в боте", "Прошли квал", "Горячие", "Приглашение", "Нажали «детали»", "Лиды highpriority", "Повторно в боте", "Ответили на опрос", "«Класс! Иду применять»", "Все лиды после выдачи"],
+    rows: all.map(function(r){ return [r.material, cell(r.took), cell(r.first, r.took), cell(r.qual_first, r.first), cell(r.hot, r.qual), cell(r.offer, r.hot), cell(r.hot_request, r.offer), cell(r.hp_leads, r.hot_request), cell(r.repeat, r.took), cell(r.reviews_repeat, r.repeat), cell(r.how[2], r.reviews), cell(r.leads, r.took)]; }),
+    note: "Ветка новых: забрали → впервые в боте → прошли квалификацию → горячие → приглашение → нажали → лид highpriority. Ветка повторных: повторно в боте → ответили на опрос. Процент — от предыдущего шага; «Класс!» — от всех ответивших, лиды — от забравших."
+  };
+  if (tab === "qual") return {
+    head: ["Тег материала", "Подписались на бота по тегу", "Прошли квал (чел)", "Список Собственник", "Список НЕ собственник"].concat(TEAM, TURN, ["ТОП менеджер. Квал", "Горячие", "Средние", "Не ЦА", "Приглашение highpriority", "Лиды highpriority"]),
+    rows: all.map(function(r){ return [r.material, cell(r.took), cell(r.qual, r.took), cell(r.owner, r.qual), cell(r.not_owner, r.qual)]
+      .concat(r.team.map(function(x){ return cell(x, r.qual); }), r.turn.map(function(x){ return cell(x, r.qual); }),
+        [cell(r.top_qual, r.qual), cell(r.hot, r.qual), cell(r.mid, r.qual), cell(r.no, r.qual), cell(r.offer, r.hot), cell(r.hp_leads, r.offer)]); }),
+    note: "Как вкладка «ТЕГ МАТЕРИАЛА» в «Анализ блока квалификации»: доли — от прошедших квалификацию по этому материалу. Квалификацию проходят те, о ком ещё ничего не знаем; остальные получают файл сразу."
+  };
+  if (tab === "poll") return {
+    head: ["тег", "Забрали ЛМ (всего) Нажали ПОЛУЧИТЬ", "CV в отзыв", "Всего отзывов"].concat(READ, ["ИТОГО, сколько прочитали (п. 2, 3, 4)"], HOW, ["Всего лидов с материала", "CV в лид от забравших"]),
+    rows: all.map(function(r){ var readSum = r.read[1] + r.read[2] + r.read[3];
+      return [r.material, cell(r.took), pc(r.reviews, r.took), cell(r.reviews)].concat(r.read.map(function(x){ return cell(x, r.reviews); }), [cell(readSum)], r.how.map(function(x){ return cell(x, readSum); }), [cell(r.leads), pc(r.leads, r.took)]); }),
+    note: "Как вкладка «ПРИМЕР 2 (новый опрос)» в «Материалы Гительман стата»: п. 1–4 — доля от всех отзывов, п. 5–7 — от прочитавших. Опрос приходит через 5 минут после файла."
+  };
+  return {
+    head: ["Дата", "Имя", "Юзернейм", "Бот", "Материал", "Метка", "Впервые в боте", "Телефон", "Собственник", "Команда", "Оборот", "Роль", "Оборот (ТОП)", "В подчинении", "Сегмент", "Приглашение", "Нажал «детали»", "Прочитали?", "Как вам?", "Сделка"],
+    rows: data.base.map(function(b){ return [dt(b.at), b.name || "", b.username || "", b.bot, b.material, b.tag || "", b.first ? "да" : "нет", b.phone ? "+" + b.phone : "", b.owner || "", b.team || "", b.turnover || "", b.role || "", b.turnover_top || "", b.reports || "", SEG[b.segment] || "", b.offer ? "да" : "", b.hot_request ? "да" : "", b.read || "", b.how || "", b.lead || ""]; }),
+    note: "Строка — человек × материал (первое нажатие в периоде). Как вкладки «база» в старых таблицах."
+  };
+}
+function render(){
+  if (!data) return;
+  var m = model(), out = document.getElementById("out");
+  document.getElementById("note").textContent = m.note;
+  if (!m.rows.length) { out.innerHTML = '<p class="empty">за период никто не забирал материалы</p>'; return; }
+  out.innerHTML = '<table><thead><tr>' + m.head.map(function(h, i){ return '<th' + (i && tab !== "base" ? ' class="num"' : '') + '>' + esc(h) + '</th>'; }).join("") + '</tr></thead><tbody>'
+    + m.rows.map(function(r){ return '<tr' + (r[0] === "ИТОГО" ? ' class="tot"' : '') + '>' + r.map(function(c, i){
+        if (i === 0) return '<td class="lbl">' + esc(c) + '</td>';
+        if (c && typeof c === "object") return '<td class="num">' + n(c.v) + (c.p ? '<span class="p">' + c.p + '</span>' : '') + '</td>';
+        if (tab === "base" && i === 19 && c) return '<td><a href="https://pavelgitelman.amocrm.ru/leads/detail/' + esc(c) + '" target="_blank" rel="noopener">' + esc(c) + '</a></td>';
+        return '<td' + (tab === "base" ? '' : ' class="num"') + '>' + esc(c) + '</td>'; }).join("") + '</tr>'; }).join("")
+    + '</tbody></table>';
+}
+// CSV в раскладке старых таблиц: у долей — две колонки «доля» и «кол-во».
+function csv(){
+  if (!data) return;
+  var m = model(), sep = ";";
+  var q = function(v){ v = String(v == null ? "" : v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  var wide = m.rows.length && m.rows[0].map(function(c){ return c && typeof c === "object" && c.p; });
+  var head = [], sub = [];
+  m.head.forEach(function(h, i){ if (wide && wide[i]) { head.push(h, ""); sub.push("доля", "кол-во"); } else { head.push(h); sub.push(""); } });
+  var lines = [head.map(q).join(sep)];
+  if (sub.some(Boolean)) lines.push(sub.join(sep));
+  m.rows.forEach(function(r){ var line = [];
+    r.forEach(function(c, i){ if (c && typeof c === "object") { if (wide && wide[i]) line.push(c.p === "—" ? "" : c.p, c.v); else line.push(c.v); } else line.push(c); });
+    lines.push(line.map(q).join(sep)); });
+  var f = document.getElementById("flt");
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
+  a.download = "materials-" + tab + "-" + f.from.value + "_" + f.to.value + ".csv";
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function load(){
+  var f = document.getElementById("flt"), p = new URLSearchParams();
+  ["from","to","bot"].forEach(function(k){ if (f[k].value) p.set(k, f[k].value); });
+  document.getElementById("out").innerHTML = '<p class="empty">загрузка…</p>';
+  fetch(A + "analytics?" + p, { credentials: "same-origin" }).then(function(r){ return r.json(); }).then(function(j){
+    if (j.error || !j.rows) { err(j.error || "нет доступа"); document.getElementById("out").innerHTML = ""; return; }
+    document.getElementById("msgs").innerHTML = "";
+    data = j;
+    document.getElementById("stamp").textContent = "забрали " + n(sum(j.rows, function(r){ return r.took; })) + " · материалов " + n(j.rows.length);
+    render();
+  }).catch(function(){ err("не удалось загрузить"); });
+}
+
+(function init(){
+  var f = document.getElementById("flt"), t = new Date();
+  f.from.value = ymd(addDays(t, -29)); f.to.value = ymd(t);
+  fetch(A + "bots", { credentials: "same-origin" }).then(function(r){ return r.json(); }).then(function(j){
+    (j.rows || j.bots || []).forEach(function(b){ var o = document.createElement("option"); o.value = b.key; o.textContent = (b.title || b.key) + " (@" + b.key + ")"; document.getElementById("bot").appendChild(o); });
+  }).catch(function(){});
+  document.getElementById("apply").onclick = load;
+  f.onsubmit = function(e){ e.preventDefault(); load(); };
+  document.getElementById("csv").onclick = csv;
+  document.querySelectorAll("#tabs button").forEach(function(b){ b.onclick = function(){ tab = b.dataset.t; document.querySelectorAll("#tabs button").forEach(function(x){ x.setAttribute("aria-pressed", x === b ? "true" : "false"); }); render(); }; });
+  load();
+})();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>
