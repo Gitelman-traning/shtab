@@ -3,7 +3,8 @@
 """
 YouTube-сделки из amo → Штаб (Маркетинг → YouTube → Сделки и выручка), таблицы yt_leads и yt_paid (schema38.sql).
 
-YouTube-сделка — поле «Источник» (1439087) = YouTube или SHORTS Youtube, сделка создана с 26.07.2025.
+YouTube-сделка — поле «Источник» (1439087) = YouTube или SHORTS Youtube, либо utm_source / utm_medium содержит youtube
+(переход с YouTube на сайт и заявка там), сделка создана с 26.07.2025.
 Фильтра по полю у amo v4 нет, поэтому листаем сделки и отбираем сами (только GET):
   MODE=inc  (ночью)   — сделки, изменённые за последние DAYS дней (по умолчанию 3): новые, сменившие этап или источник;
                         сделки, у которых источник больше не YouTube, удаляются из витрины;
@@ -93,13 +94,16 @@ def main_contact(l):
 def yt_row(l):
     """сделка amo → строка yt_leads, или None, если источник не YouTube"""
     cf = {c["field_id"]: c.get("values") or [] for c in l.get("custom_fields_values") or []}
+    utm = {k: "; ".join(str(v.get("value") or "").strip() for v in cf.get(fid, []) if str(v.get("value") or "").strip())[:120]
+           for fid, k in F_UTM.items()}
     src = next((YT_ENUMS[v.get("enum_id")] for v in cf.get(F_SRC, []) if v.get("enum_id") in YT_ENUMS), None)
+    # переход с YouTube на сайт и заявка там — тоже YouTube (решение Никиты 26.10): utm_source или utm_medium = youtube
+    if not src:
+        src = next(("utm_" + k[4:] for k in ("utm_source", "utm_medium") if "youtube" in utm[k].lower()), None)
     if not src:
         return None
     r = {"id": l["id"], "created_at": l["created_at"], "closed_at": l.get("closed_at"), "pipeline_id": l["pipeline_id"],
-         "status_id": l["status_id"], "price": int(l.get("price") or 0), "contact_id": main_contact(l), "src": src}
-    for fid, k in F_UTM.items():
-        r[k] = "; ".join(str(v.get("value") or "").strip() for v in cf.get(fid, []) if str(v.get("value") or "").strip())[:120]
+         "status_id": l["status_id"], "price": int(l.get("price") or 0), "contact_id": main_contact(l), "src": src, **utm}
     tags = [t.get("name") or "" for t in (l.get("_embedded") or {}).get("tags") or []]
     # номер канала Wazzup — номер компании, не клиента; телефонов клиентов в витрине нет
     r["channel"] = next((t for t in tags if t.startswith("WZ")), "")[:120]

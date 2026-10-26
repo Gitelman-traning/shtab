@@ -32,7 +32,7 @@ table.yt .bl{border-left:1px solid var(--line)}
 <aside class="side" id="side"></aside>
 <div class="pane">
 <header>
-  <div><div class="crumbs">Маркетинг · YouTube · <b>Сделки и выручка</b></div><h1>YouTube: сделки и выручка</h1><p class="sub">Сделки amo с источником YouTube: сколько пришло, сколько дошло до встречи и сколько оплатило. Данные с 26.07.2025, обновляются ночью.</p></div>
+  <div><div class="crumbs">Маркетинг · YouTube · <b>Сделки и выручка</b></div><h1>YouTube: сделки и выручка</h1><p class="sub">Сделки amo из YouTube: сколько пришло, сколько дошло до встречи и сколько оплатило. Данные с 26.07.2025, обновляются ночью.<br>YouTube-сделка — поле «Источник» = YouTube или SHORTS Youtube, либо метка utm_source / utm_medium = youtube (перешёл с YouTube на сайт и оставил заявку).</p></div>
   <div class="spacer"></div>
   <div class="themer" role="group" aria-label="Тема оформления">
     <button type="button" data-set="auto" aria-pressed="true">Авто</button>
@@ -113,7 +113,7 @@ function render(){
   $("stamp").textContent = D.updated ? "обновлено " + D.updated.slice(8, 10) + "." + D.updated.slice(5, 7) + " " + D.updated.slice(11, 16) + " UTC" : "ещё не собиралось";
 }
 var TIPS = {
-  leads: "Сделки amo с полем «Источник» = YouTube (или SHORTS Youtube), созданные в этом месяце. Один человек с несколькими сделками считается несколько раз — как в amo.",
+  leads: "Сделки amo с полем «Источник» = YouTube (или SHORTS Youtube) или с меткой utm_source / utm_medium = youtube, созданные в этом месяце. Один человек с несколькими сделками считается несколько раз — как в amo.",
   meetings: "Из YouTube-сделок Первой линии — перешедшие в «Встреча проведена». Месяц — когда сделка туда перешла.",
   paid: "YouTube-сделки Второй линии в «100% оплаты получено (Фин блок)» и сумма их бюджета. Месяц — когда сделка туда перешла.",
   cpaid: "Все оплаченные сделки Второй линии, у контакта которых есть хоть одна YouTube-сделка, даже если сама оплаченная сделка размечена другим источником. Прямые оплаты входят сюда же. Кампания и выпуск — от первой YouTube-сделки контакта."

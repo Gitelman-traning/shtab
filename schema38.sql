@@ -1,5 +1,6 @@
 -- Штаб, миграция 38 (26.10.2026): Маркетинг → YouTube → Сделки и выручка.
--- YouTube-сделка = поле «Источник» (1439087) = YouTube (enum 1218221) или SHORTS Youtube (1229449), созданная с 26.07.2025.
+-- YouTube-сделка = поле «Источник» (1439087) = YouTube (enum 1218221) или SHORTS Youtube (1229449), либо utm_source / utm_medium
+-- содержит youtube (переход с YouTube на сайт), созданная с 26.07.2025.
 -- Наполняет collector/youtube.py (youtube.yml): ночью — сделки, изменённые за 3 дня, вручную mode=full — все с 26.07.2025.
 -- Оплаты Второй линии (9701010 и архивная 8733518, статус 142) хранятся все, а не только YouTube: страница сама считает
 -- «оплаты через контакт» — оплаченные сделки, у контакта которых есть хоть одна YouTube-сделка.
@@ -14,7 +15,7 @@ CREATE TABLE IF NOT EXISTS yt_leads (
   status_id    INTEGER NOT NULL,
   price        INTEGER NOT NULL DEFAULT 0,
   contact_id   INTEGER,                          -- основной контакт
-  src          TEXT NOT NULL DEFAULT 'YouTube',  -- YouTube | SHORTS Youtube
+  src          TEXT NOT NULL DEFAULT 'YouTube',  -- YouTube | SHORTS Youtube (поле «Источник») | utm_source | utm_medium
   utm_source   TEXT NOT NULL DEFAULT '',
   utm_medium   TEXT NOT NULL DEFAULT '',
   utm_campaign TEXT NOT NULL DEFAULT '',
