@@ -71,7 +71,8 @@ async function checkBrowser() {
   R.browser = { ...b, ...feats, lang: navigator.language, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, cores: navigator.hardwareConcurrency || 0, memory: navigator.deviceMemory || 0 };
   const missing = Object.entries({ "WebRTC": feats.webrtc, "доступ к микрофону": feats.media, "WebSocket": feats.ws }).filter(([, v]) => !v).map(([k]) => k);
   const txt = `<b>${esc(b.name)} ${b.ver || ""}</b>, ${esc(b.os)} · часовой пояс ${esc(R.browser.tz)}`;
-  const old = (b.name === "Chrome" || b.name === "Edge" || b.name === "Яндекс Браузер") ? b.ver && b.ver < 110 : b.name === "Firefox" ? b.ver < 110 : b.name === "Safari" ? b.ver < 16 : false;
+  // у Яндекс Браузера своя нумерация (25.x, 26.x), у Chrome и Edge — 100+
+  const old = b.name === "Яндекс Браузер" ? b.ver && b.ver < 24 : (b.name === "Chrome" || b.name === "Edge") ? b.ver && b.ver < 110 : b.name === "Firefox" ? b.ver < 110 : b.name === "Safari" ? b.ver < 16 : false;
   if (missing.length) return setStep("browser", "bad", txt + ` · нет: ${missing.join(", ")}`, "Браузер не умеет звонить. Откройте эту страницу в Google Chrome последней версии."), "bad";
   if (b.name === "Safari" || b.name === "Firefox" || b.name === "Неизвестный")
     return setStep("browser", "warn", txt, "Телефония лучше всего работает в Google Chrome. Если звонки сбоят, попробуйте его."), "warn";
@@ -193,8 +194,8 @@ async function checkWss() {
   if (!res.open) return setStep("wss", "bad", `Не удалось открыть защищённое соединение с ${PBX}:8082`,
     "Именно через это соединение браузерный телефон регистрируется на АТС. Его часто блокируют VPN, антивирус (Касперский, ESET, Avast — «проверка защищённых соединений») или роутер. Выключите VPN и проверку HTTPS в антивирусе, затем проверьте ещё раз."), "bad";
   const sipMs = median(R.wss.tried.at(-1).sip);
-  const txt = `Соединение открыто за <b>${res.openMs} мс</b>` + (res.sip.length ? ` · АТС отвечает на SIP (${esc(res.sipStatus)}), <b>${sipMs} мс</b>` : " · АТС не ответила на SIP‑запрос");
-  if (!res.sip.length) return setStep("wss", "warn", txt, "Соединение есть, но АТС молчит. Если у коллег здесь же стоит зелёная галочка, причина на вашей стороне: VPN, антивирус или сеть."), "warn";
+  // на служебный запрос OPTIONS АТС не отвечает и рабочим компьютерам (сверка 26.10.2026) — не предупреждаем
+  const txt = `Соединение открыто за <b>${res.openMs} мс</b>` + (res.sip.length ? ` · АТС отвечает на SIP (${esc(res.sipStatus)}), <b>${sipMs} мс</b>` : "");
   setStep("wss", "ok", txt); return "ok";
 }
 
@@ -229,11 +230,9 @@ async function checkIce() {
   R.ice = { res, ips, symmetric, vpn: !!vpn };
   if (!ok.length) return setStep("ice", "bad", "UDP наружу не проходит: STUN‑серверы не ответили",
     "Голос по UDP не пройдёт: звонок соединится, но будет тишина или звонок сорвётся. Обычно это файрвол антивируса, VPN или настройки роутера. Выключите VPN и файрвол антивируса и проверьте ещё раз."), "bad";
-  const txt = `Внешний адрес для голоса <b>${esc(ips.join(", "))}</b>, ответ STUN за ${median(ok.map((r) => r.ms))} мс` + (symmetric ? " · NAT строгого типа" : "") + (vpn ? ` · отличается от адреса сайта (${esc(R.net.ip)})` : "");
-  const hints = [];
-  if (symmetric) hints.push("Роутер меняет порты для каждого соединения (симметричный NAT). Из‑за этого бывает односторонняя слышимость. Помогает перезагрузка роутера или включение UPnP в его настройках.");
-  if (vpn) hints.push("Голос и сайты идут разными путями: похоже, включён VPN или прокси. Выключите его на время работы.");
-  if (hints.length) return setStep("ice", "warn", txt, hints.join(" ")), "warn";
+  // строгий NAT и разные адреса бывают и на рабочих компьютерах (сверка 26.10.2026) — показываем, но не считаем сбоем
+  const txt = `Внешний адрес для голоса <b>${esc(ips.join(", "))}</b>, ответ STUN за ${median(ok.map((r) => r.ms))} мс` + (symmetric ? " · NAT строгого типа" : "") +
+    (vpn ? ` · отличается от адреса сайта (${esc(R.net.ip)}): VPN, прокси или два канала интернета` : "");
   setStep("ice", "ok", txt); return "ok";
 }
 
@@ -285,7 +284,7 @@ async function checkMic() {
   const db = peak > 0 ? Math.round(20 * Math.log10(peak)) : -100;
   R.mic.peakDb = db; R.mic.muted = track.muted;
   const txt = `<b>${esc(track.label || "Микрофон")}</b> · громкость до ${db} дБ · микрофонов в системе: ${R.mic.inputs}, динамиков: ${R.mic.outputs}`;
-  if (db < -55) return setStep("mic", "warn", txt + " · звука почти нет", "Микрофон подключён, но молчит. Проверьте кнопку выключения на гарнитуре и громкость микрофона в Windows (Параметры → Система → Звук → Ввод). Если микрофонов несколько, выберите нужный в настройках сайта (значок замка → Настройки сайта) или в Windows."), "warn";
+  if (db < -50) return setStep("mic", "bad", txt + " · звука почти нет", "Микрофон подключён, но молчит (у работающего микрофона громкость при разговоре от −35 дБ и выше). Проверьте кнопку выключения на гарнитуре и громкость микрофона в Windows (Параметры → Система → Звук → Ввод). Если микрофонов несколько, выберите нужный в настройках сайта (значок замка → Настройки сайта) или в Windows."), "bad";
   setStep("mic", "ok", txt); return "ok";
 }
 
@@ -312,7 +311,7 @@ function verdictText(v, st) {
 let lastReport = "";
 $("go").onclick = async () => {
   const name = $("name").value.trim();
-  if (!name) { $("name").focus(); $("name").placeholder = "Сначала напишите имя"; return; }
+  if ((name.match(/[A-Za-zА-Яа-яЁё]/g) || []).length < 2) { $("name").value = ""; $("name").focus(); $("name").placeholder = "Сначала напишите имя и фамилию"; return; }
   try { localStorage.setItem("pbxcheck.name", name); } catch (e) {}
   $("go").disabled = true; $("go").textContent = "Проверяю…";
   $("verdict").style.display = "none"; $("tools").style.display = "none";
