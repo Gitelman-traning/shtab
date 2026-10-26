@@ -34,7 +34,7 @@
 .goal{background:var(--soft);border-radius:12px;padding:12px 14px;margin-top:16px;font-size:13px}.goal .gm{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .goal .mo{background:var(--card);border-radius:9px;padding:7px 10px;font-size:12px;min-width:92px}.goal .mo b{display:block;font-size:18px;font-weight:600}
 .beh .bgrid{display:grid;grid-template-columns:1fr 1fr;gap:28px}@media(max-width:900px){.beh .bgrid{grid-template-columns:1fr}}
-.beh h3{margin:0 0 10px;font-size:14px;font-weight:600}.beh h4{margin:14px 0 4px;font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.beh h3{margin:0 0 10px;font-size:14px;font-weight:600}.beh h3 small{font-weight:400;color:var(--dim);font-size:12px;margin-left:4px}.beh h4{margin:14px 0 4px;font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
 .beh ol.fx.td{list-style:decimal;padding-left:20px}.beh .td li{padding-left:2px}
 .beh .blive{background:var(--soft);border-radius:10px;padding:9px 12px;font-size:12.5px;margin:-4px 0 10px}.beh .blive b{font-weight:600}
 .beh .bfreq{margin:16px 0 0;font-size:12.5px;color:var(--dim)}.beh .bfreq b{color:var(--ink);font-weight:600}
@@ -123,9 +123,9 @@ function render(s, date){
 // отчёт metrics/landing/povedenie-logi-2026-10-23.md). Разбор логов — раз в месяц, при повторе обновить BEH;
 // строка «с 19.10 по целям» у журнала считается каждую ночь из web.goal.
 var BEH = {
-  period: "21.09–20.10", next: "около 20.11, через 3 недели после переезда лендинга",
+  next: "в конце ноября: у лендинга через 3 недели после переезда, у журнала через месяц после кнопки на телефоне",
   sites: [
-    { name: "Лендинг gitelman.team",
+    { name: "Лендинг gitelman.team", period: "21.09–20.10",
       steps: [["Открыли лендинг", 1135], ["Открыли форму", 183], ["Отправили заявку", 48]],
       finds: [
         "Главный обрыв — первый экран: 84% не нажимают ни одну кнопку, 42% визитов короче 15 секунд, форму открывают в среднем на 46-й секунде.",
@@ -141,21 +141,22 @@ var BEH = {
         ["Сократить выбор ниши в форме: «Другое» выбирает каждый третий, 26 отдельных форм можно свести к одной."]
       ],
       note: "Считали по людям. Сверка с amo: 48 заявок в логах против 47 сделок с тегом tilda." },
-    { name: "Журнал", live: true,
-      steps: [["Пришли в журнал", 667], ["Перешли на лендинг", 55], ["Оставили заявку на лендинге", 4]],
+    { name: "Журнал", live: true, period: "24.09–23.10",
+      steps: [["Открыли журнал", 723], ["Открыли статью", 657], ["Пошли к тренингу", 36], ["Оставили заявку", 3]],
       finds: [
-        "78% заходов прямые, это анонсы в Телеграме. Из поиска 10%: Яндекс 59 визитов, Google 40.",
-        "Входы по статьям: Лебедев 347, Бухкалов 117, Острягина 98. У Острягиной 34 входа из поиска, это лучшая поисковая статья.",
-        "Заявка через форму журнала (тег «журнал») за период одна.",
-        "В счётчик пишет и локальная разработка (localhost:3111), это мусор в данных."
+        "Главный обрыв — от статьи к действию: к тренингу идут 5,5% открывших статью. До конца дочитывает каждый четвёртый, а кнопки стоят в середине и в конце.",
+        "Телефон отстаёт от ПК в 2,8 раза: к тренингу идут 2,9% против 8,2%, при этом с телефона читают 73%.",
+        "Поиск ведёт к тренингу лучше анонсов: 13% против 3,3%. Главные поисковые статьи — Острягина и Baden Land.",
+        "Все 3 заявки оставлены на лендинге. Форма журнала заявок не принесла: цель lead_success не сработала ни разу, в amo с тегом «журнал» 1 сделка.",
+        "В счётчик пишут локальная разработка (localhost) и один робот."
       ],
       todo: [
-        ["Растить поиск: выпускать обычные SEO-статьи по ключевым запросам и обновлять статьи, которые уже приходят из поиска (Острягина, Baden Land)."],
-        ["Поднять кнопку заявки выше в тексте статьи: пока её почти не нажимают."],
-        ["Сделать тестовую заявку с ?lf_test=1, чтобы проверить цель lead_success и сделку в amo."],
-        ["Отфильтровать localhost в счётчике 111291594."]
+        ["На телефоне закреплённая внизу кнопка «Пройти диагностику», появляется после трети статьи. Цель — с 2,9% до 5% и выше.", "wait", "делаем"],
+        ["Сделать тестовую заявку с ?lf_test=1, чтобы убедиться, что заявки из формы журнала не теряются."],
+        ["Растить поиск: обычные SEO-статьи по ключевым запросам и обновление Острягиной и Baden Land."],
+        ["Отфильтровать localhost и робота в счётчике 111291594."]
       ],
-      note: "Строка «по целям» обновляется каждую ночь, остальное — из разбора логов." }
+      note: "Считали по людям. События статьи (дочитал, кнопка, форма) пишутся только с 19.10, их пока мало. Строка «по целям» обновляется каждую ночь." }
   ]
 };
 function behSite(st) {
@@ -166,11 +167,11 @@ function behSite(st) {
   }).join("");
   var fx = st.finds.map(function (f) { return '<li>' + f + '</li>'; }).join("");
   var td = st.todo.map(function (t) { return '<li>' + t[0] + (t[1] ? '<span class="tag ' + t[1] + '">' + t[2] + '</span>' : '') + '</li>'; }).join("");
-  return '<div class="bsite"><h3>' + st.name + '</h3><div class="fn">' + fn + '</div>' + (st.live ? '<div class="blive" id="beh-live">По целям Метрики с 19.10: загрузка…</div>' : '')
+  return '<div class="bsite"><h3>' + st.name + (st.period ? ' <small>' + st.period + '</small>' : '') + '</h3><div class="fn">' + fn + '</div>' + (st.live ? '<div class="blive" id="beh-live">По целям Метрики с 19.10: загрузка…</div>' : '')
     + '<ul class="fx">' + fx + '</ul><h4>Что предлагаем</h4><ol class="fx td">' + td + '</ol><p class="empty" style="margin:10px 0 0">' + st.note + '</p></div>';
 }
 function behBox() {
-  return '<div class="card beh"><h2>Что делают посетители <small>разбор логов Метрики · ' + BEH.period + '</small></h2>'
+  return '<div class="card beh"><h2>Что делают посетители <small>разбор логов Метрики за 30 дней, по людям</small></h2>'
     + '<div class="bgrid">' + BEH.sites.map(behSite).join("") + '</div>'
     + '<p class="bfreq"><b>Как часто обновляем.</b> Строка «по целям» у журнала — каждую ночь вместе со сбором Метрики. Полный разбор логов по обоим сайтам — раз в месяц, следующий ' + BEH.next + '.</p></div>';
 }
