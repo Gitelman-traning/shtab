@@ -24,6 +24,24 @@ table.yt .bl{border-left:1px solid var(--line)}
 .src{font-size:11.5px;color:var(--dim);margin-top:2px}
 .z{color:var(--faint)}
 .tip{border-bottom:1px dashed currentColor;cursor:pointer}
+.clk{cursor:pointer;border-bottom:1px dotted var(--faint)}.clk:hover,.clk:focus{color:var(--gold);border-bottom-color:var(--gold);outline:none}
+.kpi .clk{border-bottom-width:2px}
+.mdl{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px 16px}
+.mdl[hidden]{display:none}
+.mdl .box{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;width:100%;max-width:980px;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.mdl .hd{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--line)}
+.mdl .hd h3{margin:0;font-size:15px;flex:1}.mdl .hd .sub{font-size:12px;color:var(--dim);font-weight:400;margin-top:3px}
+.mdl .x{font:inherit;font-size:20px;line-height:1;background:none;border:0;color:var(--dim);cursor:pointer;padding:2px 6px}
+.mdl .bd{overflow:auto;padding:4px 16px 14px}
+.mdl table{width:100%;border-collapse:collapse;font-size:12.5px}
+.mdl th{font-size:11px;font-weight:600;color:var(--dim);text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;background:var(--card)}
+.mdl td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.mdl td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.mdl a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--line)}.mdl a:hover{color:var(--gold);border-bottom-color:var(--gold)}
+.mdl .dim{color:var(--dim);font-size:11.5px}
+.badge{display:inline-block;font-size:10.5px;font-weight:600;border-radius:6px;padding:1px 6px;background:var(--gold-soft);color:var(--ink)}
+.badge.warn{background:var(--bad-bg);color:var(--bad)}
+@media (max-width:640px){.mdl{padding:0}.mdl .box{max-height:100vh;height:100%;border-radius:0}.mdl .hide-m{display:none}}
 #tipbox{position:fixed;z-index:50;max-width:320px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;font-weight:400;line-height:1.45;text-align:left;white-space:normal;box-shadow:0 6px 24px rgba(0,0,0,.18)}
 </style>
 </head>
@@ -52,6 +70,7 @@ table.yt .bl{border-left:1px solid var(--line)}
     <div class="rng"><span>с</span><select id="from"></select><span>по</span><select id="to"></select></div>
   </div>
   <div class="kpis" id="kpis"></div>
+  <p class="note" style="margin:-4px 0 12px">Нажмите на любую цифру — откроется список сделок или контактов за ней со ссылками в amo.</p>
   <div class="card">
     <h2>По месяцам</h2>
     <div class="tw"><table class="yt" id="t-month"></table></div>
@@ -69,6 +88,12 @@ table.yt .bl{border-left:1px solid var(--line)}
 </main>
 </div>
 </div>
+<div class="mdl" id="mdl" hidden role="dialog" aria-modal="true" aria-labelledby="mdl-t">
+  <div class="box">
+    <div class="hd"><div style="flex:1"><h3 id="mdl-t"></h3><div class="sub" id="mdl-s"></div></div><button type="button" class="x" id="mdl-x" aria-label="Закрыть">×</button></div>
+    <div class="bd" id="mdl-b"></div>
+  </div>
+</div>
 <script src="/ui.js"></script>
 <script>
 var D = null, MONTHS = [];
@@ -84,17 +109,27 @@ function head(first){
     + '<th colspan="2" class="grp bl"><span class="tip" data-k="paid">Оплаты сделки</span></th><th colspan="2" class="grp bl"><span class="tip" data-k="cpaid">Оплаты через контакт</span></th></tr>'
     + '<tr><th class="num bl">шт.</th><th class="num">выручка</th><th class="num bl">шт.</th><th class="num">выручка</th></tr></thead>';
 }
-function cells(r){ return '<td class="num">' + n(r.leads) + '</td><td class="num">' + n(r.meetings) + '</td><td class="num bl">' + n(r.paid) + '</td><td class="num">' + rub(r.revenue) + '</td><td class="num bl">' + n(r.cpaid) + '</td><td class="num">' + rub(r.crevenue) + '</td>'; }
-function table(id, first, rows, label){
+// цифра, по клику — список записей за ней (окно); m — показатель списка, tb/k — таблица и строка
+function clk(html, v, m, tb, k, title){ return v ? '<span class="clk" role="button" tabindex="0" data-m="' + m + '" data-t="' + tb + '" data-k="' + esc(k) + '" data-title="' + esc(title) + '">' + html + '</span>' : html; }
+function cells(r, tb, k, title){
+  return '<td class="num">' + clk(n(r.leads), r.leads, "leads", tb, k, "Лиды · " + title) + '</td><td class="num">' + clk(n(r.meetings), r.meetings, "meetings", tb, k, "Встречи · " + title) + '</td>'
+    + '<td class="num bl">' + clk(n(r.paid), r.paid, "paid", tb, k, "Оплаты сделки · " + title) + '</td><td class="num">' + clk(rub(r.revenue), r.paid, "paid", tb, k, "Оплаты сделки · " + title) + '</td>'
+    + '<td class="num bl">' + clk(n(r.cpaid), r.cpaid, "cpaid", tb, k, "Оплаты через контакт · " + title) + '</td><td class="num">' + clk(rub(r.crevenue), r.cpaid, "cpaid", tb, k, "Оплаты через контакт · " + title) + '</td>';
+}
+function table(id, first, rows, label, tb, keyOf, titleOf){
   var t = D.total;
-  $(id).innerHTML = head(first) + '<tbody>' + (rows.length ? rows.map(function(r){ return '<tr><td>' + label(r) + '</td>' + cells(r) + '</tr>'; }).join("") : '<tr><td colspan="7" class="empty">за этот период данных нет</td></tr>') + '</tbody>'
-    + (rows.length ? '<tfoot><tr><td>Итого</td>' + cells(t) + '</tr></tfoot>' : '');
+  $(id).innerHTML = head(first) + '<tbody>' + (rows.length ? rows.map(function(r){ return '<tr><td>' + label(r) + '</td>' + cells(r, tb, keyOf(r), titleOf(r)) + '</tr>'; }).join("") : '<tr><td colspan="7" class="empty">за этот период данных нет</td></tr>') + '</tbody>'
+    + (rows.length ? '<tfoot><tr><td>Итого</td>' + cells(t, "total", "", "за период") + '</tr></tfoot>' : '');
 }
 function opts(sel, val){ return MONTHS.map(function(m){ return '<option value="' + m + '"' + (m === val ? ' selected' : '') + '>' + mname(m) + '</option>'; }).join(""); }
-function load(){
+function periodQ(){
   var q = [], f = $("from").value, t = $("to").value;
   if (f && f !== MONTHS[MONTHS.length - 1]) q.push("from=" + f);
   if (t && t !== MONTHS[0]) q.push("to=" + t);
+  return q;
+}
+function load(){
+  var q = periodQ();
   return fetch("/api/youtube" + (q.length ? "?" + q.join("&") : ""), { credentials: "same-origin" }).then(function(r){ return r.json(); }).then(function(d){
     if (!d.ok) { $("t-month").innerHTML = '<tbody><tr><td class="empty">' + esc(d.error || "нет доступа") + '</td></tr></tbody>'; return; }
     D = d;
@@ -106,10 +141,11 @@ function render(){
   var t = D.total;
   $("kpis").innerHTML = [["YouTube-лиды", cnum(t.leads), "", "leads"], ["Встречи проведены", cnum(t.meetings), t.leads ? fmtPct(pct(t.meetings, t.leads)) + " от лидов" : "", "meetings"],
     ["Оплаты сделки", cnum(t.paid), t.revenue ? cnum(t.revenue) + " ₽" : "", "paid"], ["Оплаты через контакт", cnum(t.cpaid), t.crevenue ? cnum(t.crevenue) + " ₽" : "", "cpaid"]]
-    .map(function(k){ return '<div class="kpi"><span class="nm"><span class="tip" data-k="' + k[3] + '">' + k[0] + '</span></span><span class="v">' + k[1] + (k[2] ? ' <span class="plan">' + k[2] + '</span>' : '') + '</span></div>'; }).join("");
-  table("t-month", "Месяц", D.rows, function(r){ return mname(r.month); });
-  table("t-camp", "Кампания", D.campaigns, function(r){ return esc(CAMP[r.key] || r.key) + (r.sources && r.sources.length ? '<div class="src">utm_source: ' + esc(r.sources.join(", ")) + '</div>' : ''); });
-  table("t-cont", "Выпуск", D.contents, function(r){ return esc(r.key); });
+    .map(function(k){ return '<div class="kpi"><span class="nm"><span class="tip" data-k="' + k[3] + '">' + k[0] + '</span></span><span class="v">' + clk(k[1], t[k[3]], k[3], "total", "", k[0] + " · за период") + (k[2] ? ' <span class="plan">' + k[2] + '</span>' : '') + '</span></div>'; }).join("");
+  var key = function(r){ return r.key; };
+  table("t-month", "Месяц", D.rows, function(r){ return mname(r.month); }, "month", function(r){ return r.month; }, function(r){ return mname(r.month); });
+  table("t-camp", "Кампания", D.campaigns, function(r){ return esc(CAMP[r.key] || r.key) + (r.sources && r.sources.length ? '<div class="src">utm_source: ' + esc(r.sources.join(", ")) + '</div>' : ''); }, "camp", key, function(r){ return "кампания " + r.key; });
+  table("t-cont", "Выпуск", D.contents, function(r){ return esc(r.key); }, "cont", key, function(r){ return "выпуск " + r.key; });
   $("stamp").textContent = D.updated ? "обновлено " + D.updated.slice(8, 10) + "." + D.updated.slice(5, 7) + " " + D.updated.slice(11, 16) + " UTC" : "ещё не собиралось";
 }
 var TIPS = {
@@ -145,6 +181,43 @@ document.querySelectorAll("#preset button").forEach(function(b){ b.onclick = fun
   load();
 }; });
 ["from", "to"].forEach(function(id){ $(id).onchange = function(){ pressPreset(null); if ($("from").value > $("to").value) { var x = $("from").value; $("from").value = $("to").value; $("to").value = x; } load(); }; });
+// окно со списком: сделки (лиды, встречи, оплаты сделки) или оплаты через контакт с YouTube-сделкой, которая их связала
+function dmyS(s){ return s ? s.slice(8, 10) + "." + s.slice(5, 7) + "." + s.slice(2, 4) : "—"; }
+function lnk(o, txt){ return '<a href="' + esc(o.url) + '" target="_blank" rel="noopener">' + esc(txt || ("#" + o.id)) + '</a>'; }
+function who(c){ return c ? lnk(c, c.name || ("контакт #" + c.id)) : '<span class="z">—</span>'; }
+function dealRows(items, m){
+  return '<table><thead><tr><th>Сделка</th><th>Контакт</th><th>' + (m === "leads" ? "Создана" : "Дата") + '</th><th class="hide-m">Этап</th><th class="num">Бюджет</th><th class="hide-m">Откуда YouTube</th><th class="hide-m">Кампания</th></tr></thead><tbody>'
+    + items.map(function(x){ return '<tr><td>' + lnk(x, x.name || ("#" + x.id)) + '<div class="dim">#' + x.id + '</div></td><td>' + who(x.contact) + '</td><td>' + dmyS(m === "leads" ? x.created : x.closed || x.created) + '</td>'
+      + '<td class="hide-m dim">' + esc(x.stage || "—") + '</td><td class="num">' + rub(x.price) + '</td><td class="hide-m dim">' + esc(x.how) + '</td><td class="hide-m dim">' + esc(x.campaign) + (x.content ? " · " + esc(x.content) : "") + '</td></tr>'; }).join("") + '</tbody></table>';
+}
+function contactRows(items){
+  return '<table><thead><tr><th>Контакт</th><th>Оплаченная сделка</th><th>Оплачено</th><th class="num">Сумма</th><th>YouTube-сделка контакта</th></tr></thead><tbody>'
+    + items.map(function(x){ var v = x.via;
+      return '<tr><td>' + who(x.contact) + '</td><td>' + lnk(x.paid, x.paid.name || ("#" + x.paid.id)) + '<div class="dim">#' + x.paid.id + ' ' + (x.direct ? '<span class="badge">сама YouTube</span>' : '<span class="badge warn">другой источник</span>') + '</div></td>'
+        + '<td>' + dmyS(x.paid.closed) + '</td><td class="num">' + rub(x.paid.price) + '</td>'
+        + '<td>' + lnk(v, v.name || ("#" + v.id)) + '<div class="dim">#' + v.id + ' · ' + dmyS(v.created) + ' · ' + esc(v.stage || "") + '<br>' + esc(v.how) + (v.campaign !== "без UTM" ? " · " + esc(v.campaign) : "") + '</div></td></tr>'; }).join("") + '</tbody></table>';
+}
+var lastFocus = null;
+function openList(el){
+  lastFocus = el;
+  var m = el.dataset.m, q = periodQ().concat(["detail=" + m, "table=" + el.dataset.t, "key=" + encodeURIComponent(el.dataset.k)]);
+  $("mdl-t").textContent = el.dataset.title; $("mdl-s").textContent = "загрузка…"; $("mdl-b").innerHTML = ""; $("mdl").hidden = false; $("mdl-x").focus();
+  fetch("/api/youtube?" + q.join("&"), { credentials: "same-origin" }).then(function(r){ return r.json(); }).then(function(d){
+    if (!d.ok) { $("mdl-s").textContent = d.error || "нет доступа"; return; }
+    var sum = d.items.reduce(function(a, x){ return a + ((x.paid ? x.paid.price : x.price) || 0); }, 0);
+    var per = el.dataset.t === "month" ? mname(el.dataset.k) : ($("from").selectedOptions[0] ? $("from").selectedOptions[0].text + " — " + $("to").selectedOptions[0].text : "");
+    $("mdl-s").textContent = d.items.length + (d.truncated ? "+ (показаны первые " + d.items.length + ")" : "") + " · " + per + (m === "paid" || m === "cpaid" ? " · " + cnum(sum) + " ₽" : "");
+    $("mdl-b").innerHTML = d.items.length ? (m === "cpaid" ? contactRows(d.items) : dealRows(d.items, m)) : '<p class="empty">записей нет</p>';
+  }).catch(function(){ $("mdl-s").textContent = "не удалось загрузить список"; });
+}
+function closeList(){ if ($("mdl").hidden) return; $("mdl").hidden = true; if (lastFocus) lastFocus.focus(); }
+document.addEventListener("click", function(e){ var c = e.target.closest(".clk"); if (c) openList(c); });
+document.addEventListener("keydown", function(e){
+  if (e.key === "Escape") closeList();
+  var c = e.target.closest && e.target.closest(".clk"); if (c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openList(c); }
+});
+$("mdl").addEventListener("click", function(e){ if (e.target === this) closeList(); });
+$("mdl-x").onclick = closeList;
 load();
 </script>
 <script src="/nav.js"></script>
