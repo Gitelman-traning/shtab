@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · Instagram SMM · Каналы</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.bar-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+.bar-top input[type=search]{flex:1;min-width:180px;font:inherit;font-size:14px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:10px;padding:8px 11px}
+.seg{display:inline-flex;gap:3px;background:var(--soft);border-radius:10px;padding:3px}
+.seg button{font:inherit;font-size:12.5px;font-weight:600;background:none;border:0;color:var(--dim);padding:6px 11px;border-radius:8px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.btn{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:9px;padding:9px 16px;cursor:pointer;background:linear-gradient(135deg,var(--gold-a),var(--gold-b));color:#151616}
+.btn.ghost{background:var(--card);border:1px solid var(--line);color:var(--ink);font-weight:600;padding:4px 10px;font-size:12px}
+.tw{overflow-x:auto}
+table.ch{width:100%;border-collapse:collapse;font-size:13px}
+table.ch th{font-size:11.5px;font-weight:600;color:var(--dim);text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.ch td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.ch .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.ch tr.arch td{opacity:.5}
+table.ch tfoot td{font-weight:700;border-bottom:0}
+.nk a{color:var(--ink);font-weight:600;text-decoration:none}.nk a:hover{color:var(--gold)}
+.nk .note{font-size:11.5px;color:var(--dim);margin-top:2px;cursor:default}.nk .note.ed{cursor:pointer}.nk .note.ed:empty::before{content:"+ заметка";color:var(--faint)}
+.tagc{display:inline-block;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--gold-soft);border-radius:6px;padding:1px 7px}
+.lnk{display:flex;gap:6px;align-items:center}.lnk code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--dim);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z{color:var(--faint)}
+.f textarea{width:100%;min-height:90px;font:inherit;font-size:14px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:10px;padding:9px 11px;resize:vertical}
+.msg{padding:10px 13px;border-radius:10px;margin:10px 0 0;font-size:13px}.msg.ok{background:var(--ok-bg);color:var(--ok)}.msg.bad{background:var(--bad-bg);color:var(--bad)}
+.hint{font-size:12px;color:var(--dim);margin-top:6px}
+@media (max-width:700px){.hide-m{display:none}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · Instagram SMM · <b>Каналы</b></div><h1>Instagram-каналы</h1><p class="sub">У каждого канала своя ссылка на бота: тег канала уходит в amo тегом сделки, источник — Instagram. Ссылку ставьте в шапку профиля.</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div class="kpis" id="kpis"></div>
+  <div class="card">
+    <h2>Реестр <small id="sub"></small></h2>
+    <div class="bar-top">
+      <input type="search" id="q" placeholder="Найти канал">
+      <div class="seg" id="period" role="group" aria-label="Период захода в бота">
+        <button type="button" data-d="0" aria-pressed="true">Всё время</button>
+        <button type="button" data-d="30" aria-pressed="false">30 дней</button>
+        <button type="button" data-d="7" aria-pressed="false">7 дней</button>
+      </div>
+    </div>
+    <div class="tw"><table class="ch">
+      <thead><tr><th>#</th><th>Канал</th><th>Тег</th><th>Ссылка на бота</th>
+        <th class="num" title="Зашли в бота по ссылке канала (последний заход)">В боте</th><th class="num" title="Оставили номер">Номера</th><th class="num" title="Сделка в amo создана или привязана">Сделки</th><th class="num" title="Квалификация: горячий">Горячие</th><th class="num hide-m" title="Нажали «Связаться с менеджером»">Менеджер</th>
+        <th class="num hide-m" title="amo: лиды с этим тегом кампании, последние 3 месяца">Лиды amo</th><th class="num hide-m" title="amo: дошли до ЦА">ЦА</th><th class="num hide-m" title="amo: встреча проведена">Встречи</th><th class="num hide-m" title="amo: прислали чек">Продажи</th><th></th></tr></thead>
+      <tbody id="rows"><tr><td colspan="14" class="empty">загрузка…</td></tr></tbody>
+      <tfoot id="foot"></tfoot>
+    </table></div>
+    <p class="note" id="note"></p>
+  </div>
+  <div class="card f" id="add-card" hidden>
+    <h2>Добавить каналы</h2>
+    <textarea id="nicks" placeholder="По одному в строке: ник, @ник или ссылка на профиль"></textarea>
+    <div class="hint">Тег делается из ника сам: нижний регистр, точки → дефис (Pa.vel.pp → pa-vel-pp). Повторы пропускаются.</div>
+    <div style="margin-top:12px"><button class="btn" id="add">Добавить</button></div>
+    <div id="add-msg"></div>
+  </div>
+  <footer>«В боте», номера, сделки и горячие — из базы своих ботов по метке ссылки (человек считается по последнему заходу). Лиды amo, ЦА, встречи и продажи — из ночного сбора amo по полю utm_campaign, лиды за последние 3 месяца; появляются на следующий день.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var D = null, AMO = {}, days = 0;
+function $(id){ return document.getElementById(id); }
+function n(v){ return v ? String(v) : '<span class="z">0</span>'; }
+function post(body){ return fetch("/api/ig-channels", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function(r){ return r.json(); }); }
+function load(){
+  var q = "";
+  if (days) { var t = new Date(); t.setHours(0,0,0,0); q = "?from=" + iso(addDays(t, -days + 1)) + "&to=" + iso(t); }
+  return fetch("/api/ig-channels" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }).then(function(d){
+    if (!d.ok) { $("rows").innerHTML = '<tr><td colspan="14" class="empty">' + esc(d.error || "нет доступа") + '</td></tr>'; return; }
+    D = d; $("add-card").hidden = !d.canEdit; render();
+  });
+}
+// срезы amo: seg.*|c|<utm_campaign>, лиды за последние 3 месяца, все источники
+(function(){
+  var t = new Date(), m0 = new Date(t.getFullYear(), t.getMonth() - 2, 1), mFrom = m0.getFullYear() + "-" + String(m0.getMonth() + 1).padStart(2, "0");
+  fetch("/api/points?metric=seg.leads,seg.qual,seg.held,seg.sales&ptype=month&from=" + mFrom + "&dimlike=" + encodeURIComponent("%|c|%"), { credentials: "same-origin" })
+    .then(function(r){ return r.json(); }).then(function(d){
+      ((d && d.rows) || []).forEach(function(r){ var c = r.dim.split("|c|")[1]; if (!c) return; c = c.toLowerCase(); var o = (AMO[c] = AMO[c] || {}); o[r.metric] = (o[r.metric] || 0) + r.value; });
+      if (D) render();
+    }).catch(function(){});
+})();
+function render(){
+  var q = $("q").value.trim().toLowerCase(), tot = {}, list = D.channels.filter(function(c){ return !q || c.nick.indexOf(q) >= 0 || c.slug.indexOf(q) >= 0 || (c.note || "").toLowerCase().indexOf(q) >= 0; });
+  var K = ["total","phones","deals","hot","manager"], A = ["seg.leads","seg.qual","seg.held","seg.sales"];
+  $("rows").innerHTML = list.length ? list.map(function(c, i){
+    var s = c.stats || {}, a = AMO[c.slug] || {};
+    if (!c.archived) { K.forEach(function(k){ tot[k] = (tot[k] || 0) + (s[k] || 0); }); A.forEach(function(k){ tot[k] = (tot[k] || 0) + (a[k] || 0); }); }
+    return '<tr' + (c.archived ? ' class="arch"' : '') + '><td class="z">' + (i + 1) + '</td>'
+      + '<td class="nk"><a href="' + esc(c.profile) + '" target="_blank" rel="noopener">@' + esc(c.nick) + '</a><div class="note' + (D.canEdit ? ' ed' : '') + '" data-slug="' + esc(c.slug) + '">' + esc(c.note || "") + '</div></td>'
+      + '<td><span class="tagc">' + esc(c.slug) + '</span></td>'
+      + '<td><div class="lnk"><code title="' + esc(c.link) + '">' + esc(c.link.replace("https://", "")) + '</code><button class="btn ghost cp" data-l="' + esc(c.link) + '">копировать</button></div></td>'
+      + K.map(function(k, j){ return '<td class="num' + (j === 4 ? ' hide-m' : '') + '">' + n(s[k]) + '</td>'; }).join("")
+      + A.map(function(k){ return '<td class="num hide-m">' + n(a[k]) + '</td>'; }).join("")
+      + '<td>' + (D.canEdit ? '<button class="btn ghost ar" data-slug="' + esc(c.slug) + '" data-a="' + (c.archived ? 0 : 1) + '">' + (c.archived ? 'вернуть' : 'в архив') + '</button>' : '') + '</td></tr>';
+  }).join("") : '<tr><td colspan="14" class="empty">' + (q ? "ничего не найдено" : "каналов пока нет") + '</td></tr>';
+  $("foot").innerHTML = list.length ? '<tr><td></td><td colspan="3">Итого по активным</td>' + K.map(function(k, j){ return '<td class="num' + (j === 4 ? ' hide-m' : '') + '">' + (tot[k] || 0) + '</td>'; }).join("") + A.map(function(k){ return '<td class="num hide-m">' + (tot[k] || 0) + '</td>'; }).join("") + '<td></td></tr>' : "";
+  var act = D.channels.filter(function(c){ return !c.archived; }).length, all = {}; D.channels.forEach(function(c){ if (!c.archived) K.forEach(function(k){ all[k] = (all[k] || 0) + ((c.stats || {})[k] || 0); }); });
+  $("sub").textContent = act + " активных" + (D.channels.length > act ? " · " + (D.channels.length - act) + " в архиве" : "") + " · бот @" + D.bot;
+  $("kpis").innerHTML = [["Зашли в бота", all.total], ["Оставили номер", all.phones, pct(all.phones, all.total)], ["Сделки в amo", all.deals], ["Горячие", all.hot, pct(all.hot, all.total)]]
+    .map(function(k){ return '<div class="kpi"><span class="nm">' + k[0] + '</span><span class="v">' + (k[1] || 0) + (k[2] != null ? ' <span class="plan">' + fmtPct(k[2]) + ' от зашедших</span>' : '') + '</span></div>'; }).join("");
+  $("stamp").textContent = days ? "за " + days + " дней" : "за всё время";
+  $("note").textContent = D.statsError ? "Статистика бота недоступна: " + D.statsError : "";
+  document.querySelectorAll(".cp").forEach(function(b){ b.onclick = function(){ navigator.clipboard.writeText(b.dataset.l).then(function(){ b.textContent = "скопировано"; setTimeout(function(){ b.textContent = "копировать"; }, 1500); }); }; });
+  document.querySelectorAll(".ar").forEach(function(b){ b.onclick = function(){ post({ action: "archive", slug: b.dataset.slug, archived: +b.dataset.a }).then(load); }; });
+  document.querySelectorAll(".note.ed").forEach(function(el){ el.onclick = function(){ var v = prompt("Заметка к каналу (кто ведёт, тема)", el.textContent); if (v === null) return; post({ action: "note", slug: el.dataset.slug, note: v }).then(load); }; });
+}
+$("q").oninput = function(){ if (D) render(); };
+document.querySelectorAll("#period button").forEach(function(b){ b.onclick = function(){ document.querySelectorAll("#period button").forEach(function(x){ x.setAttribute("aria-pressed", x === b); }); days = +b.dataset.d; load(); }; });
+$("add").onclick = function(){
+  var b = this; b.disabled = true;
+  post({ action: "add", nicks: $("nicks").value }).then(function(d){
+    b.disabled = false;
+    if (!d.ok) { $("add-msg").innerHTML = '<div class="msg bad">' + esc(d.error || "ошибка") + '</div>'; return; }
+    var t = [];
+    if (d.added.length) t.push("добавлено: " + d.added.length);
+    if (d.skipped.length) t.push("уже есть: " + d.skipped.join(", "));
+    if (d.invalid.length) t.push("не похоже на ник: " + d.invalid.join(", "));
+    $("add-msg").innerHTML = '<div class="msg ' + (d.invalid.length && !d.added.length ? "bad" : "ok") + '">' + esc(t.join(" · ") || "нечего добавлять") + '</div>';
+    if (d.added.length) { $("nicks").value = ""; load(); }
+  });
+};
+load();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>
