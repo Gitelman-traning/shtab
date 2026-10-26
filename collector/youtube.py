@@ -21,6 +21,7 @@ YouTube-сделка — поле «Источник» (1439087) = YouTube ил�
 import datetime as dt
 import json
 import os
+import re
 import sys
 import time
 
@@ -43,6 +44,13 @@ YT_ENUMS = {1218221: "YouTube", 1229449: "SHORTS Youtube"}
 F_UTM = {453161: "utm_source", 453157: "utm_medium", 453159: "utm_campaign", 453155: "utm_content"}
 L1, L2 = 8733326, (9701010, 8733518)   # Первая линия; Вторая линия (действующая и архивная)
 WON = 142
+STAGES = {}   # (воронка, этап) → «Воронка / Этап», заполняется в main()
+PHONE = re.compile(r"\+?\d[\d\s()\-]{7,}\d")
+
+
+def clean(s):
+    """название сделки или имя контакта без номеров телефонов"""
+    return re.sub(r"\s{2,}", " ", PHONE.sub("…", str(s or ""))).strip()[:160]
 
 
 def log(*a):
@@ -103,7 +111,8 @@ def yt_row(l):
     if not src:
         return None
     r = {"id": l["id"], "created_at": l["created_at"], "closed_at": l.get("closed_at"), "pipeline_id": l["pipeline_id"],
-         "status_id": l["status_id"], "price": int(l.get("price") or 0), "contact_id": main_contact(l), "src": src, **utm}
+         "status_id": l["status_id"], "price": int(l.get("price") or 0), "contact_id": main_contact(l), "src": src, **utm,
+         "name": clean(l.get("name")), "stage": STAGES.get((l["pipeline_id"], l["status_id"]), "")}
     tags = [t.get("name") or "" for t in (l.get("_embedded") or {}).get("tags") or []]
     # номер канала Wazzup — номер компании, не клиента; телефонов клиентов в витрине нет
     r["channel"] = next((t for t in tags if t.startswith("WZ")), "")[:120]
@@ -118,7 +127,21 @@ def paid_rows():
         params["filter[statuses][%d][pipeline_id]" % i] = p
         params["filter[statuses][%d][status_id]" % i] = WON
     return [{"id": l["id"], "contact_id": main_contact(l), "pipeline_id": l["pipeline_id"], "price": int(l.get("price") or 0),
-             "created_at": l["created_at"], "closed_at": l.get("closed_at")} for l in leads(params, "оплаты Второй линии")]
+             "created_at": l["created_at"], "closed_at": l.get("closed_at"), "name": clean(l.get("name"))}
+            for l in leads(params, "оплаты Второй линии")]
+
+
+def contact_names(ids):
+    """id контакта → имя (без телефонов), пачками по 200"""
+    out, ids = {}, sorted({int(x) for x in ids if x})
+    for i in range(0, len(ids), 200):
+        params = {"limit": 250}
+        for k, x in enumerate(ids[i:i + 200]):
+            params["filter[id][%d]" % k] = x
+        for c in (get("/contacts", params).get("_embedded") or {}).get("contacts") or []:
+            out[c["id"]] = clean(c.get("name"))
+        time.sleep(0.2)
+    return out
 
 
 def send(body):
@@ -135,6 +158,9 @@ def main():
     if MODE not in ("inc", "full"):
         sys.exit("MODE: inc | full")
     started = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for p in (get("/leads/pipelines").get("_embedded") or {}).get("pipelines") or []:
+        for s in (p.get("_embedded") or {}).get("statuses") or []:
+            STAGES[(p["id"], s["id"])] = "%s / %s" % (p["name"], s["name"])
     params = {"filter[created_at][from]": SINCE}
     if MODE == "inc":
         params["filter[updated_at][from]"] = int(time.time()) - DAYS * 86400
@@ -148,6 +174,9 @@ def main():
         elif MODE == "inc":
             drop.append(l["id"])
     paid = paid_rows()
+    names = contact_names([r["contact_id"] for r in rows + paid])
+    for r in rows + paid:
+        r["contact_name"] = names.get(r["contact_id"], "")
     log("просмотрено сделок: %d, YouTube: %d (встреч %d, оплат %d), оплат Второй линии всего: %d"
         % (seen, len(rows), sum(r["meeting"] for r in rows), sum(r["paid"] for r in rows), len(paid)))
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "youtube.local.json"), "w", encoding="utf-8") as f:

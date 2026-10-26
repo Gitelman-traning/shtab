@@ -243,15 +243,15 @@ export async function onRequestPost({ request, env }) {
     const v = (x, n) => String(x == null ? "" : x).slice(0, n);
     const int = (x) => (x == null || x === "" || !isFinite(Number(x)) ? null : Math.trunc(Number(x)));
     const q = env.DB.prepare(
-      "INSERT INTO yt_leads (id, created_at, closed_at, pipeline_id, status_id, price, contact_id, src, utm_source, utm_medium, utm_campaign, utm_content, channel, meeting, paid, updated_at) " +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET created_at = excluded.created_at, closed_at = excluded.closed_at, " +
+      "INSERT INTO yt_leads (id, created_at, closed_at, pipeline_id, status_id, price, contact_id, src, utm_source, utm_medium, utm_campaign, utm_content, channel, meeting, paid, name, contact_name, stage, updated_at) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET created_at = excluded.created_at, closed_at = excluded.closed_at, " +
       "pipeline_id = excluded.pipeline_id, status_id = excluded.status_id, price = excluded.price, contact_id = excluded.contact_id, src = excluded.src, " +
       "utm_source = excluded.utm_source, utm_medium = excluded.utm_medium, utm_campaign = excluded.utm_campaign, utm_content = excluded.utm_content, " +
-      "channel = excluded.channel, meeting = excluded.meeting, paid = excluded.paid, updated_at = excluded.updated_at");
+      "channel = excluded.channel, meeting = excluded.meeting, paid = excluded.paid, name = excluded.name, contact_name = excluded.contact_name, stage = excluded.stage, updated_at = excluded.updated_at");
     const batch = ytl.slice(0, 1000).filter((r) => r && int(r.id) && int(r.created_at))
       .map((r) => q.bind(int(r.id), int(r.created_at), int(r.closed_at), int(r.pipeline_id) || 0, int(r.status_id) || 0, int(r.price) || 0, int(r.contact_id),
         v(r.src || "YouTube", 40), v(r.utm_source, 120), v(r.utm_medium, 120), v(r.utm_campaign, 120), v(r.utm_content, 120), v(r.channel, 120),
-        r.meeting ? 1 : 0, r.paid ? 1 : 0, stamp));
+        r.meeting ? 1 : 0, r.paid ? 1 : 0, v(r.name, 160), v(r.contact_name, 160), v(r.stage, 160), stamp));
     for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); }
   }
   const ytd = (Array.isArray(body.yt_drop) ? body.yt_drop : []).map(Number).filter((x) => Number.isInteger(x) && x > 0).slice(0, 5000);
@@ -262,11 +262,12 @@ export async function onRequestPost({ request, env }) {
   if (body.yt_paid && Array.isArray(body.yt_paid.rows)) {
     const int = (x) => (x == null || x === "" || !isFinite(Number(x)) ? null : Math.trunc(Number(x)));
     if (body.yt_paid.replace) await env.DB.prepare("DELETE FROM yt_paid").run();
-    const q = env.DB.prepare("INSERT INTO yt_paid (id, contact_id, pipeline_id, price, created_at, closed_at, updated_at) VALUES (?,?,?,?,?,?,?) " +
+    const v = (x, n) => String(x == null ? "" : x).slice(0, n);
+    const q = env.DB.prepare("INSERT INTO yt_paid (id, contact_id, pipeline_id, price, created_at, closed_at, name, contact_name, updated_at) VALUES (?,?,?,?,?,?,?,?,?) " +
       "ON CONFLICT(id) DO UPDATE SET contact_id = excluded.contact_id, pipeline_id = excluded.pipeline_id, price = excluded.price, " +
-      "created_at = excluded.created_at, closed_at = excluded.closed_at, updated_at = excluded.updated_at");
+      "created_at = excluded.created_at, closed_at = excluded.closed_at, name = excluded.name, contact_name = excluded.contact_name, updated_at = excluded.updated_at");
     const batch = body.yt_paid.rows.slice(0, 5000).filter((r) => r && int(r.id) && int(r.created_at))
-      .map((r) => q.bind(int(r.id), int(r.contact_id), int(r.pipeline_id) || 0, int(r.price) || 0, int(r.created_at), int(r.closed_at), stamp));
+      .map((r) => q.bind(int(r.id), int(r.contact_id), int(r.pipeline_id) || 0, int(r.price) || 0, int(r.created_at), int(r.closed_at), v(r.name, 160), v(r.contact_name, 160), stamp));
     for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); }
   }
   const goals = Array.isArray(body.goals) ? body.goals : [];
