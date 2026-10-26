@@ -91,6 +91,17 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
 .fl{display:inline-flex;gap:8px;align-items:center;font-size:12.5px;color:var(--gold);text-decoration:none;background:var(--page);border-radius:8px;padding:5px 9px;max-width:100%}
 .fl .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .fl .sz{color:var(--faint);white-space:nowrap}
 .fl .x{border:0;background:none;color:var(--faint);cursor:pointer;font:inherit;padding:0 2px}
+.lb{width:100vw;height:100vh;max-width:none;max-height:none;background:transparent;box-shadow:none;border-radius:0;color:#fff}
+.lb::backdrop{background:rgba(0,0,0,.88)}
+.lb .stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:52px 64px}
+.lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.5);user-select:none}
+.lb .bt{position:absolute;border:0;border-radius:50%;width:44px;height:44px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-size:24px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.lb .bt:hover{background:rgba(255,255,255,.28)}
+.lb .pv{left:12px;top:50%;transform:translateY(-50%)} .lb .nx{right:12px;top:50%;transform:translateY(-50%)}
+.lb .cl{right:12px;top:10px}
+.lb .cap{position:absolute;left:16px;right:70px;top:18px;font-size:13px;color:rgba(255,255,255,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb .cap a{color:#fff}
+@media (max-width:760px){.lb .stage{padding:56px 8px}.lb .pv,.lb .nx{top:auto;bottom:12px;transform:none}}
 @media (max-width:760px){main{padding:16px}.t{grid-template-columns:1fr auto}.t .st{display:none}.board{grid-template-columns:repeat(5,82vw)}dialog .row2{grid-template-columns:1fr}}
 </style>
 </head>
@@ -132,6 +143,8 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
 </div>
 </div>
 <dialog id="dlg"><div class="in" id="dlg-in"></div></dialog>
+<dialog id="lb" class="lb" aria-label="Просмотр скриншота"><div class="stage"><img id="lb-img" alt=""></div><div class="cap" id="lb-cap"></div>
+<button type="button" class="bt cl" data-lb="0" aria-label="Закрыть">×</button><button type="button" class="bt pv" data-lb="-1" aria-label="Предыдущий">‹</button><button type="button" class="bt nx" data-lb="1" aria-label="Следующий">›</button></dialog>
 <script src="/ui.js"></script>
 <script>
 (function () {
@@ -582,6 +595,39 @@ dialog .sect{font-size:11px;font-weight:600;text-transform:uppercase;letter-spac
           + (del(f) ? '<button type="button" class="x" data-unfile="' + f.id + '" aria-label="удалить файл">×</button>' : "") + '</a>';
       }).join("") + '</div>' : "");
   }
+
+  // ---------- просмотр скриншотов: стрелки, ←/→, свайп, Esc и клик по фону закрывают ----------
+  var lb = document.getElementById("lb"), lbImg = document.getElementById("lb-img"), lbCap = document.getElementById("lb-cap"), lbList = [], lbAt = 0;
+  function lbShow(i) {
+    lbAt = (i + lbList.length) % lbList.length;
+    var a = lbList[lbAt], many = lbList.length > 1;
+    lbImg.src = a.href; lbImg.alt = a.querySelector("img").alt;
+    lbCap.innerHTML = (many ? (lbAt + 1) + " из " + lbList.length + " · " : "") + esc(a.title) + ' · <a href="' + a.href + '" target="_blank" rel="noopener">оригинал</a>';
+    lb.querySelector(".pv").hidden = lb.querySelector(".nx").hidden = !many;
+  }
+  dIn.addEventListener("click", function (e) {
+    var a = e.target.closest("a.shot");
+    if (!a || e.target.closest("button") || e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
+    e.preventDefault();
+    lbList = [].slice.call(dIn.querySelectorAll("a.shot"));
+    lbShow(lbList.indexOf(a)); lb.showModal();
+  });
+  lb.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-lb]");
+    if (b) { var d = +b.getAttribute("data-lb"); return d ? lbShow(lbAt + d) : lb.close(); }
+    if (e.target === lb || e.target.classList.contains("stage")) lb.close();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (lb.open && (e.key === "ArrowLeft" || e.key === "ArrowRight")) { e.preventDefault(); if (lbList.length > 1) lbShow(lbAt + (e.key === "ArrowRight" ? 1 : -1)); }
+  });
+  lb.addEventListener("close", function () { lbImg.removeAttribute("src"); });
+  var lbX = null;
+  lb.addEventListener("touchstart", function (e) { lbX = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+  lb.addEventListener("touchend", function (e) {
+    if (lbX === null || lbList.length < 2) return;
+    var dx = e.changedTouches[0].clientX - lbX; lbX = null;
+    if (Math.abs(dx) > 50) lbShow(lbAt + (dx < 0 ? 1 : -1));
+  });
 
   // ---------- проекты (админ) ----------
   var pjEdit = null;
