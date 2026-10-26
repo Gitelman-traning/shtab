@@ -89,10 +89,10 @@ export async function currentUser(request, env) {
 
 // ---------- права по разделам ----------
 // дерево разделов: подраздел наследует уровень отдела, если своей строки нет
-export const SECTIONS = ["hub", "tasks", "sales", "sales.l1", "sales.l2", "sales.l2.okk", "marketing", "marketing.instagram", "marketing.telegram", "marketing.influence", "marketing.youtube", "marketing.fb", "marketing.sitechat", "marketing.site", "hr", "hr.structure", "hr.events", "hr.leave", "hr.team", "guide", "status", "users", "tags", "budget", "dashboard"];
-const PARENT = { "sales.l1": "sales", "sales.l2": "sales", "sales.l2.okk": "sales.l2", "marketing.instagram": "marketing", "marketing.telegram": "marketing", "marketing.influence": "marketing", "marketing.youtube": "marketing", "marketing.fb": "marketing", "marketing.sitechat": "marketing", "marketing.site": "marketing", "hr.structure": "hr", "hr.events": "hr", "hr.leave": "hr", "hr.team": "hr" };
-// закрытые по умолчанию: видят только те, кому выдано явно, или у кого «правка» на отделе (сотрудники HR)
-const PRIVATE = { "hr.team": "hr" };
+export const SECTIONS = ["hub", "tasks", "sales", "sales.l1", "sales.l2", "sales.l2.okk", "marketing", "marketing.instagram", "marketing.telegram", "marketing.influence", "marketing.youtube", "marketing.youtube.deals", "marketing.fb", "marketing.sitechat", "marketing.site", "hr", "hr.structure", "hr.events", "hr.leave", "hr.team", "guide", "status", "users", "tags", "budget", "dashboard"];
+const PARENT = { "sales.l1": "sales", "sales.l2": "sales", "sales.l2.okk": "sales.l2", "marketing.instagram": "marketing", "marketing.telegram": "marketing", "marketing.influence": "marketing", "marketing.youtube": "marketing", "marketing.youtube.deals": "marketing.youtube", "marketing.fb": "marketing", "marketing.sitechat": "marketing", "marketing.site": "marketing", "hr.structure": "hr", "hr.events": "hr", "hr.leave": "hr", "hr.team": "hr" };
+// закрытые по умолчанию: видят только те, кому выдано явно, или у кого «правка» на отделе (сотрудники HR, ведущие YouTube)
+const PRIVATE = { "hr.team": "hr", "marketing.youtube.deals": "marketing.youtube" };
 
 export async function loadPerms(env, login, sectionsCsv) {
   const rows = await env.DB.prepare("SELECT section, level FROM perms WHERE login = ?").bind(login).all();
@@ -137,6 +137,7 @@ export function sectionOf(pathname) {
   if (p.startsWith("/sales/l2")) return "sales.l2";
   if (p.startsWith("/sales/l1")) return "sales.l1";
   if (p.startsWith("/sales")) return "sales";
+  if (p.startsWith("/marketing/youtube/deals")) return "marketing.youtube.deals";
   const mk = /^\/marketing\/([a-z]+)/.exec(p);
   if (mk) return "marketing." + mk[1];
   if (p.startsWith("/marketing")) return "marketing";

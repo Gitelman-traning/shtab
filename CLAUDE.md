@@ -22,6 +22,7 @@
 - `site/public/nav.js` — единое меню: новый раздел добавляется в дерево `TREE` здесь и в `SECTIONS`/`sectionOf` в `_lib.js`.
 - `collector/` — ночные сборщики (GitHub Actions `shtab-collect.yml`): `collect.py` — из выгрузки amo в Google Sheets, `okna.py` — окна Первой линии прямо из amo, `metrika.py` — Яндекс Метрика (счётчики из секрета METRIKA_COUNTERS + DEFAULT_COUNTERS в коде; лендинг — только входы на gitelman.team, DEFAULT_FILTERS), `gads.py` — Google Ads (секреты GADS_*, без них пропускается).
   `articles.py` — статьи журнала и потока по sitemap.xml и чек-лист качества каждой статьи; `serp.py` — показы, клики и позиции из Search Console (сервисный аккаунт GOOGLE_SERVICE_ACCOUNT_JSON) и Вебмастера (YANDEX_WEBMASTER_TOKEN), ключевые запросы — `collector/keywords.txt`; цели Метрики (дочитывания и др.) — GOALS в `metrika.py`.
+  `youtube.py` (`youtube.yml`, ночью + вручную mode=full) — YouTube-сделки («Источник» = YouTube) и оплаты Второй линии прямо из amo → `yt_leads`/`yt_paid` → `/marketing/youtube/deals/` (раздел `marketing.youtube.deals`, закрыт по умолчанию).
   `prep.py` + `prep_prompt.md` — подготовка диагноста к встрече (`prep.yml`, каждые 30 минут днём + вебхук amo): сделки на этапе «Встреча подтверждена» → досье с веб-поиском, похожие участники, подготовка → `/sales/l2/prep/`.
 - `schema*.sql` — миграции D1, по порядку номеров; новая миграция = новый файл `schemaN.sql`, старые не править.
 - `metrics.json` — реестр показателей (id, название, раздел, единица, определение).

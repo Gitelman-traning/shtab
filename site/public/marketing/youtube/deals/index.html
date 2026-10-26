@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Штаб · YouTube · Сделки и выручка</title>
+<link rel="stylesheet" href="/ui.css">
+<style>
+.bar-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
+.seg{display:inline-flex;gap:3px;background:var(--soft);border-radius:10px;padding:3px;flex-wrap:wrap}
+.seg button{font:inherit;font-size:12.5px;font-weight:600;background:none;border:0;color:var(--dim);padding:6px 11px;border-radius:8px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.rng{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--dim)}
+.rng select{font:inherit;font-size:13px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:9px;padding:6px 8px}
+.tw{overflow-x:auto}
+table.yt{width:100%;border-collapse:collapse;font-size:13px}
+table.yt th{font-size:11.5px;font-weight:600;color:var(--dim);text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:bottom}
+table.yt th.grp{text-align:center;border-bottom:1px solid var(--line)}
+table.yt td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.yt .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.yt tfoot td{font-weight:700;border-bottom:0}
+table.yt .bl{border-left:1px solid var(--line)}
+.src{font-size:11.5px;color:var(--dim);margin-top:2px}
+.z{color:var(--faint)}
+.tip{border-bottom:1px dashed currentColor;cursor:pointer}
+#tipbox{position:fixed;z-index:50;max-width:320px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;font-weight:400;line-height:1.45;text-align:left;white-space:normal;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<div class="pane">
+<header>
+  <div><div class="crumbs">Маркетинг · YouTube · <b>Сделки и выручка</b></div><h1>YouTube: сделки и выручка</h1><p class="sub">Сделки amo из YouTube: сколько пришло, сколько дошло до встречи и сколько оплатило. Данные с 26.07.2025, обновляются ночью.<br>YouTube-сделка — поле «Источник» = YouTube или SHORTS Youtube, либо метка utm_source / utm_medium = youtube (перешёл с YouTube на сайт и оставил заявку).</p></div>
+  <div class="spacer"></div>
+  <div class="themer" role="group" aria-label="Тема оформления">
+    <button type="button" data-set="auto" aria-pressed="true">Авто</button>
+    <button type="button" data-set="light" aria-pressed="false">Светлая</button>
+    <button type="button" data-set="dark" aria-pressed="false">Тёмная</button>
+  </div>
+  <div class="stamp" id="stamp">—</div>
+</header>
+<main>
+  <div class="bar-top">
+    <div class="seg" id="preset" role="group" aria-label="Период">
+      <button type="button" data-m="0" aria-pressed="true">Всё время</button>
+      <button type="button" data-m="12" aria-pressed="false">12 месяцев</button>
+      <button type="button" data-m="6" aria-pressed="false">6 месяцев</button>
+      <button type="button" data-m="3" aria-pressed="false">3 месяца</button>
+    </div>
+    <div class="rng"><span>с</span><select id="from"></select><span>по</span><select id="to"></select></div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="card">
+    <h2>По месяцам</h2>
+    <div class="tw"><table class="yt" id="t-month"></table></div>
+  </div>
+  <div class="card">
+    <h2>По кампаниям <small>utm_campaign</small></h2>
+    <div class="tw"><table class="yt" id="t-camp"></table></div>
+  </div>
+  <div class="card">
+    <h2>По выпускам <small>utm_content</small></h2>
+    <div class="tw"><table class="yt" id="t-cont"></table></div>
+    <p class="note">Метку выпуска пока почти никто не ставит, поэтому большая часть в строке «без выпуска». Когда в ссылках под видео появится utm_content, здесь будут видны отдельные выпуски.</p>
+  </div>
+  <footer>Лиды — по месяцу создания сделки, встречи и оплаты — по месяцу, когда сделка перешла в «Встреча проведена» или «100% оплаты получено». Выручка — бюджет оплаченной сделки Второй линии. Расходы и окупаемость появятся во второй версии.</footer>
+</main>
+</div>
+</div>
+<script src="/ui.js"></script>
+<script>
+var D = null, MONTHS = [];
+var MN = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+function $(id){ return document.getElementById(id); }
+function mname(m){ var p = m.split("-"); return MN[+p[1] - 1] + " " + p[0]; }
+function n(v){ return v ? String(v) : '<span class="z">0</span>'; }
+function rub(v){ return v ? Math.round(v).toLocaleString("ru-RU") + " ₽" : '<span class="z">—</span>'; }
+function cnum(v){ return v ? Math.round(v).toLocaleString("ru-RU") : "0"; }
+var CAMP = { "description": "description — ссылка в описании видео", "0": "0 — метка без кампании" };
+function head(first){
+  return '<thead><tr><th rowspan="2">' + first + '</th><th rowspan="2" class="num"><span class="tip" data-k="leads">Лиды</span></th><th rowspan="2" class="num"><span class="tip" data-k="meetings">Встречи</span></th>'
+    + '<th colspan="2" class="grp bl"><span class="tip" data-k="paid">Оплаты сделки</span></th><th colspan="2" class="grp bl"><span class="tip" data-k="cpaid">Оплаты через контакт</span></th></tr>'
+    + '<tr><th class="num bl">шт.</th><th class="num">выручка</th><th class="num bl">шт.</th><th class="num">выручка</th></tr></thead>';
+}
+function cells(r){ return '<td class="num">' + n(r.leads) + '</td><td class="num">' + n(r.meetings) + '</td><td class="num bl">' + n(r.paid) + '</td><td class="num">' + rub(r.revenue) + '</td><td class="num bl">' + n(r.cpaid) + '</td><td class="num">' + rub(r.crevenue) + '</td>'; }
+function table(id, first, rows, label){
+  var t = D.total;
+  $(id).innerHTML = head(first) + '<tbody>' + (rows.length ? rows.map(function(r){ return '<tr><td>' + label(r) + '</td>' + cells(r) + '</tr>'; }).join("") : '<tr><td colspan="7" class="empty">за этот период данных нет</td></tr>') + '</tbody>'
+    + (rows.length ? '<tfoot><tr><td>Итого</td>' + cells(t) + '</tr></tfoot>' : '');
+}
+function opts(sel, val){ return MONTHS.map(function(m){ return '<option value="' + m + '"' + (m === val ? ' selected' : '') + '>' + mname(m) + '</option>'; }).join(""); }
+function load(){
+  var q = [], f = $("from").value, t = $("to").value;
+  if (f && f !== MONTHS[MONTHS.length - 1]) q.push("from=" + f);
+  if (t && t !== MONTHS[0]) q.push("to=" + t);
+  return fetch("/api/youtube" + (q.length ? "?" + q.join("&") : ""), { credentials: "same-origin" }).then(function(r){ return r.json(); }).then(function(d){
+    if (!d.ok) { $("t-month").innerHTML = '<tbody><tr><td class="empty">' + esc(d.error || "нет доступа") + '</td></tr></tbody>'; return; }
+    D = d;
+    if (!MONTHS.length && d.months.length) { MONTHS = d.months; $("from").innerHTML = opts("from", MONTHS[MONTHS.length - 1]); $("to").innerHTML = opts("to", MONTHS[0]); }
+    render();
+  });
+}
+function render(){
+  var t = D.total;
+  $("kpis").innerHTML = [["YouTube-лиды", cnum(t.leads), "", "leads"], ["Встречи проведены", cnum(t.meetings), t.leads ? fmtPct(pct(t.meetings, t.leads)) + " от лидов" : "", "meetings"],
+    ["Оплаты сделки", cnum(t.paid), t.revenue ? cnum(t.revenue) + " ₽" : "", "paid"], ["Оплаты через контакт", cnum(t.cpaid), t.crevenue ? cnum(t.crevenue) + " ₽" : "", "cpaid"]]
+    .map(function(k){ return '<div class="kpi"><span class="nm"><span class="tip" data-k="' + k[3] + '">' + k[0] + '</span></span><span class="v">' + k[1] + (k[2] ? ' <span class="plan">' + k[2] + '</span>' : '') + '</span></div>'; }).join("");
+  table("t-month", "Месяц", D.rows, function(r){ return mname(r.month); });
+  table("t-camp", "Кампания", D.campaigns, function(r){ return esc(CAMP[r.key] || r.key) + (r.sources && r.sources.length ? '<div class="src">utm_source: ' + esc(r.sources.join(", ")) + '</div>' : ''); });
+  table("t-cont", "Выпуск", D.contents, function(r){ return esc(r.key); });
+  $("stamp").textContent = D.updated ? "обновлено " + D.updated.slice(8, 10) + "." + D.updated.slice(5, 7) + " " + D.updated.slice(11, 16) + " UTC" : "ещё не собиралось";
+}
+var TIPS = {
+  leads: "Сделки amo с полем «Источник» = YouTube (или SHORTS Youtube) или с меткой utm_source / utm_medium = youtube, созданные в этом месяце. Один человек с несколькими сделками считается несколько раз — как в amo.",
+  meetings: "Из YouTube-сделок Первой линии — перешедшие в «Встреча проведена». Месяц — когда сделка туда перешла.",
+  paid: "YouTube-сделки Второй линии в «100% оплаты получено (Фин блок)» и сумма их бюджета. Месяц — когда сделка туда перешла.",
+  cpaid: "Все оплаченные сделки Второй линии, у контакта которых есть хоть одна YouTube-сделка, даже если сама оплаченная сделка размечена другим источником. Прямые оплаты входят сюда же. Кампания и выпуск — от первой YouTube-сделки контакта."
+};
+var tipBox = null;
+function closeTip(){ if (tipBox) { tipBox.remove(); tipBox = null; } }
+document.addEventListener("click", function(e){
+  var t = e.target.closest(".tip");
+  if (!t) { if (!e.target.closest("#tipbox")) closeTip(); return; }
+  var same = tipBox && tipBox._el === t;
+  closeTip(); if (same) return;
+  tipBox = document.createElement("div"); tipBox.id = "tipbox"; tipBox._el = t; tipBox.textContent = TIPS[t.dataset.k] || "";
+  document.body.appendChild(tipBox);
+  var r = t.getBoundingClientRect(), w = tipBox.offsetWidth, h = tipBox.offsetHeight;
+  tipBox.style.top = (r.bottom + 6 + h > window.innerHeight && r.top > h + 6 ? r.top - h - 6 : r.bottom + 6) + "px";
+  tipBox.style.left = Math.max(8, Math.min(r.left, document.documentElement.clientWidth - w - 8)) + "px";
+});
+window.addEventListener("scroll", closeTip, true);
+document.addEventListener("keydown", function(e){ if (e.key === "Escape") closeTip(); });
+function pressPreset(b){ document.querySelectorAll("#preset button").forEach(function(x){ x.setAttribute("aria-pressed", x === b); }); }
+document.querySelectorAll("#preset button").forEach(function(b){ b.onclick = function(){
+  if (!MONTHS.length) return;
+  pressPreset(b);
+  var m = +b.dataset.m, d = new Date(), f = new Date(d.getFullYear(), d.getMonth() - m + 1, 1);
+  var fk = f.getFullYear() + "-" + String(f.getMonth() + 1).padStart(2, "0");
+  // MONTHS — от новых к старым: берём самый ранний месяц с данными не раньше начала периода
+  $("from").value = m ? (MONTHS.filter(function(x){ return x >= fk; }).pop() || MONTHS[0]) : MONTHS[MONTHS.length - 1];
+  $("to").value = MONTHS[0];
+  load();
+}; });
+["from", "to"].forEach(function(id){ $(id).onchange = function(){ pressPreset(null); if ($("from").value > $("to").value) { var x = $("from").value; $("from").value = $("to").value; $("to").value = x; } load(); }; });
+load();
+</script>
+<script src="/nav.js"></script>
+</body>
+</html>
