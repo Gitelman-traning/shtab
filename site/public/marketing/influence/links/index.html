@@ -196,16 +196,19 @@ function list(rows){
       if (r.tgin) out += '<div class="ln"><span class="sub">TG-входящее</span><div class="mono">' + esc(r.tgin) + '</div><button class="btn ghost cp" type="button" data-v="' + esc(r.tgin) + '">Копировать</button></div>';
       else out += '<div class="ln"><span class="pill wait">TG-входящее: ждёт ссылку</span><div class="sub">«' + esc(r.phrase) + '»</div>' + (ME.admin ? '<div class="inl"><input type="url" placeholder="https://t.me/m/…" id="lk' + r.row + '"><button class="btn ghost act" type="button" data-a="issue" data-row="' + r.row + '">Выдать</button></div>' : '') + '</div>';
     }
-    if (r.amo === 'ждёт заведения') out += '<div class="ln"><span class="pill wait">amo: ждёт заведения</span>' + (ME.admin ? ' <button class="btn ghost act" type="button" data-a="amo" data-row="' + r.row + '">Заведено в amo</button>' : '') + '</div>';
-    else if (r.amo) out += '<div class="ln"><span class="pill done">✅ amo: ' + esc(r.amo) + '</span></div>';
+    var ab = function(op, label){ return ME.admin ? ' <button class="btn ghost act" type="button" data-a="amo" data-op="' + op + '" data-row="' + r.row + '">' + label + '</button>' : ''; };
+    if (r.amo === 'ждёт заведения') out += '<div class="ln"><span class="pill wait">amo: ждёт заведения</span>' + ab('done', '✅ Заведено') + ab('skip', '⏭ Пропустить') + ab('delete', '🗑 Удалить') + '</div>';
+    else if (/^пропущено/.test(r.amo)) out += '<div class="ln"><span class="pill wait">⏭ amo: ' + esc(r.amo) + '</span>' + ab('restore', '↩ Восстановить') + ab('delete', '🗑 Удалить') + '</div>';
+    else if (r.amo) out += '<div class="ln"><span class="pill done">✅ amo: ' + esc(r.amo) + '</span>' + ab('restore', '↩ Восстановить') + '</div>';
     return out + '</div>';
   }).join('');
   $('list').querySelectorAll('.cp').forEach(function(b){ b.onclick = function(){ copy(b, b.getAttribute('data-v'), 'Копировать'); }; });
   $('list').querySelectorAll('.act').forEach(function(b){ b.onclick = function(){
-    var row = b.getAttribute('data-row'), a = b.getAttribute('data-a'), body = { action: a, row: row };
+    var row = b.getAttribute('data-row'), a = b.getAttribute('data-a'), op = b.getAttribute('data-op'), body = { action: a, row: row, op: op };
+    if (op === 'delete' && !window.confirm('Удалить заявку? Записи в рабочих таблицах будут очищены.')) return;
     if (a === 'issue') { body.link = ($('lk' + row).value || '').trim(); if (!body.link) return; }
     b.disabled = true;
-    api('POST', body).then(function(d){ msg('ok', (a === 'issue' ? 'Ссылка выдана.' : a === 'amo' ? 'Отмечено: заведено в amo.' : 'Кружок отмечен.') + (a === 'amo' ? '' : (d.notified ? ' Заказчику ушло сообщение в Telegram.' : ' У заказчика не привязан Telegram — передайте ему сами.'))); load(); })
+    api('POST', body).then(function(d){ msg('ok', (a === 'issue' ? 'Ссылка выдана.' : a === 'amo' ? ({ done: 'Отмечено: заведено в amo.', skip: 'Пропущено.', restore: 'Восстановлено: снова ждёт заведения.', delete: 'Заявка удалена, записи в таблицах очищены.' }[op] || 'Готово.') : 'Кружок отмечен.') + (a === 'amo' ? '' : (d.notified ? ' Заказчику ушло сообщение в Telegram.' : ' У заказчика не привязан Telegram — передайте ему сами.'))); load(); })
       .catch(function(e){ b.disabled = false; msg('bad', esc(e.message)); });
   }; });
 }
