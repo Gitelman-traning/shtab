@@ -29,6 +29,13 @@
 .srch{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:8px 0 10px}
 .mnote{font-size:12.5px;color:var(--dim);margin-top:3px;white-space:pre-wrap}
 .prev{background:var(--soft);border-radius:12px;padding:12px;font-size:13.5px;white-space:pre-wrap;margin-top:6px}
+.furow{border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:6px}
+.furow .top{display:grid;grid-template-columns:90px 130px 1fr 32px;gap:6px}
+.furow textarea{min-height:56px;margin-top:6px}
+.f input[type=number]{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.f details>summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--dim);margin-top:12px}
+#mcard.editing{border-color:var(--gold-b)}
+@media (max-width:560px){.furow .top{grid-template-columns:70px 1fr 32px}.furow .top input[type=text]{grid-column:1/-1;grid-row:2}}
 </style>
 </head>
 <body>
@@ -59,13 +66,14 @@
         <label class="hint">Бот для ссылок: <select id="botsel"></select></label>
         <input type="search" class="srch" id="mq" placeholder="Поиск по названию, ключу, примечанию, тексту или файлу">
         <div class="wrap" id="mlist"><p class="empty">загрузка…</p></div></div>
-      <div class="card"><h2 id="mf-title">Новый материал</h2>
+      <div class="card" id="mcard"><h2 id="mf-title">Новый материал</h2>
+        <p class="hint" id="mf-edit" hidden>Меняется всё, кроме ключа. Ссылка, список забравших и статистика остаются прежними.</p>
         <form class="f" id="mf" autocomplete="off">
           <label>Ключ <span class="hint">латиница, цифры, _ — войдёт в ссылку, потом не меняется</span></label><input type="text" name="key" placeholder="guide_team">
           <label>Название (для себя)</label><input type="text" name="title" placeholder="Гайд «Команда»">
           <label>Примечание <span class="hint">для себя: что за документ, откуда, в каком посте — в боте не видно</span></label><textarea name="note" style="min-height:56px" placeholder="Документы Ирины Залевской (500+ сотрудников): как разбирать ошибки. Пост #2409, 19 февраля"></textarea>
           <label>Текст сообщения <span class="hint" id="tlen"></span></label><textarea name="text" placeholder="Можно &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, &lt;a href=&quot;…&quot;&gt;ссылку&lt;/a&gt;"></textarea>
-          <label>Файл <span class="hint" id="fname">не загружен</span></label><input type="file" id="file"><div class="hint">До 25 МБ. Загружается после сохранения материала.</div>
+          <label>Файл <span class="hint" id="fname">не загружен</span></label><input type="file" id="file"><div class="hint" id="filehint">До 25 МБ. Загружается после сохранения материала.</div>
           <label>Кнопки под сообщением</label><div id="btns"></div><button type="button" class="btn ghost" id="addbtn">+ кнопка</button>
           <label style="font-weight:600"><input type="checkbox" name="qual"> Блок квалификации перед файлом</label>
           <div class="hint">Выключено — простая выдача: сразу файл, считаем забравших. Включено — сначала 3 вопроса (собственник, команда, оборот; кто уже отвечал — без вопросов), потом файл, горячим через 7 мин — приглашение, через 30 мин — бизнес-экскурсии.</div>
@@ -73,11 +81,20 @@
           <label>Когда выдавать</label><select name="condition"><option value="none">сразу</option><option value="phone">после номера</option><option value="poll">после опроса</option></select>
           <div id="pollwrap" hidden><label>Опрос</label><select name="poll_key"></select></div>
           </details>
-          <div id="askwrap" hidden><label>Текст перед вопросами / просьбы номера (необязательно)</label><input type="text" name="ask_text" placeholder="Здравствуйте :) Ответьте, пожалуйста, на 3 коротких вопроса. И пришлем файл ❤️"></div>
+          <div id="askwrap" hidden><label>Текст перед вопросами / просьбы номера (необязательно)</label><textarea name="ask_text" style="min-height:56px" placeholder="Здравствуйте :) Ответьте, пожалуйста, на 3 коротких вопроса. И пришлем файл ❤️"></textarea></div>
+          <details id="subwrap"><summary>Проверка подписки на канал <span id="subsum"></span></summary>
+            <label>Канал <span class="hint">@username или -100… — бот проверяет подписку перед файлом; пусто — без проверки</span></label><input type="text" name="sub_channel" placeholder="-1001854747271">
+            <label>Ссылка «Подписаться»</label><input type="text" name="sub_link" placeholder="https://t.me/+…">
+            <label>Текст просьбы подписаться <span class="hint">пусто — стандартный</span></label><textarea name="sub_text" style="min-height:56px" placeholder="Ой, вы ещё не подписаны на канал. Подпишитесь — и забирайте файл 👇"></textarea>
+          </details>
+          <details id="fuwrap"><summary>Сообщения после файла <span id="fusum"></span></summary>
+            <div class="hint">Через сколько минут после файла и что прислать: текст, другой материал или опрос.</div>
+            <div id="fus" style="margin-top:8px"></div><button type="button" class="btn ghost" id="addfu">+ сообщение</button>
+          </details>
           <label>Список <span class="hint">по умолчанию file_&lt;ключ&gt;</span></label><input type="text" name="list_key" placeholder="file_guide_team">
           <label><input type="checkbox" name="default_buttons" checked> добавить стандартные кнопки бота <span class="hint">(YouTube, журнал — настраиваются ниже)</span></label>
           <label><input type="checkbox" name="active" checked> активен (ссылка работает)</label>
-          <div class="acts"><button class="btn" type="submit">Сохранить</button><button class="btn ghost" type="button" id="mnew">Новый</button></div>
+          <div class="acts"><button class="btn" type="submit">Сохранить</button><button class="btn ghost" type="button" id="mnew">Новый</button><button class="btn ghost" type="button" id="mcancel" hidden>Отменить правку</button></div>
         </form>
         <div id="mlink"></div>
       </div>
@@ -154,6 +171,40 @@ function readButtons(){
   });
   return rows.length ? rows : null;
 }
+// Сообщения после файла: {after_min, text | material | poll}. Поля, которых в форме нет (кнопки у текста), сохраняем как были.
+function fuRow(f){
+  var div = document.createElement("div"); div.className = "furow"; div._f = f || {};
+  var kind = f && f.poll ? "poll" : f && f.material ? "material" : "text";
+  div.innerHTML = '<div class="top"><input type="number" min="0.1" step="any" title="через сколько минут" value="' + esc(f ? f.after_min : 30) + '">'
+    + '<select><option value="text">текст</option><option value="material">материал</option><option value="poll">опрос</option></select>'
+    + '<input type="text" placeholder="ключ материала или опроса" value="' + esc(f ? (f.material || f.poll || "") : "") + '">'
+    + '<button type="button" class="btn ghost" title="убрать">×</button></div>'
+    + '<textarea placeholder="Текст сообщения">' + esc(f && f.text || "") + '</textarea>';
+  var sel = div.querySelector("select"), key = div.querySelector(".top input[type=text]"), ta = div.querySelector("textarea");
+  function sync(){ key.hidden = sel.value === "text"; ta.hidden = sel.value === "material"; ta.placeholder = sel.value === "poll" ? "Текст перед опросом (необязательно)" : "Текст сообщения"; }
+  sel.value = kind; sel.onchange = sync; sync();
+  div.querySelector("button").onclick = function(){ div.remove(); fuSum(); };
+  document.getElementById("fus").appendChild(div);
+}
+document.getElementById("addfu").onclick = function(){ fuRow(null); fuSum(); };
+function readFollowups(){
+  var rows = [], bad = null;
+  document.querySelectorAll("#fus .furow").forEach(function(r, i){
+    var min = Number(r.querySelector("input[type=number]").value), k = r.querySelector("select").value,
+      v = r.querySelector(".top input[type=text]").value.trim(), t = r.querySelector("textarea").value.trim();
+    if (k === "text" && !t || k !== "text" && !v) return;   // пустую строку просто пропускаем
+    if (!(min > 0)) { bad = "сообщение после файла " + (i + 1) + ": укажите, через сколько минут"; return; }
+    var f = { after_min: min };
+    if (k === "text") { f.text = t; if (r._f.buttons && !r._f.material && !r._f.poll) f.buttons = r._f.buttons; }
+    else { f[k] = v; if (k === "poll" && t) f.text = t; }
+    rows.push(f);
+  });
+  if (bad) throw new Error(bad);
+  return rows.length ? rows : null;
+}
+function fuSum(){ var n = document.querySelectorAll("#fus .furow").length; document.getElementById("fusum").textContent = n ? "· " + n : ""; }
+function subSum(){ document.getElementById("subsum").textContent = mf.sub_channel.value.trim() ? "· включена" : ""; }
+mf.sub_channel.oninput = subSum;
 var QUAL = "qual";
 function syncCond(){
   var q = mf.qual.checked, c = mf.condition.value;
@@ -171,25 +222,42 @@ function link(key){
   var b = document.getElementById("botsel").value, bot = bots.find(function(x){ return x.key === b; });
   return b ? "https://t.me/" + b + "?start=" + (bot && bot.tag_materials ? "" : "file_") + key : "(бот ещё не подключён к движку)";
 }
-function editMaterial(m){
-  editing = m ? m.key : null;
-  document.getElementById("mf-title").textContent = m ? "Материал «" + m.title + "»" : "Новый материал";
-  mf.reset(); document.getElementById("btns").innerHTML = "";
+var editingRow = null;
+function editMaterial(m, scroll){
+  editing = m ? m.key : null; editingRow = m || null;
+  document.getElementById("mf-title").textContent = m ? "Изменить материал «" + m.title + "»" : "Новый материал";
+  document.getElementById("mf-edit").hidden = !m; document.getElementById("mcancel").hidden = !m;
+  document.getElementById("mcard").classList.toggle("editing", !!m);
+  mf.reset(); document.getElementById("btns").innerHTML = ""; document.getElementById("fus").innerHTML = "";
   mf.key.readOnly = !!m;
   if (m) {
     mf.key.value = m.key; mf.title.value = m.title || ""; mf.note.value = m.note || ""; mf.text.value = m.text || ""; mf.condition.value = m.condition || "none";
     mf.qual.checked = m.condition === "poll" && m.poll_key === QUAL; mf.poll_key.value = m.poll_key || ""; mf.ask_text.value = m.ask_text || ""; mf.list_key.value = m.list_key || ""; mf.active.checked = !!m.active; mf.default_buttons.checked = m.default_buttons !== 0;
+    mf.sub_channel.value = m.sub_channel || ""; mf.sub_link.value = m.sub_link || ""; mf.sub_text.value = m.sub_text || "";
     try { (JSON.parse(m.buttons || "[]") || []).forEach(function(row){ (Array.isArray(row) ? row : [row]).forEach(btnRow); }); } catch (e) {}
+    try { (JSON.parse(m.followups || "[]") || []).forEach(fuRow); } catch (e) {}
     document.getElementById("fname").textContent = m.file_name ? m.file_name : "не загружен";
+    document.getElementById("filehint").textContent = m.file_name ? "Выберите новый файл, чтобы заменить текущий: ссылка и статистика не меняются. До 25 МБ." : "До 25 МБ. Загрузится при сохранении.";
     document.getElementById("mlink").innerHTML = '<p class="note">Ссылка: <span class="mono">' + esc(link(m.key)) + '</span></p>';
-  } else { document.getElementById("fname").textContent = "не загружен"; document.getElementById("mlink").innerHTML = ""; }
-  mf.text.oninput(); syncCond();
+  } else {
+    document.getElementById("fname").textContent = "не загружен"; document.getElementById("mlink").innerHTML = "";
+    document.getElementById("filehint").textContent = "До 25 МБ. Загружается после сохранения материала.";
+  }
+  document.getElementById("subwrap").open = !!(m && m.sub_channel); document.getElementById("fuwrap").open = !!(m && m.followups);
+  mf.text.oninput(); syncCond(); subSum(); fuSum();
+  // Форма под длинным списком (или справа вверху) — без прокрутки кажется, что «изменить» не сработало.
+  if (scroll) { document.getElementById("mcard").scrollIntoView({ block: "start" }); mf.title.focus({ preventScroll: true }); }
 }
-document.getElementById("mnew").onclick = function(){ editMaterial(null); };
+document.getElementById("mnew").onclick = function(){ editMaterial(null, true); };
+document.getElementById("mcancel").onclick = function(){ editMaterial(editingRow, true); };
 mf.onsubmit = function(e){
   e.preventDefault();
+  var followups; try { followups = readFollowups(); } catch (err) { return say(false, err.message); }
   var body = { key: mf.key.value.trim(), title: mf.title.value.trim(), note: mf.note.value.trim(), text: mf.text.value, buttons: readButtons(), condition: mf.qual.checked ? "poll" : (mf.condition.value === "poll" && mf.poll_key.value === QUAL ? "none" : mf.condition.value),
-    poll_key: mf.qual.checked ? QUAL : (mf.condition.value === "poll" && mf.poll_key.value !== QUAL ? mf.poll_key.value : null), ask_text: mf.ask_text.value.trim() || null, list_key: mf.list_key.value.trim() || null, active: mf.active.checked, default_buttons: mf.default_buttons.checked };
+    poll_key: mf.qual.checked ? QUAL : (mf.condition.value === "poll" && mf.poll_key.value !== QUAL ? mf.poll_key.value : null), ask_text: mf.ask_text.value.trim() || null, list_key: mf.list_key.value.trim() || null, active: mf.active.checked, default_buttons: mf.default_buttons.checked,
+    sub_channel: mf.sub_channel.value.trim() || null, sub_link: mf.sub_link.value.trim() || null, sub_text: mf.sub_text.value.trim() || null, followups: followups };
+  // Список — это «кто забрал»: новый список начнёт счёт с нуля, старые люди в нём не окажутся.
+  if (editingRow && (editingRow.list_key || "") !== (body.list_key || "") && !confirm("Сменить список? Счётчик «получили» начнётся заново, прежние люди останутся в старом списке.")) return;
   post("materials", body).then(function(j){
     if (!j.ok) return say(false, j.error || "не сохранилось");
     var f = document.getElementById("file").files[0];
@@ -207,7 +275,7 @@ function renderMaterials(){
   document.getElementById("mlist").innerHTML = rows.length ? '<table><thead><tr><th>Материал</th><th>Выдача</th><th class="num">Получили</th><th></th></tr></thead><tbody>'
     + rows.map(function(m){ return '<tr><td><b>' + esc(m.title) + '</b>' + (m.active ? '' : ' <span class="pill">выключен</span>') + (m.note ? '<div class="mnote">' + esc(m.note) + '</div>' : '') + '<div class="mono">' + esc(link(m.key)) + '</div>' + (m.file_name ? '<div class="note">📎 ' + esc(m.file_name) + '</div>' : '') + '</td><td class="k">' + esc(condLabel(m)) + '</td><td class="num">' + (m.got || 0) + '</td><td><button class="btn ghost" data-k="' + esc(m.key) + '">изменить</button></td></tr>'; }).join("")
     + '</tbody></table>' : '<p class="empty">' + (mats.length ? "ничего не нашлось" : "материалов пока нет") + '</p>';
-  document.querySelectorAll("#mlist button[data-k]").forEach(function(b){ b.onclick = function(){ editMaterial(mats.find(function(m){ return m.key === b.dataset.k; })); }; });
+  document.querySelectorAll("#mlist button[data-k]").forEach(function(b){ b.onclick = function(){ editMaterial(mats.find(function(m){ return m.key === b.dataset.k; }), true); }; });
 }
 document.getElementById("mq").oninput = renderMaterials;
 function loadMaterials(open){
