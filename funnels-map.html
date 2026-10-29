@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Карта воронок amoCRM — макет</title>
+<style>
+  :root{
+    --ink:#151616; --paper:#f6f4ef; --card:#fff; --line:#d9d4c8; --muted:#6b6a66;
+    --gold:#b59f76; --gold2:#d8c9a8; --red:#c0392b; --green:#2e7d4f; --robot:#4a6fa5; --human:#b59f76;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  header{padding:28px 24px 12px;max-width:1560px;margin:0 auto}
+  h1{margin:0 0 6px;font-size:26px;letter-spacing:.02em;text-transform:uppercase;font-weight:800}
+  .sub{color:var(--muted);max-width:900px}
+  .mock{display:inline-block;background:#fff3c4;border:1px dashed #d1b23a;color:#6b5200;font-size:12px;padding:3px 8px;border-radius:6px;margin-bottom:10px;letter-spacing:.04em}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:var(--muted)}
+  .legend span::before{content:"";display:inline-block;width:26px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px;border-radius:2px}
+  .legend .r::before{border-color:var(--robot)}
+  .legend .h::before{border-color:var(--human)}
+  .legend .x::before{border-color:var(--red);border-top-style:dashed}
+  .legend .a::before{border-color:#888;border-top-style:dotted}
+
+  .board{position:relative;max-width:1560px;margin:8px auto 40px;padding:0 24px}
+  .grid{display:grid;grid-template-columns:200px 1fr 1fr 190px;grid-template-rows:auto auto;gap:110px 150px;align-items:start}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 0 rgba(0,0,0,.03);position:relative}
+  .card h2{margin:0;padding:12px 16px;font-size:15px;text-transform:uppercase;letter-spacing:.05em;font-weight:800;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .card h2 small{font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted);font-size:12px}
+  .card .who{padding:6px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);background:#faf9f6}
+  ol.stages{list-style:none;margin:0;padding:8px 10px}
+  ol.stages li{padding:6px 8px;border-radius:8px;margin:2px 0;font-size:13.5px;display:flex;gap:8px;align-items:baseline}
+  ol.stages li .n{color:var(--muted);font-size:11px;min-width:16px}
+  ol.stages li.key{background:#f3efe4;font-weight:600}
+  ol.stages li.win{background:#e6f2ea;color:var(--green);font-weight:700}
+  ol.stages li.lose{background:#f8e7e5;color:var(--red);font-weight:700}
+  ol.stages li.dim{color:#9a9890}
+  ol.stages li .hint{font-weight:400;color:var(--muted);font-size:12px;margin-left:auto;text-align:right;max-width:52%}
+  .inputs .card{padding:0}
+  .inputs ul{list-style:none;margin:0;padding:8px 10px}
+  .inputs li{padding:7px 8px;font-size:13.5px;border-radius:8px}
+  .inputs li small{display:block;color:var(--muted);font-size:12px}
+  .note{font-size:12px;color:var(--muted);padding:8px 16px 12px;border-top:1px dashed var(--line)}
+  .rule{grid-column:1/-1;background:var(--ink);color:#fff;border-radius:14px;padding:16px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .rule h3{margin:0 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--gold2)}
+  .rule p{margin:0;font-size:13.5px;color:#e8e6e0}
+  svg.arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  svg.arrows path{fill:none;stroke-width:2.5;stroke-linejoin:round}
+  .lbls{position:absolute;inset:0;pointer-events:none}
+  .lbl{position:absolute;transform:translate(-50%,-50%);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:12px;line-height:1.25;text-align:center;white-space:nowrap;color:var(--ink)}
+  .lbl.ban{color:var(--red);font-weight:600;border-color:#e3b3ad}
+  svg.arrows .robot{stroke:var(--robot)}
+  svg.arrows .human{stroke:var(--human)}
+  svg.arrows .auto{stroke:#888;stroke-dasharray:2 5}
+  svg.arrows .ban{stroke:var(--red);stroke-dasharray:7 6}
+  @media (max-width:1100px){ .grid{grid-template-columns:1fr 1fr;gap:60px 40px} .inputs{grid-column:1/-1} svg.arrows,.lbls{display:none} .rule{grid-template-columns:1fr} }
+  @media print{ body{background:#fff} .mock{display:none} }
+</style>
+</head>
+<body>
+<header>
+  <div class="mock">МАКЕТ v1 · структура и стрелки · тексты «что делаю на этапе» заполним после согласования</div>
+  <h1>Как живёт сделка в amoCRM</h1>
+  <div class="sub">Пять воронок, между которыми сделку переносит либо менеджер, либо робот. Стрелка показывает, куда уходит сделка, подпись — кто это делает и почему. Красная стрелка — то, что делать нельзя.</div>
+  <div class="legend"><span class="h">менеджер переносит руками</span><span class="r">робот создаёт или переносит сам</span><span class="a">автоматика по сроку</span><span class="x">запрещено, сторож откатит</span></div>
+</header>
+
+<div class="board" id="board">
+<div class="grid">
+
+  <!-- ВХОДЫ -->
+  <div class="inputs" id="inputs">
+    <div class="card">
+      <h2>Откуда лиды</h2>
+      <ul>
+        <li id="in-chat">Чаты WhatsApp / Telegram<small>кодовая фраза блогера</small></li>
+        <li id="in-bot">Salebot<small>после «поделиться контактом»</small></li>
+        <li id="in-site">Сайт и чат ИИ<small>форма, виджет чата</small></li>
+        <li id="in-fb">Реклама FB<small>через Google Таблицы</small></li>
+      </ul>
+      <div class="note">Робот ищет контакт по телефону. Есть активная сделка в 1-й или 2-й линии — новая не создаётся.</div>
+    </div>
+  </div>
+
+  <!-- ПЕРВАЯ ЛИНИЯ -->
+  <div class="card" id="p1">
+    <h2>Первая линия <small>продажи тренинга</small></h2>
+    <div class="who">Общая очередь. Руководитель делит поровну. Взять в работу — до 3 минут.</div>
+    <ol class="stages">
+      <li class="dim"><span class="n">·</span>Неразобранное / клик чат-ИИ / чат-ИИ ответил</li>
+      <li class="key" id="p1-new"><span class="n">1</span>Новый лид<span class="hint">точка входа всех лидов</span></li>
+      <li id="p1-work"><span class="n">2</span>Взят в работу<span class="hint">менеджер принял лид</span></li>
+      <li id="p1-ndz"><span class="n">3</span>НДЗ 1 → НДЗ 2 → НДЗ 3 → НДЗ 4<span class="hint">попытки дозвона</span></li>
+      <li><span class="n">4</span>Ответил на первый вопрос<span class="hint">здесь идёт квалификация</span></li>
+      <li><span class="n">5</span>Квалифицирован, не назначили</li>
+      <li><span class="n">6</span>Квалифицирован, прогрев</li>
+      <li class="key" id="p1-meet"><span class="n">7</span>Встреча назначена<span class="hint">оригинал остаётся здесь</span></li>
+      <li><span class="n">8</span>Встреча перенесена · подтверждена</li>
+      <li class="win" id="p1-win"><span class="n">✓</span>Встреча проведена<span class="hint">успех, финал 1-й линии</span></li>
+      <li class="lose" id="p1-zin"><span class="n">✕</span>Закрыто и не реализовано (ЗИН)<span class="hint">причина отказа обязательна · на 30-й день сюда попадает сама</span></li>
+    </ol>
+    <div class="note">Не ЦА — это не этап, а значение поля «Квалификация».</div>
+  </div>
+
+  <!-- ВТОРАЯ ЛИНИЯ -->
+  <div class="card" id="p2">
+    <h2>Вторая линия <small>диагностика → оплата</small></h2>
+    <div class="who">Диагносты и комитет. Сделка здесь — копия, оригинал живёт в 1-й линии.</div>
+    <ol class="stages">
+      <li class="dim"><span class="n">·</span>Неразобранное · «Иные» лиды</li>
+      <li class="key" id="p2-diag"><span class="n">1</span>Назначена на сегодня диагностика<span class="hint">точка входа копии</span></li>
+      <li><span class="n">2</span>Диагностика проведена · Повторка проведена</li>
+      <li><span class="n">3</span>Подали заявку на комитет → одобрил</li>
+      <li><span class="n">4</span>Клиент отреагировал → подтвердил дату $</li>
+      <li><span class="n">5</span>Счёт выставлен → чек → предоплата</li>
+      <li class="win" id="p2-win"><span class="n">✓</span>100 % оплаты получено</li>
+      <li class="lose" id="p2-zin"><span class="n">✕</span>Прогрев / закрытие (ЗИН)</li>
+    </ol>
+  </div>
+
+  <!-- ДУБЛИ -->
+  <div class="card" id="dup">
+    <h2>Дубли</h2>
+    <div class="who">Технический склад</div>
+    <ol class="stages"><li id="dup-in" class="dim">Дубль контакта</li></ol>
+    <div class="note">Робот уносит сюда закрытые сделки, если контакт оказался дублем. Менеджер сюда не ходит.</div>
+  </div>
+
+  <!-- РЕАНИМАЦИЯ 1 ЛИНИИ -->
+  <div></div>
+  <div class="card" id="r1">
+    <h2>Реанимация 1 линия <small>прогрев после ЗИН</small></h2>
+    <div class="who">Менеджеры реанимации. Сделку создаёт робот, источник сохраняется.</div>
+    <ol class="stages">
+      <li class="key" id="r1-base"><span class="n">1</span>База реанимации<span class="hint">точка входа</span></li>
+      <li><span class="n">2</span>НДЗ 1 → НДЗ 2 → НДЗ 3</li>
+      <li><span class="n">3</span>Игнор</li>
+      <li><span class="n">4</span>ЦА, не назначено</li>
+      <li class="win" id="r1-win"><span class="n">✓</span>Встреча назначена</li>
+      <li class="lose" id="r1-zin"><span class="n">✕</span>Закрыто и не реализовано</li>
+    </ol>
+  </div>
+
+  <!-- ПОВТОРНЫЕ ДИАГНОСТИКИ -->
+  <div class="card" id="pd">
+    <h2>Повторных диагностик <small>база клиентов 2-й линии</small></h2>
+    <div class="who">Полина Ахметшина. Сделку создаёт робот.</div>
+    <ol class="stages">
+      <li class="key" id="pd-new"><span class="n">1</span>Новый лид<span class="hint">точка входа</span></li>
+      <li><span class="n">2</span>Лид в работе · на запись касдев</li>
+      <li><span class="n">3</span>Касание 1 → 2 → 3 → 4</li>
+      <li><span class="n">4</span>Клиент ответил</li>
+      <li><span class="n">5</span>Встреча назначена · подтверждена · прогрев</li>
+      <li class="win" id="pd-win"><span class="n">✓</span>Встреча проведена</li>
+      <li class="lose" id="pd-zin"><span class="n">✕</span>Закрыто и не реализовано</li>
+    </ol>
+  </div>
+  <div></div>
+
+  <!-- ПРАВИЛА -->
+  <div class="rule">
+    <div><h3>Из ЗИН назад нельзя</h3><p>Сделку из «Закрыто и не реализовано» 1-й и 2-й линии не возвращают. Клиент вернулся — работаем с ним в реанимации, после успеха робот заводит новую сделку с источником «БК ЗИН». Сторож откатит возврат и напишет в канал.</p></div>
+    <div><h3>30 дней на лид</h3><p>На 27-й день после создания сделки в 1-й линии приходит задача, на 30-й день сделка закрывается сама с причиной «Пропал / Не отвечает».</p></div>
+    <div><h3>Одна сделка на клиента</h3><p>Пока в 1-й или 2-й линии есть открытая сделка, новая не создаётся, даже если клиент пришёл от другого блогера. Источник живёт в сделке.</p></div>
+  </div>
+
+</div>
+<svg class="arrows" id="arrows"></svg>
+<div class="lbls" id="lbls"></div>
+</div>
+
+<script>
+// Стрелки: from → to (id элементов), тип, подпись (строки через |), маршрут.
+//   route: "h"  — вправо через коридор между колонками
+//          "v"  — вниз через коридор между рядами
+//          "gutter-right" — выйти вправо, подняться по коридору, войти слева в цель
+//          "gutter-far"   — выйти вправо, подняться по правому коридору, войти в цель справа
+//          "loop-left"    — выйти влево, подняться по левому коридору, войти слева (запрет)
+const ARROWS = [
+  {from:"inputs", to:"p1-new", kind:"robot", route:"h", label:"робот, если нет|активной сделки"},
+  {from:"p1-meet", to:"p2-diag", kind:"robot", route:"h", label:"робот создаёт копию|при назначении диагностики"},
+  {from:"p1-zin", to:"r1-base", kind:"robot", route:"v", label:"робот ЗИН: ставит галку и дату ЗИН, создаёт сделку в реанимации"},
+  {from:"r1-win", to:"p2-diag", kind:"robot", route:"gutter-right", label:"новая сделка|«БК ЗИН 1-линия»"},
+  {from:"p2-zin", to:"pd-new", kind:"robot", route:"v", label:"робот: закрытие 2-й линии → база клиентов"},
+  {from:"pd-win", to:"p2-diag", kind:"robot", route:"gutter-far", label:"новая сделка|«БК ЗИН 2-линия»"},
+  {from:"p1-zin", to:"p1-new", kind:"ban", route:"loop-left", label:"вернуть из ЗИН|нельзя"},
+];
+const NS="http://www.w3.org/2000/svg";
+// Координаты в единицах SVG. При CSS-масштабе (zoom, печать) getBoundingClientRect
+// отдаёт экранные пиксели, поэтому делим на реальный коэффициент доски.
+function rect(idOrEl){ const board=document.getElementById("board"); const b=board.getBoundingClientRect(); const k=b.width/board.offsetWidth||1;
+  const e=typeof idOrEl==="string"?document.getElementById(idOrEl):idOrEl; const r=e.getBoundingClientRect();
+  const x=(r.left-b.left)/k, y=(r.top-b.top)/k, w=r.width/k, h=r.height/k;
+  return {x, y, w, h, cx:x+w/2, cy:y+h/2, r:x+w, b:y+h}; }
+function card(id){ const e=document.getElementById(id); return rect(e.closest(".card") || e.querySelector(".card") || e); }
+function el(tag, attrs){ const e=document.createElementNS(NS,tag); for (const k in attrs) e.setAttribute(k,attrs[k]); return e; }
+function poly(pts, r=14){ // ломаная со скруглёнными углами
+  let d=`M${pts[0][0]},${pts[0][1]}`;
+  for (let i=1;i<pts.length-1;i++){
+    const [x0,y0]=pts[i-1],[x1,y1]=pts[i],[x2,y2]=pts[i+1];
+    const l1=Math.hypot(x1-x0,y1-y0), l2=Math.hypot(x2-x1,y2-y1), rr=Math.min(r,l1/2,l2/2);
+    const ax=x1-(x1-x0)/l1*rr, ay=y1-(y1-y0)/l1*rr, bx=x1+(x2-x1)/l2*rr, by=y1+(y2-y1)/l2*rr;
+    d+=` L${ax},${ay} Q${x1},${y1} ${bx},${by}`;
+  }
+  const [xl,yl]=pts[pts.length-1]; return d+` L${xl},${yl}`;
+}
+function label(x, y, lines, kind){
+  const d=document.createElement("div"); d.className="lbl "+(kind==="ban"?"ban":"");
+  d.innerHTML=lines.map((l)=>l.replace(/&/g,"&amp;").replace(/</g,"&lt;")).join("<br>");
+  d.style.left=Math.round(x)+"px"; d.style.top=Math.round(y)+"px";
+  document.getElementById("lbls").appendChild(d);
+}
+function draw(){
+  const svg=document.getElementById("arrows"); svg.innerHTML=""; document.getElementById("lbls").innerHTML="";
+  const defs=el("defs",{});
+  for (const [k,c] of [["robot","#4a6fa5"],["human","#b59f76"],["auto","#888"],["ban","#c0392b"]]){
+    const m=el("marker",{id:"m-"+k, markerWidth:10, markerHeight:10, refX:8, refY:5, orient:"auto", markerUnits:"userSpaceOnUse"});
+    m.appendChild(el("path",{d:"M0,0 L10,5 L0,10 z", fill:c})); defs.appendChild(m);
+  }
+  svg.appendChild(defs);
+  for (const a of ARROWS){
+    const f=rect(a.from), t=rect(a.to), fc=card(a.from), tc=card(a.to);
+    let pts, lx, ly, anchor="middle";
+    if (a.route==="h"){ pts=[[fc.r,f.cy],[tc.x,t.cy]]; if (Math.abs(f.cy-t.cy)>6){ const gx=(fc.r+tc.x)/2; pts=[[fc.r,f.cy],[gx,f.cy],[gx,t.cy],[tc.x,t.cy]]; } lx=(fc.r+tc.x)/2; ly=Math.min(f.cy,t.cy)-26; }
+    else if (a.route==="v"){ pts=[[f.cx,fc.b],[t.cx,tc.y]]; lx=f.cx; ly=(fc.b+tc.y)/2; }
+    else if (a.route==="gutter-right"){ const gx=(fc.r+tc.x)/2; pts=[[fc.r,f.cy],[gx,f.cy],[gx,t.cy+10],[tc.x,t.cy+10]]; lx=gx; ly=(f.cy+t.cy)/2+40; }
+    else if (a.route==="gutter-far"){ const gx=tc.r+75; pts=[[fc.r,f.cy],[gx,f.cy],[gx,t.cy+10],[tc.r,t.cy+10]]; lx=gx; ly=(f.cy+t.cy)/2; }
+    else if (a.route==="loop-left"){ const gx=fc.x-60; pts=[[fc.x,f.cy],[gx,f.cy],[gx,t.cy],[tc.x,t.cy]]; lx=gx; ly=(f.cy+t.cy)/2; }
+    svg.appendChild(el("path",{d:poly(pts), class:a.kind, "marker-end":`url(#m-${a.kind})`}));
+    label(lx, ly, a.label.split("|"), a.kind);
+  }
+}
+window.addEventListener("load",draw); window.addEventListener("resize",draw);
+</script>
+</body>
+</html>
