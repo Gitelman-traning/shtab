@@ -37,6 +37,7 @@
 .tabs button[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .tabs button[aria-selected="true"]::after{content:"";display:block;height:2px;margin:6px auto 0;width:28px;border-radius:2px;background:var(--gold-b)}
 .tabnote{font-size:12.5px;color:var(--dim);margin:0 0 4px;min-height:18px}.tabnote b{color:var(--ink)}
+.qrbox{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:8px}.qrbox .qi{width:160px;height:160px;background:#fff;border-radius:8px;padding:6px}.qrbox .qi svg{display:block;width:100%;height:100%}.qrbox .qa{display:flex;flex-direction:column;gap:6px}
 .it .ln{margin-top:8px}.inl{display:flex;gap:8px;margin-top:6px}.inl input{flex:1;font:inherit;font-size:13px;color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:8px;padding:6px 9px}
 </style>
 </head>
@@ -92,7 +93,7 @@
           <textarea id="text" maxlength="200" style="margin-top:8px"></textarea>
           <div class="hint">В 245 знаков помещается около 35 букв. «Я от Мухаммада, тренинг Команда» = 202, с фамилией уже не лезет.</div>
           <div class="res"><div class="meter" id="meter"><span>Длина ссылки для сторис</span><b><span id="len">0</span> / <span id="lim">245</span></b></div><div class="bar"><i id="bar"></i></div>
-          <button class="btn ghost" type="button" id="copywa" style="margin-top:4px">Копировать WA-ссылку</button>
+          <button class="btn ghost" type="button" id="copywa" style="margin-top:4px">Копировать WA-ссылку</button> <button class="btn ghost qrb" type="button" id="qrwa" style="margin-top:4px" hidden>QR-код</button>
           <div class="hint bad" id="over" hidden>Длиннее предела — стикер в сторис не примет. Сократите текст или подтвердите при копировании.</div></div>
         </div>
 
@@ -100,7 +101,7 @@
           <label for="botsel">Бот</label><select id="botsel"></select>
           <div class="hint">Метка только латиницей: последнее слово тега (обычно фамилия) транслитерируется, добавляются день и месяц. Для запасного бота имя блогера само попадёт в приветствие.</div>
           <div class="res"><div class="sub">Метка: <span class="tagc" id="botslug">—</span></div>
-          <button class="btn ghost" type="button" id="copybot" style="margin-top:8px">Копировать ссылку на бота</button></div>
+          <button class="btn ghost" type="button" id="copybot" style="margin-top:8px">Копировать ссылку на бота</button> <button class="btn ghost qrb" type="button" id="qrbot" style="margin-top:8px" hidden>QR-код</button></div>
           <label>Кружок Паши в боте <span class="req">обязательно</span></label>
           <div class="checks">
             <label><input type="radio" name="circle" value="no" checked> Не нужен</label>
@@ -130,6 +131,7 @@
 </div>
 </div>
 <script src="/ui.js"></script>
+<script src="/vendor/qrcode.js"></script>
 <script>
 (function(){
 var $ = function(id){ return document.getElementById(id); };
@@ -144,6 +146,30 @@ function slug(tag){ var m = tag.match(/^(\d{2})\.(\d{2})_(.+)$/u); if (!m) retur
 function msg(kind, html){ $('msgs').innerHTML = html ? '<div class="msg ' + kind + '">' + html + '</div>' : ''; if (html) window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function api(method, body){ return fetch('/api/influence-links', { method: method, credentials: 'same-origin', headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
   .then(function(r){ return r.json().then(function(j){ if (!r.ok || !j.ok) throw new Error(j.error || ('ошибка ' + r.status)); return j; }); }); }
+// QR-код — пока только для YouTube: на экране ролика по ссылке не кликнуть, а камерой телефона навести можно
+function isYT(platform){ return /youtube/i.test(String(platform || '')); }
+function qrOf(v){ var q = qrcode(0, 'M'); q.addData(v); q.make(); return q; }
+function qrSvg(q){ var n = q.getModuleCount(), m = 4, d = '';
+  for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) d += 'M' + (c + m) + ',' + (r + m) + 'h1v1h-1z';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + (n + 2 * m) + ' ' + (n + 2 * m) + '" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>'; }
+function qrPng(q, cb){ var n = q.getModuleCount() + 8, k = Math.max(8, Math.ceil(1024 / n)), cv = document.createElement('canvas'), x = cv.getContext('2d');
+  cv.width = cv.height = n * k; x.fillStyle = '#fff'; x.fillRect(0, 0, cv.width, cv.height); x.fillStyle = '#000';
+  for (var r = 0; r < n - 8; r++) for (var c = 0; c < n - 8; c++) if (q.isDark(r, c)) x.fillRect((c + 4) * k, (r + 4) * k, k, k);
+  cv.toBlob(cb, 'image/png'); }
+function save(blob, name){ var a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(u); }, 2000); }
+// имя файла латиницей: браузеры не всегда принимают кириллицу в имени скачиваемого файла
+function latin(v){ var l = String(v || '').toLowerCase(), o = ''; for (var i = 0; i < l.length; i++) o += (TR[l[i]] !== undefined ? TR[l[i]] : l[i]); return o.replace(/[^a-z0-9._-]+/g, '_').replace(/_+/g, '_'); }
+function qrBtn(v, name){ return ' <button class="btn ghost qrb" type="button" data-v="' + esc(v) + '" data-n="' + esc(name) + '">QR-код</button>'; }
+function qrBox(b){ var x = b.nextElementSibling; return x && x.classList.contains('qrbox') ? x : null; }
+function qrToggle(b){ var box = qrBox(b);
+  if (box) { box.remove(); return; }
+  var v = b.getAttribute('data-v'), name = 'qr_' + latin(b.getAttribute('data-n')); if (!v) return;
+  var q = qrOf(v), svg = qrSvg(q); box = document.createElement('div'); box.className = 'qrbox';
+  box.innerHTML = '<div class="qi">' + svg + '</div><div class="qa"><button class="btn ghost" type="button" data-f="png">Скачать PNG</button><button class="btn ghost" type="button" data-f="svg">Скачать SVG</button><span class="sub">Перед выдачей наведите камеру телефона и проверьте</span></div>';
+  box.querySelector('[data-f=png]').onclick = function(){ qrPng(q, function(bl){ save(bl, name + '.png'); }); };
+  box.querySelector('[data-f=svg]').onclick = function(){ save(new Blob([svg], { type: 'image/svg+xml' }), name + '.svg'); };
+  b.insertAdjacentElement('afterend', box); }
+document.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('.qrb'); if (b) qrToggle(b); });
 function copy(btn, v, label){ if (!v) return; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(function(){ btn.textContent = 'Скопировано'; setTimeout(function(){ btn.textContent = label; }, 1500); }, function(){ window.prompt('Скопируйте', v); }); }
 
 var st = { tag: '', wa: '', over: false, bot: '', types: [] };
@@ -169,6 +195,10 @@ function render(){
   var n = st.wa.length; $('len').textContent = n; $('bar').style.width = Math.min(100, n / LIMIT * 100) + '%'; 
   st.over = n > LIMIT; $('meter').className = 'meter' + (st.over ? ' over' : (t ? ' ok' : '')); $('over').hidden = !st.over;
   var s = slug(st.tag); st.bot = s ? 'https://t.me/' + (($('botsel') && $('botsel').value) || CFG.bot) + '?start=' + CFG.prefix + s : ''; $('botslug').textContent = s ? CFG.prefix + s : '—';
+  var yt = isYT($('platform').value);
+  [['qrwa', st.wa, '_wa'], ['qrbot', st.bot, '_bot']].forEach(function(x){ var b = $(x[0]), old = b.getAttribute('data-v') || '';
+    b.hidden = !yt || !x[1]; b.setAttribute('data-v', x[1]); b.setAttribute('data-n', (st.tag || 'qr') + x[2]);
+    var box = qrBox(b); if (box && (b.hidden || old !== x[1])) box.remove(); });
   var p = [];
   if (!st.tag) p.push('тег не по формату'); if (!$('customer').value) p.push('не выбран заказчик'); if (!$('name').value.trim()) p.push('не указан блогер'); if (!$('gen').value.trim()) p.push('не заполнено «Я от …»');
   if (st.types.indexOf('wa') >= 0 && !t) p.push('нет текста для WhatsApp'); if (st.types.indexOf('wa') >= 0 && t && !/я от/i.test(t)) p.push('в тексте нет «Я от …»');
@@ -187,13 +217,14 @@ function list(rows){
   if (pend) $('cnt').innerHTML = 'последние ' + rows.length + ' · <span class="pill wait">ждут администратора: ' + pend + '</span>';
   if (!rows.length) { $('list').innerHTML = '<p class="note">Заявок пока нет</p>'; return; }
   $('list').innerHTML = rows.map(function(r){
+    var qr = function(v, t){ return isYT(r.who) ? qrBtn(v, r.tag + '_' + t) : ''; };
     var out = '<div class="it"><span class="tagc">' + esc(r.tag) + '</span> <span class="sub" style="display:inline">' + esc(r.date) + ' · ' + esc(r.by) + '</span><div class="sub">' + esc(r.who) + '</div>';
-    if (r.wa) out += '<div class="ln"><span class="sub">WA · ' + esc(r.waLen) + ' зн. · «' + esc(r.waText) + '»</span><div class="mono">' + esc(r.wa) + '</div><button class="btn ghost cp" type="button" data-v="' + esc(r.wa) + '">Копировать</button></div>';
-    if (r.bot) out += '<div class="ln"><span class="sub">TG-бот</span><div class="mono">' + esc(r.bot) + '</div><button class="btn ghost cp" type="button" data-v="' + esc(r.bot) + '">Копировать</button></div>';
+    if (r.wa) out += '<div class="ln"><span class="sub">WA · ' + esc(r.waLen) + ' зн. · «' + esc(r.waText) + '»</span><div class="mono">' + esc(r.wa) + '</div><button class="btn ghost cp" type="button" data-v="' + esc(r.wa) + '">Копировать</button>' + qr(r.wa, 'wa') + '</div>';
+    if (r.bot) out += '<div class="ln"><span class="sub">TG-бот</span><div class="mono">' + esc(r.bot) + '</div><button class="btn ghost cp" type="button" data-v="' + esc(r.bot) + '">Копировать</button>' + qr(r.bot, 'bot') + '</div>';
     if (String(r.circle).indexOf('нужен') === 0) out += '<div class="ln"><span class="pill wait">Кружок в боте: ждёт администратора</span><div class="sub">' + esc(r.circle.slice(7)) + '</div>' + (ME.admin ? '<button class="btn ghost act" type="button" data-a="circle" data-row="' + r.row + '" style="margin-top:6px">Кружок добавлен</button>' : '') + '</div>';
     else if (r.circle === 'добавлен') out += '<div class="sub ln">Кружок в боте добавлен</div>';
     if (String(r.types).indexOf('tgin') >= 0) {
-      if (r.tgin) out += '<div class="ln"><span class="sub">TG-входящее</span><div class="mono">' + esc(r.tgin) + '</div><button class="btn ghost cp" type="button" data-v="' + esc(r.tgin) + '">Копировать</button></div>';
+      if (r.tgin) out += '<div class="ln"><span class="sub">TG-входящее</span><div class="mono">' + esc(r.tgin) + '</div><button class="btn ghost cp" type="button" data-v="' + esc(r.tgin) + '">Копировать</button>' + qr(r.tgin, 'tgin') + '</div>';
       else out += '<div class="ln"><span class="pill wait">TG-входящее: ждёт ссылку</span><div class="sub">«' + esc(r.phrase) + '»</div>' + (ME.admin ? '<div class="inl"><input type="url" placeholder="https://t.me/m/…" id="lk' + r.row + '"><button class="btn ghost act" type="button" data-a="issue" data-row="' + r.row + '">Выдать</button></div>' : '') + '</div>';
     }
     var ab = function(op, label){ return ME.admin ? ' <button class="btn ghost act" type="button" data-a="amo" data-op="' + op + '" data-row="' + r.row + '">' + label + '</button>' : ''; };
@@ -234,8 +265,9 @@ $('f').addEventListener('submit', function(e){
     phrase: $('phrase').value, circle: circle(), circleNote: $('circleNote').value, long: st.over, botKey: $('botsel').value })
     .then(function(d){
       var html = 'Записано: <b>' + esc(d.tag) + '</b>.';
-      if (d.wa) html += '<br>WA (' + d.waLen + ' зн.): <span class="mono">' + esc(d.wa) + '</span>';
-      if (d.bot) html += '<br>TG-бот: <span class="mono">' + esc(d.bot) + '</span>';
+      var yt = isYT($('platform').value);
+      if (d.wa) html += '<br>WA (' + d.waLen + ' зн.): <span class="mono">' + esc(d.wa) + '</span>' + (yt ? qrBtn(d.wa, d.tag + '_wa') : '');
+      if (d.bot) html += '<br>TG-бот: <span class="mono">' + esc(d.bot) + '</span>' + (yt ? qrBtn(d.bot, d.tag + '_bot') : '');
       if (d.waiting && d.waiting.length) html += '<br>Ждёт администратора: ' + esc(d.waiting.join(', ')) + '. Готовую ссылку пришлём в Telegram.';
       html += '<br>Нужна ещё ссылка для этого блогера — переключите вкладку, тег и имя уже заполнены. <a href="#" id="clearf">Новый блогер</a>';
       msg('ok', html); $('circleNote').value = ''; fill(); render(); load();
@@ -256,7 +288,7 @@ load().then(function(d){
   $('phone').innerHTML = CFG.phones.map(function(p){ return '<option value="' + esc(p.value) + '">' + esc(p.label) + '</option>'; }).join('');
   $('watpl').innerHTML = CFG.waTemplates.map(function(t, i){ return '<option value="' + i + '">' + esc(t) + '</option>'; }).join('') + '<option value="custom">Свой текст</option>';
   $('tgtpl').innerHTML = CFG.tgTemplates.map(function(t, i){ return '<option value="' + i + '">' + esc(t) + '</option>'; }).join('') + '<option value="custom">Своя фраза</option>';
-  ['tag','name','text','phone','phrase','circleNote','customer'].forEach(function(id){ $(id).addEventListener('input', render); $(id).addEventListener('change', render); });
+  ['tag','name','text','phone','phrase','circleNote','customer','platform'].forEach(function(id){ $(id).addEventListener('input', render); $(id).addEventListener('change', render); });
   ['gen','watpl','tgtpl'].forEach(function(id){ $(id).addEventListener('input', function(){ fill(); render(); }); $(id).addEventListener('change', function(){ fill(); render(); }); });
   document.querySelectorAll('[name=circle]').forEach(function(c){ c.addEventListener('change', render); });
   document.querySelectorAll('.tabs [role=tab]').forEach(function(b){ b.addEventListener('click', function(){ setTab(b.getAttribute('data-type')); }); });
