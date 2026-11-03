@@ -8,11 +8,15 @@ export function fixture(perms = {}, role = 'member') {
   const order = file => file === 'schema20.sql' ? 17.5 : +(file.match(/\d+/)?.[0] || 1);
   for (const file of readdirSync(root).filter(f => /^schema\d*\.sql$/.test(f) && f !== 'schema18.sql').sort((a,b) => order(a) - order(b))) {
     sqlite.exec(readFileSync(new URL(file, root), 'utf8'));
+    // The initial production hub was seeded before the numbered UPDATE migrations.
+    if (file === 'schema.sql') sqlite.exec("INSERT INTO sections (id,name,config) VALUES ('hub','Synthetic Hub','{}')");
   }
   const calls = [];
   function statement(sql, args = []) {
     const execute = kind => {
       calls.push({sql,args,kind});
+      // SQLite itself permits more variables; production D1 accepts at most 100.
+      if (args.length > 100) throw new Error('D1_ERROR: too many SQL variables (maximum 100)');
       const q = sqlite.prepare(sql);
       if (kind === 'first') return q.get(...args) || null;
       if (kind === 'all') return { results:q.all(...args), success:true };

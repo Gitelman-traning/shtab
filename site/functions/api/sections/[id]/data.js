@@ -27,9 +27,13 @@ export async function onRequestGet({ request, env, params }) {
   // снимки (участники по потокам): последний срез по каждому показателю
   const mx = await env.DB.prepare("SELECT metric, ptype, MAX(asof) AS a FROM points WHERE ptype IN ('potok','month') AND metric IN (" + metrics.map(() => "?").join(",") + ") GROUP BY metric, ptype").bind(...metrics).all();
   const pairs = (mx.results || []).filter((r) => r.a != null);
+  // У общего экрана больше 33 stock-показателей: три параметра на каждый
+  // превышали лимит D1 в 100. Передаём список снимков одним JSON-параметром.
   const stock = pairs.length ? await env.DB.prepare(
-    "SELECT metric, period, dim, value, asof FROM points WHERE " + pairs.map(() => "(metric = ? AND ptype = ? AND asof = ?)").join(" OR ") + " ORDER BY metric, period"
-  ).bind(...pairs.flatMap((r) => [r.metric, r.ptype, r.a])).all() : { results: [] };
+    "SELECT p.metric, p.period, p.dim, p.value, p.asof FROM points p JOIN json_each(?) s " +
+    "ON p.metric = json_extract(s.value, '$[0]') AND p.ptype = json_extract(s.value, '$[1]') " +
+    "AND p.asof = json_extract(s.value, '$[2]') ORDER BY p.metric, p.period"
+  ).bind(JSON.stringify(pairs.map((r) => [r.metric, r.ptype, r.a]))).all() : { results: [] };
   const plans = await env.DB.prepare("SELECT metric, ptype, period, dim, value FROM plans WHERE metric IN (" + metrics.map(() => "?").join(",") + ") ORDER BY period").bind(...metrics).all();
   // раздел одного источника: только его срез (лиды по dim = источник, воронка по dim = "src:источник") как итог ('' )
   let out = (rows.results || []).map((r) => [r.metric, r.period, r.dim, r.value]);

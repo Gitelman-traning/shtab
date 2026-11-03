@@ -78,6 +78,19 @@ test('P1-1 aggregate section snapshot excludes closed child data',async()=>{
   const r=await (await data.onRequestGet({request:request('/api/sections/sales/data'),env:e,params:{id:'sales'}})).json();
   assert.equal(r.rows.length,1);assert.equal(r.rows[0][0],'l1.booked');assert(!JSON.stringify(r).includes('987654'));
 });
+test('P1-2 hub preview with all stock metrics stays within the D1 parameter limit',async()=>{
+  const e=env({},'admin');
+  const cfg=JSON.parse(e.sqlite.prepare("SELECT config FROM sections WHERE id='hub'").get().config);
+  const stocks=cfg.metrics.filter(id=>/^(pay|fun|cv)\./.test(id));
+  assert(stocks.length>33,'fixture must reproduce the production-sized hub');
+  for(const [i,id] of stocks.entries())point(e,id,i+1,id.startsWith('pay.')?'potok':'month');
+  e.sqlite.prepare("INSERT INTO section_versions (section,version,html,active) VALUES ('hub',1,'<!doctype html><html><body>Existing hub view</body></html>',1)").run();
+  const snapshot=await data.onRequestGet({request:request('/api/sections/hub/data?days=120'),env:e,params:{id:'hub'}});
+  assert.equal(snapshot.status,200);assert.equal((await snapshot.json()).stock.length,stocks.length);
+  const result=await view.onRequestGet({request:request('/api/sections/hub/view?v=1'),env:e,params:{id:'hub'}});
+  assert.equal(result.status,200);assert.match(await result.text(),/Existing hub view/);
+  assert(e.DB.calls.every(call=>call.args.length<=100));
+});
 test('P1-1 meeting assistant enforces section before reading transcript/model',async()=>{
   const e=env({'sales.l2.okk':0});e.LLM_API_KEY='fixture';e.LLM_BASE_URL='https://model.invalid';e.kv.set('t:1','PRIVATE TRANSCRIPT');const calls=llm();
   assert.equal((await ask.onRequestPost({request:request('/__ask',{deal:1,question:'summary'}),env:e})).status,403);
