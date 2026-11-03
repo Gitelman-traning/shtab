@@ -1,8 +1,8 @@
-// Пользователи (только администратор; создать первого можно токеном сборщика).
+// Пользователи: только персональная сессия администратора.
 //   GET   /api/users                      — список
 //   POST  /api/users {login,name,role,sections}            — создать, вернёт временный пароль
 //   PATCH /api/users {login, action, ...}  — reset (новый временный пароль) / disable / enable / update {name,role,sections}
-import { json, bad, canRead, isAdmin, hasIngestToken, hashPassword, randomId, audit, now, tgSend, SECTIONS, NOTIFY, notifyList } from "./_lib.js";
+import { json, bad, canRead, isAdmin, hashPassword, randomId, audit, now, tgSend, SECTIONS, NOTIFY, notifyList } from "./_lib.js";
 
 const ROLES = ["admin", "head", "member", "viewer"];
 const RE_LOGIN = /^[a-z0-9._-]{3,32}$/;
@@ -14,7 +14,6 @@ function tempPassword() {
 }
 
 async function gate(request, env) {
-  if (hasIngestToken(request, env)) return { login: "collector", role: "admin" };
   const user = await canRead(request, env);
   if (!user || !isAdmin(user)) return null;
   return user;
@@ -39,7 +38,6 @@ export async function onRequestPost({ request, env }) {
   try { b = await request.json(); } catch (e) { return bad("тело не JSON"); }
   const login = String(b.login || "").trim().toLowerCase();
   if (!RE_LOGIN.test(login)) return bad("логин: 3–32 символа, латиница, цифры, точка, дефис");
-  if (login === "admin") return bad("«admin» занят общим входом");
   const role = ROLES.includes(b.role) ? b.role : "member";
   const sections = String(b.sections || "").split(",").map((s) => s.trim()).filter(Boolean).join(",");
   const exists = await env.DB.prepare("SELECT login FROM users WHERE login = ?").bind(login).first();

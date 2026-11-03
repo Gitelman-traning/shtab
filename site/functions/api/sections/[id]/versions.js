@@ -1,11 +1,16 @@
 // Версии собственного вида раздела.
 //   GET  /api/sections/<id>/versions                 — список (без html)
 //   POST /api/sections/<id>/versions {action:"publish"|"rollback"|"unpublish", version}
-import { json, bad, canRead, canEdit, audit, now } from "../../_lib.js";
+import { json, bad, canRead, canView, canEdit, audit, now } from "../../_lib.js";
 
 export async function onRequestGet({ request, env, params }) {
   const user = await canRead(request, env);
   if (!user) return bad("нет доступа", 401);
+  if (!canView(user, params.id)) return bad("раздел закрыт", 403);
+  if (!canEdit(user, params.id)) {
+    const active = await env.DB.prepare("SELECT version, active FROM section_versions WHERE section = ? AND active = 1").bind(params.id).all();
+    return json({ ok: true, section: params.id, can_edit: false, versions: active.results || [] });
+  }
   const rows = await env.DB.prepare(
     "SELECT version, prompt, author, created_at, active, length(html) AS size FROM section_versions WHERE section = ? ORDER BY version DESC LIMIT 50"
   ).bind(params.id).all();

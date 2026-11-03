@@ -234,7 +234,7 @@ dialog .in{max-height:calc(100vh - 40px);overflow:auto}
   function editPerson(id) {
     var p = id ? person(id) : { name: "", position: "", dept: "", manager: null, login: "", status: "active", hired: "", birth: "", leave_year: 28, leave_adj: 0 };
     var kidRow = function (c) { return '<div class="kid"><input class="k-name" maxlength="60" placeholder="Имя" value="' + esc(c.name) + '"><input class="k-birth" type="date" value="' + esc(/^\d{4}/.test(c.birth || "") ? c.birth : "") + '"><button type="button" class="btn ghost" data-kdel>×</button></div>'; };
-    var personal = D.is_hr ? '<div class="sect">Личное · видит только HR</div>'
+    var personal = D.can_edit_private ? '<div class="sect">Личное · видит только HR</div>'
       + '<label class="f">Дата рождения<input id="f-birth" type="date" value="' + esc(/^\d{4}/.test(p.birth || "") ? p.birth : "") + '"></label>'
       + '<div class="f">Дети<div id="f-kids">' + (id ? kidsOf(id) : []).map(kidRow).join("") + '</div><button type="button" class="btn ghost" data-kadd style="align-self:flex-start">+ ребёнок</button></div>'
       + '<div class="row2"><label class="f">Отпуск, дней в год<input id="f-lyear" type="number" min="0" step="1" value="' + esc(p.leave_year == null ? 28 : p.leave_year) + '"></label>'
@@ -249,7 +249,7 @@ dialog .in{max-height:calc(100vh - 40px);overflow:auto}
       + '<label class="f">Дата выхода в компанию<input id="f-hired" type="date" value="' + esc(p.hired || "") + '"></label>'
       + personal
       + '<label class="f">Статус<select id="f-status">' + opts([["active", "работает"], ["left", "уволен"]], p.status, "").replace('<option value=""></option>', "") + '</select></label>'
-      + '<p class="err"></p><div class="row">' + (id ? '<button class="btn danger" type="button" data-pdel="' + id + '">Удалить</button>' : "")
+      + '<p class="err"></p><div class="row">' + (id && D.can_delete ? '<button class="btn danger" type="button" data-pdel="' + id + '">Удалить</button>' : "")
       + '<span class="sp"></span><button class="btn ghost" type="button" data-close>Отмена</button><button class="btn" type="button" data-psave="' + (id || "") + '">Сохранить</button></div>';
     open(h); dIn.querySelector("#f-name").focus();
   }
@@ -301,7 +301,7 @@ dialog .in{max-height:calc(100vh - 40px);overflow:auto}
     if (t.hasAttribute("data-psave")) {
       var v = function (id) { return dIn.querySelector(id).value; };
       var body = { action: "person_save", id: t.getAttribute("data-psave") || null, name: v("#f-name"), position: v("#f-pos"), dept: v("#f-dept"), login: v("#f-login"), tg: v("#f-tg"), status: v("#f-status"), hired: v("#f-hired") };
-      if (D.is_hr) {
+      if (D.can_edit_private) {
         body.birth = v("#f-birth"); body.leave_year = v("#f-lyear"); body.leave_adj = v("#f-ladj");
         body.children = [].map.call(dIn.querySelectorAll(".kid"), function (k) { return { name: k.querySelector(".k-name").value, birth: k.querySelector(".k-birth").value }; }).filter(function (k) { return k.name.trim(); });
       }
@@ -310,7 +310,7 @@ dialog .in{max-height:calc(100vh - 40px);overflow:auto}
     if (t.hasAttribute("data-kadd")) { dIn.querySelector("#f-kids").insertAdjacentHTML("beforeend", editPerson.kidRow({ name: "", birth: "" })); return; }
     if (t.hasAttribute("data-kdel")) { t.closest(".kid").remove(); return;
     }
-    if (t.hasAttribute("data-pdel")) { if (confirm("Удалить сотрудника из структуры? Если человек уволился, лучше поставить статус «уволен».")) save({ action: "person_del", id: +t.getAttribute("data-pdel") }); return; }
+    if (t.hasAttribute("data-pdel")) { if (D.can_delete && confirm("Удалить сотрудника из структуры? Если человек уволился, лучше поставить статус «уволен».")) save({ action: "person_del", id: +t.getAttribute("data-pdel") }); return; }
     if (t.hasAttribute("data-dsave")) {
       var w = function (id) { return dIn.querySelector(id).value; };
       return save({ action: "dept_save", id: t.getAttribute("data-dsave") || "", name: w("#f-dname"), parent: w("#f-parent"), head: w("#f-head"), sort: w("#f-sort") });

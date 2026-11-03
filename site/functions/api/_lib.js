@@ -107,10 +107,11 @@ export async function loadPerms(env, login, sectionsCsv) {
 
 // 0 закрыт · 1 просмотр · 2 редактирование
 export function level(user, section) {
-  if (!user) return 0;
-  if (user.role === "admin" || user.login === "collector") return 2;
+  if (!user || !SECTIONS.includes(section)) return 0;
   if (user.role === "pending" || user.active === 0) return 0;
-  if (user.login === "shared") return (section === "users" || section === "tags" || section === "budget" || section === "dashboard" || PRIVATE[section]) ? 0 : 1;   // общий пароль: смотрит всё открытое
+  if (user.role === "service") return user.perms?.[section] || 0;
+  if (user.login === "shared") return 0; // общий вход выведен из эксплуатации
+  if (user.role === "admin") return 2;
   if (section === "users" || section === "tags" || section === "budget" || section === "dashboard") return 0;   // dashboard — личный дашборд Никиты
   const p = user.perms || {};
   if (PRIVATE[section]) {
@@ -131,8 +132,9 @@ export function effectivePerms(user) {
 
 // какой раздел отвечает за адрес страницы
 export function sectionOf(pathname) {
-  const p = pathname.replace(/\.html$/, "").replace(/\/index$/, "/");
+  const p = pathname.replace(/\.html$/, "").replace(/\/index$/, "/").replace(/\/+$/, "") || "/";
   if (p === "/" || p === "") return "hub";
+  if (p === "/__ask") return "sales.l2.okk";
   if (/^\/sales\/l2\/(meetings|managers|compare|coach)/.test(p)) return "sales.l2.okk";
   if (p.startsWith("/sales/l2")) return "sales.l2";
   if (p.startsWith("/sales/l1")) return "sales.l1";
@@ -157,29 +159,21 @@ export function sectionOf(pathname) {
   return null;
 }
 
-// ---------- общий пароль (cookie okk_auth = HMAC пароля из KV, как в _middleware) ----------
-async function signShared(password) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  return hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("okk-dashboard")));
-}
-
-export async function hasSharedCookie(request, env) {
-  if (!env.OKK_KV) return false;
-  const c = getCookie(request, "okk_auth");
-  if (!c) return false;
-  const stored = await env.OKK_KV.get("password");
-  return !!stored && timingSafeEqual(c, await signShared(stored));
-}
-
 // ---------- кто пришёл ----------
-// Читать данные можно по токену сборщика, с именной сессией или с cookie общего пароля
+// Служебный токен допускается только на перечисленные операции чтения.
+// Запись сборщиков проверяется отдельно через hasIngestToken в служебных маршрутах.
+const COLLECTOR_READ = new Map([
+  ["/api/points", {}], ["/api/metrics", {}], ["/api/status", { status: 1 }],
+  // Подготовка и пинги читают свои прежние результаты перед следующим расчётом.
+  ["/api/prep", { "sales.l2": 1 }], ["/api/pings", { "sales.l2": 1 }],
+]);
 export async function canRead(request, env) {
-  if (hasIngestToken(request, env)) return { login: "collector", role: "admin", sections: "" };
-  const user = await currentUser(request, env);
-  if (user) return user;
-  if (await hasSharedCookie(request, env)) return { login: "shared", role: "viewer", sections: "" };
-  return null;
+  if (hasIngestToken(request, env)) {
+    const perms = COLLECTOR_READ.get(new URL(request.url).pathname);
+    if (request.method !== "GET" || !perms) return null;
+    return { login: "collector", role: "service", sections: "", perms };
+  }
+  return currentUser(request, env);
 }
 
 export function isAdmin(user) {

@@ -3,6 +3,8 @@ import { level } from "../_lib.js";
 
 // сотрудник HR: тот, кому открыта закрытая часть (правка на «HR» или явный доступ к «Для HR»)
 export const isHR = (user) => level(user, "hr.team") >= 1;
+export const canManageHR = (user) => level(user, "hr.team") >= 2;
+export const canManageLeave = (user) => canManageHR(user) && level(user, "hr.leave") >= 2;
 
 // сегодня по Москве, ГГГГ-ММ-ДД
 export function today() {

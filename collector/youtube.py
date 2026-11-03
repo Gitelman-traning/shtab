@@ -184,14 +184,22 @@ def main():
     if not (URL and STOKEN):
         log("SHTAB_URL/SHTAB_TOKEN не заданы — записан только youtube.local.json")
         return
-    # пачками: витрина пишет в D1 кусками, большой запрос не нужен
-    for i in range(0, max(len(rows), 1), 500):
-        send({"collector": "amo-youtube", "yt_leads": rows[i:i + 500], "yt_reset": MODE == "full" and i == 0})
-    for i in range(0, len(drop), 2000):
-        send({"collector": "amo-youtube", "yt_drop": drop[i:i + 2000]})
-    send({"collector": "amo-youtube", "yt_paid": {"replace": True, "rows": paid}, "finalize": True, "started": started,
-          "total_points": len(rows) + len(paid), "run_note": "%s: YouTube-сделок %d, оплат Второй линии %d" % (MODE, len(rows), len(paid))})
+    publish(rows, paid, drop, started)
     log("отправлено в витрину")
+
+
+def publish(rows, paid, drop, started):
+    body = {"collector": "amo-youtube", "yt_paid": {"replace": True, "rows": paid}, "finalize": True, "started": started,
+            "total_points": len(rows) + len(paid), "run_note": "%s: YouTube-сделок %d, оплат Второй линии %d" % (MODE, len(rows), len(paid))}
+    if MODE == "full":
+        # Весь снимок — одним запросом: прежние сделки и оплаты видны до общей транзакционной замены.
+        body["yt_leads_replace"] = {"rows": rows}
+    else:
+        for i in range(0, len(rows), 500):
+            send({"collector": "amo-youtube", "yt_leads": rows[i:i + 500]})
+        for i in range(0, len(drop), 2000):
+            send({"collector": "amo-youtube", "yt_drop": drop[i:i + 2000]})
+    send(body)
 
 
 if __name__ == "__main__":

@@ -1,15 +1,4 @@
-/**
- * Один общий пароль на весь дашборд (страницы ОКК и Штаба); /api/* — своя проверка.
- *
- * Пароль ещё не задан — первый вошедший его придумывает, и дальше он общий для всех.
- * Хранится в KV (OKK_KV, ключ "password"), в репозитории и в коде его нет.
- * Логина нет: только поле пароля, дальше месяц живёт cookie — в ней подпись пароля,
- * а не он сам, восстановить оттуда пароль нельзя.
- *
- * Сбросить пароль (например, если утёк):
- *   npx wrangler kv key delete password --namespace-id 7d847d9c74434c35a28b148f488dd3b0
- * После сброса первый вошедший задаёт новый.
- */
+/** Персональный вход по паролю или Telegram; общий пароль и публичный setup отключены. */
 
 import { loadSecrets } from "./_secrets.js";
 import { currentUser, createSession, dropSession, verifyPassword, hashPassword, randomId, audit, tgVerify, tgSend, tgRequestAccess, now, level, sectionOf } from "./api/_lib.js";
@@ -37,37 +26,7 @@ ${STYLE}</head><body>
 </form></body></html>`;
 }
 
-const COOKIE = "okk_auth";
-const LOGIN = "admin";          // единый логин к общему паролю (решение 04.09.2026)
-const MONTH = 60 * 60 * 24 * 30;
-const KEY = "password";
-const MIN_LEN = 6;
-
-async function sign(password) {
-  const key = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(password),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-  );
-  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode("okk-dashboard"));
-  return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/** Сравнение без ранней остановки: не даём подобрать значение по времени ответа. */
-function same(a, b) {
-  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-function cookieValue(request, name) {
-  const raw = request.headers.get("Cookie") || "";
-  for (const part of raw.split(";")) {
-    const [k, ...v] = part.trim().split("=");
-    if (k === name) return v.join("=");
-  }
-  return null;
-}
+const COOKIE = "okk_auth"; // удаляем старую cookie при выходе, но больше не принимаем её
 
 const STYLE = `<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -100,14 +59,12 @@ const STYLE = `<link rel="preconnect" href="https://fonts.googleapis.com">
   .tgbtn:hover{background:#1c9ad8}
 </style>`;
 
-function page({ setup, message, tgBot }) {
-  const title = setup ? "Придумайте пароль" : "Вход";
-  const hint = setup
-    ? "Пароль ещё не задан. Тот, что вы введёте, станет общим для всех, кто открывает дашборд."
-    : "Страница закрыта: внутри данные компании. Входите по своему логину и паролю или через Telegram.";
-  const action = setup ? "/__setup" : "/__login";
-  const button = setup ? "Сохранить пароль" : "Войти";
-  const autocomplete = setup ? "new-password" : "current-password";
+function page({ message, tgBot }) {
+  const title = "Вход";
+  const hint = "Страница закрыта: внутри данные компании. Входите по своему логину и паролю или через Telegram.";
+  const action = "/__login";
+  const button = "Войти";
+  const autocomplete = "current-password";
   const note = message ? `<p class="err">${message}</p>` : `<p class="hint">${hint}</p>`;
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -120,9 +77,9 @@ ${STYLE}</head><body>
   ${note}
   <input type="text" name="login" placeholder="Логин" autofocus required autocomplete="username" aria-label="Логин">
   <input type="password" name="password" placeholder="Пароль" required
-         autocomplete="${autocomplete}" aria-label="Пароль"${setup ? ` minlength="${MIN_LEN}"` : ""}>
+         autocomplete="${autocomplete}" aria-label="Пароль">
   <button type="submit">${button}</button>
-  ${tgBot && !setup ? `<div class="or"><span>или</span></div>
+  ${tgBot ? `<div class="or"><span>или</span></div>
   <a class="tgbtn" id="tgbtn" href="https://t.me/${tgBot}" target="_blank" rel="noopener">Войти через Telegram</a>
   <p class="hint" id="tgst">Кнопка откроет бота @${tgBot}: нажмите в нём «Start», и эта вкладка впустит вас сама.
   Первый раз — заявка, администратор подтверждает доступ.</p>
@@ -149,7 +106,7 @@ ${STYLE}</head><body>
     document.addEventListener("visibilitychange",function(){ if(!document.hidden && timer) poll(); });
   })();
   </script>` : ""}
-  ${setup ? "" : `<p class="hint" style="text-align:center">Нет доступа? Нажмите «Войти через Telegram» — администратор подтвердит заявку.</p>`}
+  <p class="hint" style="text-align:center">Нет доступа? Нажмите «Войти через Telegram» — администратор подтвердит заявку.</p>
 </form></body></html>`;
 }
 
@@ -168,20 +125,8 @@ function html(body, status = 200) {
   });
 }
 
-function letIn(token) {
-  return new Response(null, {
-    status: 303,
-    headers: {
-      Location: "/",
-      "Set-Cookie": `${COOKIE}=${token}; Path=/; Max-Age=${MONTH}; HttpOnly; Secure; SameSite=Lax`,
-      "Cache-Control": "no-store",
-    },
-  });
-}
-
 export async function onRequest(context) {
   const { request, env, next } = context;
-  if (!env.OKK_KV) return new Response("Хранилище пароля не подключено", { status: 500 });
   const url = new URL(request.url);
   await loadSecrets(env, context);   // секреты из Doppler (если задан DOPPLER_TOKEN) — для всех маршрутов, включая /api/*
   // старый адрес okk-dashboard.pages.dev: всех, кроме координатора, переводим на новый сайт (решение Никиты 05.10.2026)
@@ -198,10 +143,10 @@ export async function onRequest(context) {
   // проверка связи с АТС — скрытая страница без входа (23.10.2026): сотрудник открывает её по прямой ссылке
   if (/^\/pbx-check(\.html|\.js|\.css)?\/?$/.test(url.pathname)) return next();
 
-  const stored = await env.OKK_KV.get(KEY);
+  if (url.pathname === "/__setup") return html(page({ tgBot: env.TG_BOT_NAME, message: "Общий вход отключён. Войдите под личным аккаунтом." }), 410);
   // тело читаем только у форм входа: иначе запрос уйдёт дальше уже «пустым»
   const isForm = request.method === "POST" &&
-    (url.pathname === "/__login" || url.pathname === "/__setup" || url.pathname === "/__register");
+    (url.pathname === "/__login" || url.pathname === "/__register");
   const posted = isForm;
   let value = "", login = "", reg = null;
   if (isForm) {
@@ -231,7 +176,7 @@ export async function onRequest(context) {
       .bind(login, await hashPassword(value, salt), salt, reg.name, now()).run();
     await audit(env, login, "register", login, reg.name);
     await tgSend(env, env.TG_ADMIN_CHAT, "Штаб: заявка на доступ — " + reg.name + " (" + login + "). Подтвердить: " + url.origin + "/users");
-    return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка отправлена. Когда администратор подтвердит доступ, входите с этим логином и паролем." }), 202);
+    return html(page({ tgBot: env.TG_BOT_NAME, message: "Заявка отправлена. Когда администратор подтвердит доступ, входите с этим логином и паролем." }), 202);
   }
 
   // выход: снимаем и общую cookie, и именную сессию
@@ -272,15 +217,15 @@ export async function onRequest(context) {
 
   // вход через Telegram: виджет возвращает сюда подписанные данные аккаунта
   if (url.pathname === "/__tg") {
-    if (!env.TG_BOT_TOKEN || !env.DB) return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Вход через Telegram не настроен." }), 503);
+    if (!env.TG_BOT_TOKEN || !env.DB) return html(page({ tgBot: env.TG_BOT_NAME, message: "Вход через Telegram не настроен." }), 503);
     const tg = await tgVerify(url.searchParams, env.TG_BOT_TOKEN);
-    if (!tg) return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Подпись Telegram не сошлась или устарела. Попробуйте ещё раз." }), 403);
+    if (!tg) return html(page({ tgBot: env.TG_BOT_NAME, message: "Подпись Telegram не сошлась или устарела. Попробуйте ещё раз." }), 403);
     const req = await tgRequestAccess(env, tg, url.origin);
     if (req.status === "created") {
-      return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка отправлена. Администратор подтвердит доступ, и вы сможете войти этой же кнопкой." }), 202);
+      return html(page({ tgBot: env.TG_BOT_NAME, message: "Заявка отправлена. Администратор подтвердит доступ, и вы сможете войти этой же кнопкой." }), 202);
     }
     if (req.status === "pending") {
-      return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка ещё не подтверждена. Мы напишем в Telegram, когда доступ откроют." }), 403);
+      return html(page({ tgBot: env.TG_BOT_NAME, message: "Заявка ещё не подтверждена. Мы напишем в Telegram, когда доступ откроют." }), 403);
     }
     const row = { login: req.login };
     await env.DB.prepare("UPDATE users SET tg_username = ?, photo = ? WHERE login = ?").bind(tg.username || "", tg.photo_url || "", row.login).run();
@@ -289,15 +234,15 @@ export async function onRequest(context) {
     return new Response(null, { status: 303, headers: { Location: "/shtab", "Set-Cookie": s.cookie, "Cache-Control": "no-store" } });
   }
 
-  // именной пользователь: логин не «admin» — ищем в базе, сессия в cookie shtab_s
-  if (posted && url.pathname === "/__login" && login && login !== LOGIN) {
+  // именной пользователь: проверяем только базу пользователей, сессия в cookie shtab_s
+  if (posted && url.pathname === "/__login") {
     const row = env.DB ? await env.DB.prepare("SELECT login, pass_hash, salt, active, role FROM users WHERE login = ?").bind(login).first() : null;
     if (row && row.role === "pending" && await verifyPassword(value, row.salt, row.pass_hash)) {
-      return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Заявка ещё не подтверждена администратором. Попробуйте позже." }), 403);
+      return html(page({ tgBot: env.TG_BOT_NAME, message: "Заявка ещё не подтверждена администратором. Попробуйте позже." }), 403);
     }
     if (!row || !row.active || !(await verifyPassword(value, row.salt, row.pass_hash))) {
       await audit(env, login, "login.fail");
-      return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
+      return html(page({ tgBot: env.TG_BOT_NAME, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
     }
     const s = await createSession(env, row.login);
     await audit(env, row.login, "login");
@@ -317,39 +262,5 @@ export async function onRequest(context) {
     return out;
   }
 
-  // пароля ещё нет — первый вошедший его задаёт
-  if (!stored) {
-    if (posted && url.pathname === "/__setup") {
-      if (!same(login, LOGIN)) {
-        return html(page({ tgBot: env.TG_BOT_NAME, setup: true, message: "Логин должен быть " + LOGIN + "." }), 400);
-      }
-      if (value.length < MIN_LEN) {
-        return html(page({ tgBot: env.TG_BOT_NAME, setup: true, message: `Пароль короче ${MIN_LEN} символов — так не пойдёт.` }), 400);
-      }
-      // если кто-то успел раньше, его пароль остаётся в силе
-      const again = await env.OKK_KV.get(KEY);
-      if (again) return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Пароль уже задан. Введите его." }), 409);
-      await env.OKK_KV.put(KEY, value);
-      return letIn(await sign(value));
-    }
-    return html(page({ tgBot: env.TG_BOT_NAME, setup: true, message: "" }), 401);
-  }
-
-  // пароль задан — обычный вход
-  if (posted && url.pathname === "/__login") {
-    if (!same(login, LOGIN) || !same(value, stored)) {
-      return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
-    }
-    return letIn(await sign(stored));
-  }
-
-  if (!same(cookieValue(request, COOKIE) || "", await sign(stored))) {
-    return html(page({ tgBot: env.TG_BOT_NAME, setup: false, message: "" }), 401);
-  }
-
-  const response = await next();
-  const out = new Response(response.body, response);
-  out.headers.set("Cache-Control", "no-store");
-  out.headers.set("X-Robots-Tag", "noindex, nofollow");
-  return out;
+  return html(page({ tgBot: env.TG_BOT_NAME, message: "" }), 401);
 }

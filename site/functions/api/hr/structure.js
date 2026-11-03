@@ -6,7 +6,7 @@
 //       год рождения и дети — только для сотрудников HR: остальным GET отдаёт день и месяц рождения, детей не отдаёт
 //     import {rows:[{name, position, dept, manager}]} — пачкой; dept — id или название отдела, manager — имя
 import { json, bad, canRead, canEdit, canView, audit, now } from "../_lib.js";
-import { isHR, cleanDate } from "./_hr.js";
+import { isHR, canManageHR, canManageLeave, cleanDate } from "./_hr.js";
 
 const SEC = "hr.structure";
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
@@ -28,7 +28,7 @@ export async function onRequestGet({ request, env }) {
   ).all()).results || [];
   if (!hr) for (const p of people) { p.birth = p.birth ? "--" + p.birth.slice(-5) : ""; delete p.leave_adj; delete p.leave_year; }
   const children = hr ? ((await env.DB.prepare("SELECT id, person, name, birth FROM hr_children ORDER BY birth").all()).results || []) : [];
-  return json({ ok: true, can_edit: edit, is_hr: hr, depts: depts.results || [], people, children });
+  return json({ ok: true, can_edit: edit, can_edit_private: edit && canManageHR(user), can_delete: edit && canManageLeave(user), is_hr: hr, depts: depts.results || [], people, children });
 }
 
 async function deptExists(env, id) {
@@ -76,6 +76,8 @@ export async function onRequestPost({ request, env }) {
   }
 
   if (action === "person_save") {
+    const privateFields = ["birth", "children", "leave_year", "leave_adj"];
+    if (!canManageHR(user) && privateFields.some(key => Object.prototype.hasOwnProperty.call(body, key))) return bad("личные поля может менять только редактор HR", 403);
     const name = str(body.name, 80);
     if (!name) return bad("укажите имя");
     const dept = str(body.dept, 40);
@@ -104,7 +106,7 @@ export async function onRequestPost({ request, env }) {
       await audit(env, user.login, "hr.person_add", String(pid || ""), name);
     }
     // личное — дата рождения, дети, поправка отпуска — пишет только сотрудник HR
-    if (isHR(user) && pid) {
+    if (canManageHR(user) && pid) {
       const birth = cleanDate(body.birth, true);
       if (birth === null) return bad("дата рождения: ГГГГ-ММ-ДД или --ММ-ДД");
       const kids = Array.isArray(body.children) ? body.children.slice(0, 10) : [];
@@ -121,6 +123,8 @@ export async function onRequestPost({ request, env }) {
   }
 
   if (action === "person_del") {
+    // Удаление человека также удаляет его отпуска и личные HR-данные.
+    if (!canManageLeave(user)) return bad("для удаления сотрудника нужно право редактирования HR и отпусков", 403);
     const id = int(body.id);
     if (!id) return bad("нет id");
     await env.DB.batch([

@@ -1,6 +1,7 @@
 // GET /api/sections/<id>/data?days=90 — данные раздела для его страницы (стандартной или собственного вида).
 // Раздел видит только свои показатели (config.metrics). Ответ компактный: дни × показатель × срез.
 import { json, bad, canRead, canView } from "../../_lib.js";
+import { readableMetrics } from "../../_metric-access.js";
 
 export async function onRequestGet({ request, env, params }) {
   const user = await canRead(request, env);
@@ -10,7 +11,8 @@ export async function onRequestGet({ request, env, params }) {
   if (!sec) return bad("раздела нет", 404);
   let cfg = {};
   try { cfg = JSON.parse(sec.config || "{}"); } catch (e) {}
-  const metrics = Array.isArray(cfg.metrics) ? cfg.metrics : [];
+  const allowed = new Set((await readableMetrics(env, user, cfg.dim || null)).map(m => m.id));
+  const metrics = (Array.isArray(cfg.metrics) ? cfg.metrics : []).filter(id => allowed.has(id));
   if (!metrics.length) return json({ ok: true, section: sec.id, name: sec.name, days: [], metrics: [], rows: [] });
   const u = new URL(request.url);
   const days = Math.min(400, Math.max(7, parseInt(u.searchParams.get("days") || "90", 10) || 90));
@@ -26,7 +28,7 @@ export async function onRequestGet({ request, env, params }) {
   const mx = await env.DB.prepare("SELECT metric, ptype, MAX(asof) AS a FROM points WHERE ptype IN ('potok','month') AND metric IN (" + metrics.map(() => "?").join(",") + ") GROUP BY metric, ptype").bind(...metrics).all();
   const pairs = (mx.results || []).filter((r) => r.a != null);
   const stock = pairs.length ? await env.DB.prepare(
-    "SELECT metric, period, value, asof FROM points WHERE " + pairs.map(() => "(metric = ? AND ptype = ? AND asof = ?)").join(" OR ") + " ORDER BY metric, period"
+    "SELECT metric, period, dim, value, asof FROM points WHERE " + pairs.map(() => "(metric = ? AND ptype = ? AND asof = ?)").join(" OR ") + " ORDER BY metric, period"
   ).bind(...pairs.flatMap((r) => [r.metric, r.ptype, r.a])).all() : { results: [] };
   const plans = await env.DB.prepare("SELECT metric, ptype, period, dim, value FROM plans WHERE metric IN (" + metrics.map(() => "?").join(",") + ") ORDER BY period").bind(...metrics).all();
   // раздел одного источника: только его срез (лиды по dim = источник, воронка по dim = "src:источник") как итог ('' )
@@ -34,7 +36,7 @@ export async function onRequestGet({ request, env, params }) {
   if (cfg.dim) out = out.filter((r) => r[2] === cfg.dim || r[2] === "src:" + cfg.dim).map((r) => [r[0], r[1], "", r[3]]);
   return json({ ok: true, section: sec.id, name: sec.name, from: iso(from), to: iso(to), source: cfg.dim || null,
     metrics: reg.results || [], rows: out,
-    stock: (stock.results || []).map((r) => [r.metric, r.period, r.value, r.asof]),
-    plans: (plans.results || []).map((r) => [r.metric, r.ptype, r.period, r.dim, r.value]),
+    stock: (stock.results || []).filter(r => cfg.dim ? r.dim === cfg.dim || r.dim === "src:" + cfg.dim : r.dim === "").map((r) => [r.metric, r.period, r.value, r.asof]),
+    plans: (plans.results || []).filter(r => !cfg.dim || r.dim === cfg.dim || r.dim === "src:" + cfg.dim).map((r) => [r.metric, r.ptype, r.period, cfg.dim ? "" : r.dim, r.value]),
     format: "rows: [metric, day YYYY-MM-DD, dim ('' = всего), value]; stock: [metric, месяц YYYY-MM (поток или месяц воронки) или 'shortlist', value, дата снимка]; plans: [metric, ptype, period, dim, план]" });
 }

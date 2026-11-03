@@ -194,10 +194,7 @@ def manager_chat(card):
     forced = os.environ.get("PINGS_TG_CHAT", "").strip()
     if forced:
         return forced
-    for u in shtab("GET", "/api/users").get("users", []):
-        if card["tg_match"].lower() in (u.get("name") or "").lower() and u.get("tg_id") and u.get("active"):
-            return u["tg_id"]
-    return None
+    return shtab("GET", "/api/pings", params={"mode": "recipient", "match": card["tg_match"]}).get("tg_id")
 
 
 def deliver(plan_path, dry):

@@ -2,7 +2,9 @@
 //   POST /api/chat {messages:[{role:"user"|"assistant", content}]} → {ok, answer}
 // Модель получает сводку витрины (последние два месяца, источники, менеджеры, план/факт, участники, сайт),
 // определения показателей из реестра и справочные записи из таблицы knowledge (структура компании, карта разделов).
-import { json, bad, canRead, llmChat, audit } from "./_lib.js";
+import { json, bad, canRead, canView, isAdmin, llmChat, audit } from "./_lib.js";
+
+import { readableMetrics } from "./_metric-access.js";
 
 const DAY_METRICS = ["mkt.leads", "mkt.qual", "l1.leads", "l1.booked", "l2.held", "l2.sales"];
 const NAMES = { "mkt.leads": "лиды", "mkt.qual": "ЦА/УЦА (квалифицированные лиды)", "l1.leads": "лиды Первой линии (все воронки)", "l1.booked": "назначено диагностик", "l2.held": "проведено диагностик", "l2.sales": "продажи (прислали чек)" };
@@ -14,7 +16,9 @@ function addDays(d, n) { const x = new Date(d); x.setUTCDate(x.getUTCDate() + n)
 function dmy(s) { return s.slice(8, 10) + "." + s.slice(5, 7); }
 function pct(a, b) { return b ? Math.round(100 * a / b) + "%" : "—"; }
 
-async function digest(env) {
+async function digest(env, user, allowed) {
+  const has = (...ids) => ids.every(id => allowed.has(id));
+  const dayMetrics = DAY_METRICS.filter(id => allowed.has(id));
   const today = new Date(); today.setUTCHours(0, 0, 0, 0);
   const yesterday = addDays(today, -1);
   const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
@@ -23,16 +27,16 @@ async function digest(env) {
   const month = iso(monthStart).slice(0, 7), pmonth = iso(pmStart).slice(0, 7);
   const q = (sql, ...args) => env.DB.prepare(sql).bind(...args).all().then((r) => r.results || []);
   const [days, srcs, mgr2, mgr1, fun, plans, pay, web, reg, know] = await Promise.all([
-    q("SELECT metric, period, value FROM points WHERE ptype='day' AND dim='' AND metric IN (" + DAY_METRICS.map(() => "?").join(",") + ") AND period >= ? AND period <= ?", ...DAY_METRICS, iso(from), iso(yesterday)),
-    q("SELECT dim, SUM(value) v FROM points WHERE ptype='day' AND metric='mkt.leads' AND dim <> '' AND dim NOT LIKE 'tag:%' AND period >= ? AND period <= ? GROUP BY dim ORDER BY v DESC", iso(monthStart), iso(yesterday)),
-    q("SELECT metric, dim, SUM(value) v FROM points WHERE ptype='day' AND metric IN ('l2.held','l2.sales') AND dim <> '' AND dim NOT LIKE 'src:%' AND period >= ? AND period <= ? GROUP BY metric, dim", iso(monthStart), iso(yesterday)),
-    q("SELECT metric, dim, SUM(value) v FROM points WHERE ptype='day' AND metric IN ('l1m.leads','l1m.held') AND dim <> '' AND period >= ? AND period <= ? GROUP BY metric, dim", iso(monthStart), iso(yesterday)),
-    q("SELECT metric, period, value, asof FROM points WHERE ptype='month' AND dim='' AND metric LIKE 'fun.%' AND period = ?", month),
-    q("SELECT metric, value FROM plans WHERE ptype='month' AND dim='' AND metric LIKE 'fun.%' AND period = ?", month),
-    q("SELECT metric, period, value, asof FROM points WHERE ptype='potok' AND metric IN ('pay.participants','pay.full','pay.prepaid','pay.receipts') AND asof = (SELECT MAX(asof) FROM points WHERE ptype='potok' AND metric='pay.participants') ORDER BY period"),
-    q("SELECT dim, SUM(value) v FROM points WHERE ptype='day' AND metric='web.visits' AND period >= ? AND period <= ? GROUP BY dim", iso(monthStart), iso(yesterday)),
-    q("SELECT id, name, definition FROM metrics ORDER BY id"),
-    env.DB.prepare("SELECT title, text FROM knowledge ORDER BY id").all().then((r) => r.results || []).catch(() => []),
+    q("SELECT metric, period, value FROM points WHERE ptype='day' AND dim='' AND metric IN (" + dayMetrics.map(() => "?").join(",") + ") AND period >= ? AND period <= ?", ...dayMetrics, iso(from), iso(yesterday)),
+    has("mkt.leads") ? q("SELECT dim, SUM(value) v FROM points WHERE ptype='day' AND metric='mkt.leads' AND dim <> '' AND dim NOT LIKE 'tag:%' AND period >= ? AND period <= ? GROUP BY dim ORDER BY v DESC", iso(monthStart), iso(yesterday)) : Promise.resolve([]),
+    has("l2.held", "l2.sales") ? q("SELECT metric, dim, SUM(value) v FROM points WHERE ptype='day' AND metric IN ('l2.held','l2.sales') AND dim <> '' AND dim NOT LIKE 'src:%' AND period >= ? AND period <= ? GROUP BY metric, dim", iso(monthStart), iso(yesterday)) : Promise.resolve([]),
+    has("l1m.leads", "l1m.held") ? q("SELECT metric, dim, SUM(value) v FROM points WHERE ptype='day' AND metric IN ('l1m.leads','l1m.held') AND dim <> '' AND period >= ? AND period <= ? GROUP BY metric, dim", iso(monthStart), iso(yesterday)) : Promise.resolve([]),
+    FUN.every(([id]) => allowed.has(id)) ? q("SELECT metric, period, value, asof FROM points WHERE ptype='month' AND dim='' AND metric IN (SELECT value FROM json_each(?)) AND period = ?", JSON.stringify(FUN.map(([id]) => id)), month) : Promise.resolve([]),
+    FUN.every(([id]) => allowed.has(id)) ? q("SELECT metric, value FROM plans WHERE ptype='month' AND dim='' AND metric IN (SELECT value FROM json_each(?)) AND period = ?", JSON.stringify(FUN.map(([id]) => id)), month) : Promise.resolve([]),
+    has("pay.participants", "pay.full", "pay.prepaid", "pay.receipts") ? q("SELECT metric, period, value, asof FROM points WHERE ptype='potok' AND metric IN ('pay.participants','pay.full','pay.prepaid','pay.receipts') AND asof = (SELECT MAX(asof) FROM points WHERE ptype='potok' AND metric='pay.participants') ORDER BY period") : Promise.resolve([]),
+    has("web.visits") ? q("SELECT dim, SUM(value) v FROM points WHERE ptype='day' AND metric='web.visits' AND period >= ? AND period <= ? GROUP BY dim", iso(monthStart), iso(yesterday)) : Promise.resolve([]),
+    Promise.resolve([...allowed.values()]),
+    isAdmin(user) ? env.DB.prepare("SELECT title, text FROM knowledge ORDER BY id").all().then((r) => r.results || []).catch(() => []) : Promise.resolve([]),
   ]);
   const byDay = {}; days.forEach((r) => { (byDay[r.metric] = byDay[r.metric] || {})[r.period] = r.value; });
   const sum = (m, a, b) => { let s = 0; for (let d = new Date(a); d <= b; d = addDays(d, 1)) s += (byDay[m] && byDay[m][iso(d)]) || 0; return s; };
@@ -46,15 +50,17 @@ async function digest(env) {
   const L = [];
   L.push("ДАННЫЕ ПО " + dmy(lastDay) + "." + lastDay.slice(0, 4) + " (сегодня " + dmy(iso(today)) + "). Месяц = с 1-го числа по вчера; прошлый месяц взят по то же число.");
   L.push("Итоги по дням (все источники):");
-  for (const m of DAY_METRICS) {
+  for (const m of dayMetrics) {
     const y = (byDay[m] && byDay[m][iso(yesterday)]) || 0;
     const [ws, we] = wk(0);
     L.push(`- ${NAMES[m]} [${m}]: вчера ${y}; неделя с ${dmy(iso(ws))} по ${dmy(iso(we))}: ${sum(m, ws, we)} (та же часть прошлой недели ${sum(m, wkPrevSame[0], wkPrevSame[1])}); месяц ${sum(m, monthStart, yesterday)} (прошлый месяц по то же число ${sum(m, pmStart, pmEnd)})`);
   }
   const mL = sum("mkt.leads", monthStart, yesterday), mQ = sum("mkt.qual", monthStart, yesterday), mB = sum("l1.booked", monthStart, yesterday), mH = sum("l2.held", monthStart, yesterday), mS = sum("l2.sales", monthStart, yesterday);
-  L.push(`Конверсии за месяц (по датам событий, не когорта): лид→ЦА ${pct(mQ, mL)}, лид→назначено ${pct(mB, mL)}, назначено→проведено ${pct(mH, mB)}, проведено→продажа ${pct(mS, mH)}.`);
+  if (DAY_METRICS.every(id => allowed.has(id))) L.push(`Конверсии за месяц (по датам событий, не когорта): лид→ЦА ${pct(mQ, mL)}, лид→назначено ${pct(mB, mL)}, назначено→проведено ${pct(mH, mB)}, проведено→продажа ${pct(mS, mH)}.`);
+  if (["mkt.leads", "l1.booked", "l2.held", "l2.sales"].every(id => allowed.has(id))) {
   L.push("Недели (пн–вс; первая — текущая, неполная; лиды / назначено / проведено / продажи), от свежей к старой:");
   for (let k = 0; k < 8; k++) { const [s, e] = wk(k); L.push(`- ${dmy(iso(s))}–${dmy(iso(e))}: ${sum("mkt.leads", s, e)} / ${sum("l1.booked", s, e)} / ${sum("l2.held", s, e)} / ${sum("l2.sales", s, e)}`); }
+  }
   if (srcs.length) L.push("Лиды по источникам за месяц: " + srcs.map((r) => `${r.dim} ${r.v}`).join(", ") + ".");
   const m2 = {}; mgr2.forEach((r) => { (m2[r.dim] = m2[r.dim] || {})[r.metric] = r.v; });
   if (Object.keys(m2).length) L.push("Вторая линия за месяц по менеджерам (проведено / продажи): " + Object.keys(m2).map((n) => `${n} ${m2[n]["l2.held"] || 0}/${m2[n]["l2.sales"] || 0}`).join(", ") + ".");
@@ -90,19 +96,22 @@ function tokens(q) {
 }
 function hit(name, toks) { const n = name.toLowerCase(), nt = translit(n); return toks.some((k) => n.includes(k) || nt.includes(k)); }
 
-async function lookup(env, question, monthFrom) {
+async function lookup(env, user, allowed, question, monthFrom) {
+  const segments = ["seg.leads", "seg.answered", "seg.q3", "seg.qual", "seg.booked", "seg.held", "seg.sales"];
+  const canSegments = segments.every(id => allowed.has(id));
+  const managerMetrics = ["l1m.leads", "l1m.booked", "l1m.held", "l1m.calls", "l1m.talk", "l1m.touches", "l2.held", "l2.sales"].filter(id => allowed.has(id));
   const toks = tokens(question);
   if (!toks.length) return "";
   const q = (sql, ...args) => env.DB.prepare(sql).bind(...args).all().then((r) => r.results || []);
-  const dims = await q("SELECT DISTINCT dim FROM points WHERE ptype='month' AND metric='seg.leads' AND period >= ?", monthFrom);
+  const dims = canSegments ? await q("SELECT DISTINCT dim FROM points WHERE ptype='month' AND metric='seg.leads' AND period >= ?", monthFrom) : [];
   const wantsBloggers = /блогер|интеграц|инфлюенс|тег/i.test(question);
   let matched = dims.map((r) => r.dim).filter((d) => { const parts = d.split("|"); return parts.length === 3 && (hit(parts[2], toks) || (parts[1] !== "t" && hit(parts[0], toks) && /utm|источник|кампан|source|medium|campaign/i.test(question))); });
   if (!matched.length && wantsBloggers) matched = dims.map((r) => r.dim).filter((d) => d.startsWith("Интеграции|t|"));
   const out = [];
   if (matched.length) {
     const top = matched.slice(0, 40);
-    const rows = await q("SELECT metric, period, dim, value FROM points WHERE ptype='month' AND metric LIKE 'seg.%' AND dim IN (" + top.map(() => "?").join(",") + ") AND period >= ? ORDER BY dim, period", ...top, monthFrom);
-    const owners = await q("SELECT tag, owner, kind FROM tags").catch(() => []);
+    const rows = await q("SELECT metric, period, dim, value FROM points WHERE ptype='month' AND metric IN (SELECT value FROM json_each(?)) AND dim IN (" + top.map(() => "?").join(",") + ") AND period >= ? ORDER BY dim, period", JSON.stringify(segments), ...top, monthFrom);
+    const owners = canView(user, "tags") ? await q("SELECT tag, owner, kind FROM tags").catch(() => []) : [];
     const own = {}; owners.forEach((r) => { own[r.tag] = r; });
     const by = {}; rows.forEach((r) => { const o = (by[r.dim] = by[r.dim] || {}); (o[r.period] = o[r.period] || {})[r.metric] = r.value; });
     const list = Object.keys(by).map((d) => { const tot = {}; Object.values(by[d]).forEach((m) => Object.keys(m).forEach((k) => { tot[k] = (tot[k] || 0) + m[k]; })); return { d, tot }; })
@@ -119,10 +128,10 @@ async function lookup(env, question, monthFrom) {
     if (matched.length > list.length) out.push(`…и ещё ${matched.length - list.length} совпадений не показаны — уточните название.`);
   }
   // менеджеры: недели по l1m.* / l2.*
-  const mgrRows = await q("SELECT DISTINCT metric, dim FROM points WHERE ptype='day' AND dim <> '' AND dim NOT LIKE 'src:%' AND dim NOT LIKE 'tag:%' AND metric IN ('l1m.leads','l1m.held','l1m.calls','l1m.talk','l1m.touches','l2.held','l2.sales') AND period >= ?", monthFrom + "-01");
+  const mgrRows = await q("SELECT DISTINCT metric, dim FROM points WHERE ptype='day' AND dim <> '' AND dim NOT LIKE 'src:%' AND dim NOT LIKE 'tag:%' AND metric IN (SELECT value FROM json_each(?)) AND period >= ?", JSON.stringify(managerMetrics), monthFrom + "-01");
   const names = [...new Set(mgrRows.map((r) => r.dim))].filter((n) => hit(n, toks)).slice(0, 4);
   if (names.length) {
-    const rows = await q("SELECT metric, dim, period, value FROM points WHERE ptype='day' AND dim IN (" + names.map(() => "?").join(",") + ") AND metric IN ('l1m.leads','l1m.booked','l1m.held','l1m.calls','l1m.talk','l1m.touches','l2.held','l2.sales') AND period >= ? ORDER BY period", ...names, monthFrom + "-01");
+    const rows = await q("SELECT metric, dim, period, value FROM points WHERE ptype='day' AND dim IN (" + names.map(() => "?").join(",") + ") AND metric IN (SELECT value FROM json_each(?)) AND period >= ? ORDER BY period", ...names, JSON.stringify(managerMetrics), monthFrom + "-01");
     const agg = {}; rows.forEach((r) => { const mo = r.period.slice(0, 7), o = (agg[r.dim] = agg[r.dim] || {}); (o[mo] = o[mo] || {})[r.metric] = ((o[mo] || {})[r.metric] || 0) + r.value; });
     out.push("МЕНЕДЖЕРЫ ПО ВОПРОСУ (по месяцам; Первая линия: лиды/назначено/проведено встреч, звонков с разговором, минут разговора, касаний базы; Вторая линия: проведено диагностик/продаж):");
     for (const n of Object.keys(agg)) out.push(`- ${n}: ` + Object.keys(agg[n]).sort().map((mo) => { const m = agg[n][mo]; const l1 = m["l1m.leads"] != null || m["l1m.held"] != null;
@@ -134,6 +143,7 @@ async function lookup(env, question, monthFrom) {
 const SYSTEM = `Ты — помощник «Штаба», внутреннего центра показателей компании Gitelman Team (обучение предпринимателей: лиды из маркетинга → квалификация Первой линией → диагностика Второй линией → продажа → участие в потоке).
 Отвечай по-русски, коротко и по делу, без вступлений. Цифры бери только из блока ДАННЫЕ и всегда называй период («за сентябрь по 09.09», «за неделю 07–13.09»).
 Если спрашивают про конкретного блогера, интеграцию, тег, UTM, источник или менеджера — ищи в блоке «СРЕЗЫ ПО ВОПРОСУ» / «МЕНЕДЖЕРЫ ПО ВОПРОСУ» и отвечай цифрами оттуда; имя может быть написано по-разному (Боня = bonya1607, bonya0508, 15.06_Боня — перечисли все подходящие). Если совпадений нет — так и скажи и подскажи страницу (см. КАРТА РАЗДЕЛОВ). Не выдумывай цифры и имена.
+В данных есть только разрешённые пользователю разделы. Если нужного показателя нет, не считай его нулём и не пытайся восстановить закрытые цифры.
 На общие вопросы (не про данные компании) отвечать можно — как обычный ассистент, кратко.
 Формат: обычный текст, короткие абзацы или список через «- »; без заголовков и таблиц.`;
 
@@ -146,10 +156,12 @@ export async function onRequestPost({ request, env }) {
     .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
     .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return bad("нужен вопрос");
-  const d = await digest(env);
+  if (!canView(user, "hub")) return bad("общий экран закрыт", 403);
+  const allowed = new Map((await readableMetrics(env, user)).map(m => [m.id, m]));
+  const d = await digest(env, user, allowed);
   const m0 = new Date(); m0.setUTCDate(1); m0.setUTCMonth(m0.getUTCMonth() - 2);
   let extra = "";
-  try { extra = await lookup(env, msgs.filter((m) => m.role === "user").slice(-2).map((m) => m.content).join(" "), m0.toISOString().slice(0, 7)); } catch (e) { extra = ""; }
+  try { extra = await lookup(env, user, allowed, msgs.filter((m) => m.role === "user").slice(-2).map((m) => m.content).join(" "), m0.toISOString().slice(0, 7)); } catch (e) { extra = ""; }
   const system = SYSTEM + "\n\n=== ДАННЫЕ ===\n" + d.data + (extra ? "\n\n=== " + extra : "") + "\n\n=== ОПРЕДЕЛЕНИЯ ПОКАЗАТЕЛЕЙ ===\n" + d.reg + (d.know ? "\n\n=== СПРАВКА ===\n" + d.know : "");
   let answer;
   try {

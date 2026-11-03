@@ -1,12 +1,12 @@
 // GET  /api/metrics — реестр показателей
 // POST /api/metrics — сборщик синхронизирует реестр из metrics.json (по токену)
 import { json, bad, canRead, hasIngestToken, now } from "./_lib.js";
+import { readableMetrics } from "./_metric-access.js";
 
 export async function onRequestGet({ request, env }) {
   const user = await canRead(request, env);
   if (!user) return bad("нет доступа", 401);
-  const rows = await env.DB.prepare("SELECT * FROM metrics ORDER BY section, id").all();
-  return json({ ok: true, metrics: rows.results || [] });
+  return json({ ok: true, metrics: await readableMetrics(env, user) });
 }
 
 export async function onRequestPost({ request, env }) {

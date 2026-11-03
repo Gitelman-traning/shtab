@@ -2,12 +2,14 @@
  * Вопрос по конкретной встрече.
  *
  * Принимает {deal, question}, достаёт расшифровку этой встречи из KV
- * и отвечает по ней через OpenRouter. Доступ уже проверен в _middleware:
- * без пароля сюда не попасть.
+ * и отвечает по ней через OpenRouter. Именная сессия и доступ к sales.l2.okk
+ * проверяются до чтения KV и обращения к модели, независимо от middleware.
  *
  * Провайдер — любой OpenAI-совместимый: секреты LLM_BASE_URL + LLM_API_KEY
  * (например ProxyAPI). Без них — OpenRouter с ключом OPENROUTER_API_KEY и бесплатными моделями.
  */
+
+import { currentUser, canView } from "./api/_lib.js";
 
 const DEFAULT_BASE = "https://openrouter.ai/api/v1";
 const PAID_MODEL = "anthropic/claude-sonnet-5";   // модель у платного провайдера, если ASK_MODEL не задан
@@ -39,6 +41,9 @@ function json(body, status = 200) {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+  const user = await currentUser(request, env);
+  if (!user) return json({ error: "нужен личный вход" }, 401);
+  if (!canView(user, "sales.l2.okk")) return json({ error: "раздел ОКК закрыт" }, 403);
 
   const base = (env.LLM_BASE_URL || DEFAULT_BASE).replace(/\/+$/, "");
   const key = env.LLM_API_KEY || env.OPENROUTER_API_KEY;

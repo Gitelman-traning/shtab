@@ -1,5 +1,6 @@
 // GET  /api/pings?manager=krotov[&days=120] — журнал подготовленных пингов (сборщик — токеном; люди — с правом на Вторую линию).
 // GET  /api/pings?mode=suggest[&days=60]   — предложения пингов (15.10.2026): повод из разбора встречи, текст и сценарий кружочка.
+// GET  /api/pings?mode=recipient&match=… — только сборщику: Telegram единственного активного адресата по имени.
 // POST /api/pings {action:"decide", id, status: text|video|skip|new} — менеджер отметил, что сделал с предложением.
 // POST /api/pings {action:"suggest", silent?, rows:[{deal, manager, client, company, due_day, reason, loyalty, text, script, model}]} — сборщик (токен):
 //      добавить предложения; что уже пора — сразу в Telegram менеджеру.
@@ -8,9 +9,18 @@ import { ownerMaps } from "./_owners.js";
 import { json, bad, canRead, level, now, audit, hasIngestToken, tgSend } from "./_lib.js";
 
 export async function onRequestGet({ request, env }) {
+  const u = new URL(request.url);
+  if (u.searchParams.get("mode") === "recipient") {
+    if (!hasIngestToken(request, env)) return bad("нужен токен сборщика", 403);
+    const match = String(u.searchParams.get("match") || "").trim().toLowerCase();
+    if (match.length < 3 || match.length > 80) return bad("укажите имя адресата, от 3 до 80 символов");
+    const rows = (await env.DB.prepare("SELECT name, tg_id FROM users WHERE active = 1 AND role != 'pending' AND tg_id IS NOT NULL AND tg_id != ''").all()).results || [];
+    const hits = rows.filter(row => String(row.name || "").toLowerCase().includes(match));
+    // Не отдаём список аккаунтов, права, другие поля профиля или неоднозначного адресата.
+    return json({ ok: true, tg_id: hits.length === 1 ? hits[0].tg_id : null });
+  }
   const user = await canRead(request, env);
   if (!user || level(user, "sales.l2") < 1) return bad("нет доступа", 401);
-  const u = new URL(request.url);
   if (u.searchParams.get("mode") === "suggest") {
     const days = Math.min(Number(u.searchParams.get("days")) || 60, 400);
     const from = new Date(Date.now() - days * 864e5).toISOString().slice(0, 10);

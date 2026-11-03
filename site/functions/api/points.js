@@ -2,6 +2,7 @@
 // Возвращает сырые точки; недели и месяцы складываются на клиенте из дней.
 // Для stock-показателей (ptype=potok/month) без asof отдаёт последний снимок. С &plans=1 добавляет планы из таблицы plans.
 import { json, bad, canRead } from "./_lib.js";
+import { readableMetrics } from "./_metric-access.js";
 
 export async function onRequestGet({ request, env }) {
   const user = await canRead(request, env);
@@ -15,6 +16,8 @@ export async function onRequestGet({ request, env }) {
   const to = u.searchParams.get("to") || "";
   const dim = u.searchParams.get("dim");            // null = все срезы; '' = только итог
   const asof = u.searchParams.get("asof") || "";
+  const allowed = new Set((await readableMetrics(env, user, dim)).map(m => m.id));
+  if (metrics.some(m => !allowed.has(m))) return bad("нет доступа к запрошенным показателям", 403);
 
   const where = ["metric IN (" + metrics.map(() => "?").join(",") + ")", "ptype = ?"];
   const args = [...metrics, ptype];

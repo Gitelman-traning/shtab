@@ -1,0 +1,31 @@
+name: P1 release verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Server regression tests
+        run: node --experimental-sqlite --test tests/p1-security.test.mjs
+      - name: Collector regression tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Production checks without data changes or notifications
+        run: python tools/production-smoke.py
+        env:
+          SHTAB_URL: https://shtab-20v.pages.dev
+          SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}

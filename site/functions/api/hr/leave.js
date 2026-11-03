@@ -3,7 +3,7 @@
 //        сотруднику HR: все записи, больничные и остатки отпуска по каждому.
 //   POST /api/hr/leave {action:"add", person, kind, date_from, date_to, days?, note} | {action:"del", id} — только HR
 import { json, bad, canRead, canView, audit, now } from "../_lib.js";
-import { isHR, today, addDays, daysBetween, cleanDate, balance } from "./_hr.js";
+import { isHR, canManageLeave, today, addDays, daysBetween, cleanDate, balance } from "./_hr.js";
 
 const KINDS = ["vacation", "sick", "unpaid"];
 
@@ -20,20 +20,20 @@ export async function onRequestGet({ request, env }) {
     const ids = new Set(people.map((p) => p.id));
     const away = rows.filter((r) => ids.has(r.person))
       .map((r) => ({ person: r.person, kind: r.kind === "vacation" ? "vacation" : "away", date_from: r.date_from, date_to: r.date_to }));
-    return json({ ok: true, is_hr: false, today: day, people: people.map(({ id, name, position, dept }) => ({ id, name, position, dept })), depts, away });
+    return json({ ok: true, is_hr: false, can_edit: false, today: day, people: people.map(({ id, name, position, dept }) => ({ id, name, position, dept })), depts, away });
   }
   const leaves = (await env.DB.prepare("SELECT id, person, kind, date_from, date_to, days, note, created_by FROM hr_leave ORDER BY date_from DESC").all()).results || [];
   const away = leaves.filter((r) => r.date_to >= day && r.date_from <= addDays(day, 60))
     .map((r) => ({ person: r.person, kind: r.kind, date_from: r.date_from, date_to: r.date_to }))
     .sort((a, b) => a.date_from.localeCompare(b.date_from));
   for (const p of people) p.balance = balance(p, leaves, day);
-  return json({ ok: true, is_hr: true, today: day, people, depts, away, leaves });
+  return json({ ok: true, is_hr: true, can_edit: canManageLeave(user), today: day, people, depts, away, leaves });
 }
 
 export async function onRequestPost({ request, env }) {
   const user = await canRead(request, env);
   if (!user) return bad("нет доступа", 401);
-  if (!isHR(user)) return bad("отпуска ведут сотрудники HR", 403);
+  if (!canManageLeave(user)) return bad("нужно право редактирования HR и отпусков", 403);
   let body;
   try { body = await request.json(); } catch (e) { return bad("тело не JSON"); }
   if (body.action === "del") {

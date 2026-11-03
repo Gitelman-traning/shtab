@@ -2,6 +2,7 @@
 // Тело: {"collector": "amo-sheet", "points": [{"metric","ptype","period","dim","asof","value"}, ...], "plans": [{"metric","ptype","period","dim","value"}, ...],
 //        "okna": [{"day","mgr","key","n","items"}, ...], "goals": [{"mgr","month","goal","base","rate","note"}, ...]}
 import { json, bad, hasIngestToken, now, tgSend } from "./_lib.js";
+import { replacementPlan } from "./_replace.js";
 
 // диагносту в Telegram: «подготовка готова». Пользователь Штаба ищется по имени (все слова его имени есть в имени диагноста из amo);
 // шлём, только если совпадение одно. PREP_TG_CC — чат, которому дублировать всё (пилот).
@@ -53,15 +54,22 @@ export async function onRequestPost({ request, env }) {
   const collector = String(body.collector || "unknown").slice(0, 60);
   const has = (k) => Array.isArray(body[k]) && body[k].length;
   if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("prep_debrief") && !has("prep_debrief_versions") && !has("debrief_status") && !(body.prep_alumni && body.prep_alumni.rows) && !has("expenses")
-      && !has("yt_leads") && !body.yt_reset && !has("yt_drop") && !(body.yt_paid && body.yt_paid.rows)) return bad("пустая пачка");
+      && !has("yt_leads") && !body.yt_reset && !body.yt_leads_replace && !has("yt_drop") && !(body.yt_paid && body.yt_paid.rows)) return bad("пустая пачка");
 
   const stamp = now();
+  let replacements;
+  try { replacements = replacementPlan(env.DB, body, stamp); }
+  catch (e) { return bad(e.message); }
+  if (replacements.statements.length) {
+    try { await env.DB.batch(replacements.statements); }
+    catch (e) { return bad("Не удалось заменить набор данных целиком. Повторите загрузку.", 503); }
+  }
   const stmt = env.DB.prepare(
     "INSERT INTO points (metric, ptype, period, dim, asof, value, source, updated_at) VALUES (?,?,?,?,?,?,?,?) " +
     "ON CONFLICT(metric, ptype, period, dim, asof) DO UPDATE SET value = excluded.value, " +
     "source = excluded.source, updated_at = excluded.updated_at"
   );
-  let written = 0;
+  let written = replacements.count;
   for (let i = 0; i < points.length; i += CHUNK) {
     const batch = [];
     for (const p of points.slice(i, i + CHUNK)) {
@@ -212,11 +220,10 @@ export async function onRequestPost({ request, env }) {
     try { for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); } } catch (e) { /* таблицы может ещё не быть */ }
   }
   // база кейсов выпускников из отчётных презентаций (19.10.2026): {replace: true, rows: [...]} — заливается целиком
-  if (body.prep_alumni && Array.isArray(body.prep_alumni.rows)) {
+  if (body.prep_alumni && !body.prep_alumni.replace && Array.isArray(body.prep_alumni.rows)) {
     const v = (x, n) => String(x == null ? "" : x).slice(0, n);
     const F = ["file_id", "stream", "company", "person", "niche", "region", "size", "evidence", "problems", "results", "grow", "pct",
                "changed", "say", "confirmed", "cannot", "when_use", "transition", "takeaway", "question", "ask_alumni"];
-    if (body.prep_alumni.replace) await env.DB.prepare("DELETE FROM prep_alumni").run();
     const q = env.DB.prepare("INSERT INTO prep_alumni (" + F.join(", ") + ", updated_at) VALUES (" + F.map(() => "?").join(",") + ",?)");
     const batch = body.prep_alumni.rows.slice(0, 1000).filter((r) => r && (r.say || r.changed))
       .map((r) => q.bind(...F.map((k) => v(r[k], k === "say" || k === "changed" || k === "confirmed" || k === "cannot" ? 1500 : 600)), stamp));
@@ -236,8 +243,7 @@ export async function onRequestPost({ request, env }) {
     }
     for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); }
   }
-  // YouTube-сделки (collector/youtube.py, schema38): yt_reset — полная перезаливка, yt_drop — сделки, у которых источник больше не YouTube
-  if (body.yt_reset) await env.DB.prepare("DELETE FROM yt_leads").run();
+  // Полная замена: yt_leads_replace.rows (одна транзакция выше). Здесь только инкрементальные изменения.
   const ytl = Array.isArray(body.yt_leads) ? body.yt_leads : [];
   if (ytl.length) {
     const v = (x, n) => String(x == null ? "" : x).slice(0, n);
@@ -259,9 +265,8 @@ export async function onRequestPost({ request, env }) {
     const part = ytd.slice(i, i + 90);
     await env.DB.prepare("DELETE FROM yt_leads WHERE id IN (" + part.map(() => "?").join(",") + ")").bind(...part).run();
   }
-  if (body.yt_paid && Array.isArray(body.yt_paid.rows)) {
+  if (body.yt_paid && !body.yt_paid.replace && Array.isArray(body.yt_paid.rows)) {
     const int = (x) => (x == null || x === "" || !isFinite(Number(x)) ? null : Math.trunc(Number(x)));
-    if (body.yt_paid.replace) await env.DB.prepare("DELETE FROM yt_paid").run();
     const v = (x, n) => String(x == null ? "" : x).slice(0, n);
     const q = env.DB.prepare("INSERT INTO yt_paid (id, contact_id, pipeline_id, price, created_at, closed_at, name, contact_name, updated_at) VALUES (?,?,?,?,?,?,?,?,?) " +
       "ON CONFLICT(id) DO UPDATE SET contact_id = excluded.contact_id, pipeline_id = excluded.pipeline_id, price = excluded.price, " +
