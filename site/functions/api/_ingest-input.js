@@ -1,3 +1,4 @@
+import { goalTerms } from './_goal-terms.js';
 // Проверяем весь запрос до первой записи, в том числе до замены полных снимков.
 const deal = row => Number.isSafeInteger(Number(row?.deal)) && Number(row.deal) > 0;
 const metric = row => row?.metric && row.ptype && row.period && Number.isFinite(row.value);
@@ -5,7 +6,7 @@ const yt = row => Number.isSafeInteger(Number(row?.id)) && Number(row.id)>0 && N
 const date = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
 const batches = {
   points:[20000,metric], plans:[500,metric], okna:[200,r=>date(r?.day)&&r.mgr&&r.key],
-  goals:[50,r=>r?.mgr&&/^\d{4}-(0[1-9]|1[0-2])$/.test(r.month)&&Number.isFinite(r.goal)],
+  goals:[50,r=>r?.mgr&&/^\d{4}-(0[1-9]|1[0-2])$/.test(r.month)&&goalTerms(r)],
   pings:[200,r=>deal(r)&&r.manager&&date(r.day)], prep:[50,deal], prep_cases:[200,deal],
   prep_growth:[200,deal], prep_manager:[50,r=>deal(r)&&r.manager], prep_style:[20,r=>r?.manager&&r.text],
   prep_debrief:[20,r=>deal(r)&&r.text], prep_debrief_versions:[30,r=>deal(r)&&r.text], debrief_status:[200,deal],

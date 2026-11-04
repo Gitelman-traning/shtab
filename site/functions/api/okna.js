@@ -24,18 +24,21 @@ export async function onRequestGet({ request, env }) {
   return json({ ok: true, day, days, rows: out, goals: gl.results || [] });
 }
 
+import { goalTerms } from './_goal-terms.js';
+
 export async function onRequestPost({ request, env }) {
   const user = await canRead(request, env);
   if (!user || level(user, "sales.l1") < 2) return bad("нет доступа", 401);
   let b;
   try { b = await request.json(); } catch (e) { return bad("тело не JSON"); }
   const mgr = String(b.mgr || "").trim().slice(0, 40), month = String(b.month || "");
-  const goal = Number(b.goal);
-  if (!mgr || !/^\d{4}-\d{2}$/.test(month) || !isFinite(goal) || goal <= 0) return bad("нужны mgr, month, goal");
+  const terms = goalTerms(b);
+  if (!mgr || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !terms) return bad("Укажите менеджера, месяц, положительную цель и неотрицательные оклад и ставку.");
+  const {goal,base,rate}=terms;
   await env.DB.prepare(
     "INSERT INTO okna_goals (mgr, month, goal, base, rate, note, set_by, updated_at) VALUES (?,?,?,?,?,?,?,?) " +
     "ON CONFLICT(mgr, month) DO UPDATE SET goal = excluded.goal, base = excluded.base, rate = excluded.rate, note = excluded.note, set_by = excluded.set_by, updated_at = excluded.updated_at")
-    .bind(mgr, month, goal, Number(b.base) || 25000, Number(b.rate) || 1500, String(b.note || "").slice(0, 200), user.login, now()).run();
+    .bind(mgr, month, goal,base,rate, String(b.note || "").slice(0, 200), user.login, now()).run();
   await audit(env, user.login, "okna.goal", mgr + " " + month, String(goal));
   return json({ ok: true });
 }

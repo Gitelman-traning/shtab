@@ -135,6 +135,7 @@ function render(){
   document.getElementById("stamp").textContent = upd ? "собрано " + new Date(upd).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
 
   function calc(){
+    if (RATE === 0) return '<div class="want"><label>Цель <input id="goal" type="number" min="1" value="' + goal + '"></label></div><p>Оклад ' + rub(BASE) + '. Ставка за встречу — 0. ' + (goal <= BASE ? 'Оклад покрывает цель.' : 'При таких условиях встречи не увеличивают выплату.') + '</p>';
     var need = Math.max(0, Math.ceil((goal - BASE) / RATE)), left = Math.max(0, need - cond);
     var daysLeft = dim - dn + 1, wdLeft = 0; for (var k = dn; k <= dim; k++) { var w = new Date(y, mo, k).getDay(); if (w !== 0 && w !== 6) wdLeft++; }
     var shLeft = shifts.filter(function(x){ return x >= dn; });

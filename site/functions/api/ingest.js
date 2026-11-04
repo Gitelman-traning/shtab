@@ -4,6 +4,7 @@
 import { json, bad, hasIngestToken, now, tgSend } from "./_lib.js";
 import { replacementPlan } from "./_replace.js";
 import { inspectIngest } from "./_ingest-input.js";
+import { goalTerms } from "./_goal-terms.js";
 
 // диагносту в Telegram: «подготовка готова». Пользователь Штаба ищется по имени (все слова его имени есть в имени диагноста из amo);
 // шлём, только если совпадение одно. PREP_TG_CC — чат, которому дублировать всё (пилот).
@@ -285,8 +286,8 @@ export async function onRequestPost({ request, env }) {
       "ON CONFLICT(mgr, month) DO UPDATE SET goal = excluded.goal, base = excluded.base, rate = excluded.rate, note = excluded.note, set_by = excluded.set_by, updated_at = excluded.updated_at");
     const batch = [];
     for (const g of goals) {
-      if (!g || !g.mgr || !/^\d{4}-\d{2}$/.test(String(g.month || "")) || typeof g.goal !== "number") continue;
-      batch.push(gs.bind(String(g.mgr).slice(0, 40), String(g.month), g.goal, Number(g.base) || 25000, Number(g.rate) || 1500, String(g.note || "").slice(0, 200), "collector:" + collector, stamp));
+      const {goal,base,rate}=goalTerms(g);
+      batch.push(gs.bind(String(g.mgr).slice(0, 40), String(g.month), goal,base,rate, String(g.note || "").slice(0, 200), "collector:" + collector, stamp));
     }
     if (batch.length) { await env.DB.batch(batch); written += batch.length; }
   }

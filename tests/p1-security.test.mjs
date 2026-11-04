@@ -15,6 +15,7 @@ import * as data from '../site/functions/api/sections/[id]/data.js';
 import * as versions from '../site/functions/api/sections/[id]/versions.js';
 import * as users from '../site/functions/api/users.js';
 import * as me from '../site/functions/api/me.js';
+import * as okna from '../site/functions/api/okna.js';
 import * as leave from '../site/functions/api/hr/leave.js';
 import * as structure from '../site/functions/api/hr/structure.js';
 import * as prep from '../site/functions/api/prep.js';
@@ -291,6 +292,14 @@ test('P2-10 points never report a truncated response as complete',async()=>{
   const last=await(await get('&page=10001&page_size=2')).json();assert.deepEqual(last.rows.map(r=>r.value),[20001]);assert.equal(last.has_more,false);
 });
 const paid=(id)=>({id,created_at:100,price:id});
+test('P2-11 both goal entry points preserve zero, default omitted terms and reject invalid values',async()=>{
+  const e=env({'sales.l1':2});const g={mgr:'fixture',month:'2026-11',goal:100};
+  for(const submit of [body=>put(e,{goals:[body]}),body=>okna.onRequestPost({request:request('/api/okna',body),env:e})]){
+    assert.equal((await submit({...g,base:0,rate:0})).status,200);let saved=rows(e,'okna_goals').find(row=>row.mgr==='fixture');assert.equal(saved.base,0);assert.equal(saved.rate,0);
+    for(const rate of ['',false,-1,'abc'])assert.equal((await submit({...g,rate})).status,400);
+    assert.equal((await submit(g)).status,200);saved=rows(e,'okna_goals').find(row=>row.mgr==='fixture');assert.equal(saved.base,25000);assert.equal(saved.rate,1500);
+  }
+});
 test('P1-6 failed paid replacement rolls back real SQLite deletion and preceding inserts',async()=>{
   const e=env();assert.equal((await put(e,{yt_paid:{replace:true,rows:[paid(1)]}})).status,200);
   e.sqlite.exec("CREATE TRIGGER fail_paid BEFORE INSERT ON yt_paid WHEN NEW.id=3 BEGIN SELECT RAISE(ABORT,'synthetic failure'); END");
