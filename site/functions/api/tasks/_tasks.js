@@ -54,9 +54,13 @@ export function teamOf(login, hr, depts) {
   while (queue.length) {
     const pid = queue.shift();
     const below = hr.filter((p) => p.manager === pid);
-    const led = []; const walk = (d) => { led.push(d.id); kids(d.id).forEach(walk); };
-    depts.filter((d) => d.head === pid).forEach(walk);
-    for (const p of hr) if (led.includes(p.dept)) below.push(p);
+    const led = new Set(), departments=depts.filter(d=>d.head===pid);
+    while(departments.length) {
+      const dept=departments.pop();
+      if(led.has(dept.id)) continue;
+      led.add(dept.id);departments.push(...kids(dept.id));
+    }
+    for (const p of hr) if (led.has(p.dept)) below.push(p);
     for (const p of below) {
       if (seen.has(p.id) || p.status !== "active") continue;
       seen.add(p.id); queue.push(p.id);

@@ -53,14 +53,13 @@ export async function onRequestPost({ request, env }) {
     if (!id) id = "d" + Date.now().toString(36);
     if (!/^[a-z0-9-]{1,40}$/.test(id)) return bad("id отдела: латиница, цифры, дефис");
     if (parent && (parent === id || !(await deptExists(env, parent)))) return bad("нет такого вышестоящего отдела");
-    if (parent) {   // не даём сделать отдел подотделом собственного подотдела
-      const p = await env.DB.prepare("SELECT parent FROM hr_depts WHERE id = ?").bind(parent).first();
-      if (p && p.parent === id) return bad("получится круг: этот отдел уже вышестоящий для выбранного");
-    }
     const sort = int(body.sort) ?? 100;
-    await env.DB.prepare("INSERT INTO hr_depts (id, name, parent, head, sort, updated_at) VALUES (?,?,?,?,?,?) " +
+    // Проверка и запись одной командой: параллельные перемещения не образуют цикл.
+    const saved=await env.DB.prepare("WITH RECURSIVE chain(id,parent) AS (SELECT id,parent FROM hr_depts WHERE id=? UNION SELECT d.id,d.parent FROM hr_depts d JOIN chain c ON d.id=c.parent) " +
+      "INSERT INTO hr_depts (id,name,parent,head,sort,updated_at) SELECT ?,?,?,?,?,? WHERE ?='' OR (EXISTS (SELECT 1 FROM chain WHERE parent='') AND NOT EXISTS (SELECT 1 FROM chain WHERE id=?)) " +
       "ON CONFLICT(id) DO UPDATE SET name = excluded.name, parent = excluded.parent, head = excluded.head, sort = excluded.sort, updated_at = excluded.updated_at")
-      .bind(id, name, parent, int(body.head), sort, t).run();
+      .bind(parent,id,name,parent,int(body.head),sort,t,parent,id).run();
+    if (!saved.meta.changes) return bad('Нельзя перенести отдел: в цепочке родителей есть цикл.');
     await audit(env, user.login, isNew ? "hr.dept_add" : "hr.dept_edit", id, name);
     return json({ ok: true, id });
   }

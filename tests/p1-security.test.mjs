@@ -16,6 +16,7 @@ import * as versions from '../site/functions/api/sections/[id]/versions.js';
 import * as users from '../site/functions/api/users.js';
 import * as me from '../site/functions/api/me.js';
 import * as okna from '../site/functions/api/okna.js';
+import {teamOf} from '../site/functions/api/tasks/_tasks.js';
 import * as leave from '../site/functions/api/hr/leave.js';
 import * as structure from '../site/functions/api/hr/structure.js';
 import * as prep from '../site/functions/api/prep.js';
@@ -292,6 +293,13 @@ test('P2-10 points never report a truncated response as complete',async()=>{
   const last=await(await get('&page=10001&page_size=2')).json();assert.deepEqual(last.rows.map(r=>r.value),[20001]);assert.equal(last.has_more,false);
 });
 const paid=(id)=>({id,created_at:100,price:id});
+test('P2-12 department moves reject indirect cycles and damaged hierarchies terminate',async()=>{
+  const e=env({hr:2});const save=(id,parent)=>structure.onRequestPost({request:request('/api/hr/structure',{action:'dept_save',id,name:id,parent}),env:e});
+  for(const [id,parent] of [['a',''],['b','a'],['c','b']])assert.equal((await save(id,parent)).status,200);
+  assert.equal((await save('a','c')).status,400);assert.equal(e.sqlite.prepare("SELECT parent FROM hr_depts WHERE id='a'").get().parent,'');
+  const depts=[{id:'a',parent:'c',head:1},{id:'b',parent:'a'},{id:'c',parent:'b'}];
+  assert.deepEqual(teamOf('boss',[{id:1,login:'boss',status:'active'},{id:2,login:'member',dept:'c',status:'active'}],depts),['member']);
+});
 test('P2-11 both goal entry points preserve zero, default omitted terms and reject invalid values',async()=>{
   const e=env({'sales.l1':2});const g={mgr:'fixture',month:'2026-11',goal:100};
   for(const submit of [body=>put(e,{goals:[body]}),body=>okna.onRequestPost({request:request('/api/okna',body),env:e})]){
