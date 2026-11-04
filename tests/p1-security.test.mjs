@@ -35,6 +35,36 @@ const section=(e)=>{
 };
 const llm=()=>{const calls=[];globalThis.fetch=async(url,init)=>{assert.match(String(url),/^https:\/\/model.invalid\//);calls.push(JSON.parse(init.body));return Response.json({choices:[{message:{content:'synthetic answer'}}]});};return calls;};
 
+test('P2-9 AI distinguishes absent, confirmed zero and incomplete periods',async()=>{
+  const e=env(),calls=llm();e.LLM_API_KEY='fixture';e.LLM_BASE_URL='https://model.invalid';
+  const askForData=async()=>{
+    const response=await chat.onRequestPost({request:request('/api/chat',{messages:[{role:'user',content:'итоги'}]}),env:e});
+    assert.equal(response.status,200);return calls.at(-1).messages[0].content;
+  };
+  const empty=await askForData();assert.match(empty,/Суточные показатели: данных нет/);assert.doesNotMatch(empty,/вчера 0/);
+  point(e,'l1.booked',0);const present=await askForData();assert.match(present,/\[l1.booked\]: вчера 0/);assert.match(present,/\[l2.sales\]: вчера нет данных/);
+});
+
+test('P2-9 Telegram cards keep source figures with a forbidden total and show gaps as dashes',async()=>{
+  const elements=new Map();const node=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:''});return elements.get(id);};
+  const document={getElementById:node,querySelectorAll:()=>[],querySelector:()=>null,documentElement:{removeAttribute(){},setAttribute(){}}};
+  class November4 extends Date { constructor(...args){super(...(args.length?args:['2026-11-04T09:00:00Z']));} static now(){return Date.parse('2026-11-04T09:00:00Z');} }
+  const allRows=[1,2,3].map((n)=>({period:'2026-11-0'+n,value:n===1?2:1}));
+  const context={document,Date:November4,fetch:async address=>{
+    const u=new URL(address,'https://test.invalid');const m=u.searchParams.get('metric');
+    if(u.searchParams.get('dim')==='')return Response.json({ok:false},{status:403});
+    if(m==='mkt.leads')return Response.json({ok:true,rows:allRows});
+    if(m==='l2.sales')return Response.json({ok:true,rows:allRows.map(r=>({...r,value:0}))});
+    return Response.json({ok:true,rows:[]});
+  }};
+  runInNewContext(readFileSync(new URL('site/public/ui.js',root),'utf8'),context);
+  const html=readFileSync(new URL('site/public/marketing/telegram/index.html',root),'utf8');
+  for(const [,script] of html.matchAll(/<script>([\s\S]*?)<\/script>/g))runInNewContext(script,context);
+  await new Promise(resolve=>setImmediate(resolve));
+  const funnel=node('funnel').innerHTML;assert.match(funnel,/Лиды<\/div><div class="v">4</);assert.match(funnel,/Продажи<\/div><div class="v">0</);assert.match(funnel,/ЦА<\/div><div class="v">—</);
+  assert.match(node('stamp').textContent,/часть показателей недоступна/);assert.doesNotMatch(node('kpis').innerHTML+node('trend').innerHTML,/null|undefined|NaN/);
+});
+
 for(const metric of ['l2.sales','fun.l2.paid','cv.l2.held.paid','pay.full','seg.sales'])test('P1-1 denies closed sales through '+metric,async()=>{
   const e=env({'sales.l2':0});point(e,metric);
   const r=await points.onRequestGet({request:request('/api/points?metric='+metric),env:e});

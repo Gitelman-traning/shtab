@@ -24,9 +24,6 @@ import re
 import sys
 import time
 
-import requests
-from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
 
 SA_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
 SA_FILE = os.environ.get("GOOGLE_SA_FILE", "").strip()
@@ -67,11 +64,46 @@ def parse_date(s):
         return None
 
 
-def sheets():
-    scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+def sheet_credentials():
+    from google.oauth2.service_account import Credentials
+    scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly", "https://www.googleapis.com/auth/drive.metadata.readonly"]
     creds = (Credentials.from_service_account_file(SA_FILE, scopes=scopes) if SA_FILE
              else Credentials.from_service_account_info(json.loads(SA_JSON), scopes=scopes))
-    return build("sheets", "v4", credentials=creds, cache_discovery=False).spreadsheets().values()
+    return creds
+
+
+def google_service(name, version, credentials):
+    from googleapiclient.discovery import build
+    return build(name, version, credentials=credentials, cache_discovery=False)
+
+
+def monthly_report(service, credentials, day_to):
+    """Choose the matching monthly report and verify the exporter's own coverage marker."""
+    base_id = LAYOUT["sheet_id"]
+    def title(file_id):
+        return service.get(spreadsheetId=file_id, fields="properties/title").execute()["properties"]["title"]
+    base_title = title(base_id)
+    if not re.match(r"^\d{2}\.\d{2}\b", base_title):
+        raise ValueError("В названии базового отчёта нет месяца; публикация остановлена")
+    expected = day_to.strftime("%m.%y") + base_title[5:]
+    selected = os.environ.get("REPORT_SHEET_ID") or base_id
+    current_title = base_title if selected == base_id else title(selected)
+    if current_title != expected:
+        drive = google_service("drive", "v3", credentials)
+        escaped = expected.replace("\\", "\\\\").replace("'", "\\'")
+        matches = drive.files().list(q="trashed = false and mimeType = 'application/vnd.google-apps.spreadsheet' and name = '" + escaped + "'", fields="nextPageToken,files(id)", pageSize=2, includeItemsFromAllDrives=True, supportsAllDrives=True).execute()
+        if matches.get("nextPageToken") or len(matches.get("files", [])) != 1:
+            raise ValueError("Не найден единственный отчёт за " + day_to.strftime("%m.%Y") + "; проверьте REPORT_SHEET_ID")
+        selected = matches["files"][0]["id"]
+    marker_range = os.environ.get("REPORT_STAMP_RANGE")
+    if not marker_range:
+        raise ValueError("Не задан REPORT_STAMP_RANGE с отметкой export_date исходной выгрузки")
+    marker = read(service.values(), selected, marker_range)
+    dates = [parse_date(r[1]) for r in marker if len(r) >= 2 and r[0] == 'export_date']
+    if len(dates) != 1 or dates[0] is None or dates[0] < day_to:
+        raise ValueError("Выгрузка не подтверждает данные по " + day_to.isoformat() + "; публикация остановлена")
+    log("месячный отчёт %s, выгрузка по %s" % (day_to.strftime("%m.%Y"), dates[0]))
+    return selected
 
 
 def read(values, sheet_id, rng):
@@ -98,6 +130,8 @@ def deal_points(values, day_from, day_to):
     log("строк выгрузки: %d" % len(rows))
     lead_funnel = L["lead_funnel"]
     prefix = L["first_line_prefix"]
+    if not any(cell(r, c['funnel']) == lead_funnel and parse_date(cell(r, c['lead_date'])) for r in rows):
+        raise ValueError("Нет распознаваемых сделок целевой воронки; публикация остановлена")
 
     def in_range(d):
         return d is not None and day_from <= d <= day_to
@@ -203,6 +237,10 @@ def deal_points(values, day_from, day_to):
     while day <= day_to:
         for metric in ("mkt.leads", "mkt.qual", "l1.leads", "l1.booked", "l2.held", "l2.sales"):
             counts.setdefault((metric, day.isoformat(), ""), 0)
+            if metric != 'l1.leads':
+                for source in ("Инстаграм smm", "Телеграм канал", "Интеграции", "YouTube", "Реклама FB", "GitelmanSiteChat", "Сайт"):
+                    dim = source if metric == 'mkt.leads' else 'src:' + source
+                    counts.setdefault((metric, day.isoformat(), dim), 0)
         day += dt.timedelta(days=1)
     for (metric, period, dim), n in counts.items():
         points.append({"metric": metric, "ptype": "day", "period": period, "dim": dim, "value": n})
@@ -397,6 +435,7 @@ def plan_points(values, today):
 # ---------- отправка ----------
 
 def post(path, body):
+    import requests
     r = requests.post(URL + path, headers={"Authorization": "Bearer " + TOKEN}, json=body, timeout=120)
     if r.status_code >= 400:
         raise RuntimeError("%s → %s %s" % (path, r.status_code, r.text[:200]))
@@ -421,12 +460,17 @@ def main():
     if missing or not (SA_JSON or SA_FILE):
         log("ОШИБКА: не заданы " + ", ".join(missing + ([] if (SA_JSON or SA_FILE) else ["GOOGLE_SERVICE_ACCOUNT_JSON"])))
         sys.exit(1)
-    today = dt.date.today()
+    today = dt.datetime.now(dt.timezone(dt.timedelta(hours=3))).date()
     day_to = dt.date.fromisoformat(os.environ["TO"]) if os.environ.get("TO") else today - dt.timedelta(days=1)
     day_from = dt.date.fromisoformat(os.environ["FROM"]) if os.environ.get("FROM") else day_to - dt.timedelta(days=13)
     log("период: %s — %s" % (day_from, day_to))
 
-    values = sheets()
+    if day_from > day_to or day_to >= today:
+        raise ValueError("Нужен законченный период до вчерашнего дня включительно")
+    credentials = sheet_credentials()
+    service = google_service("sheets", "v4", credentials).spreadsheets()
+    LAYOUT['sheet_id'] = monthly_report(service, credentials, day_to)
+    values = service.values()
     if SYNC_METRICS:
         here = os.path.dirname(os.path.abspath(__file__))
         reg = json.load(io.open(os.path.join(here, "..", "metrics.json"), encoding="utf-8"))
@@ -434,6 +478,10 @@ def main():
 
     pts = deal_points(values, day_from, day_to)
     log("точек по сделкам: %d" % len(pts))
+    if os.environ.get('DEALS_ONLY') == '1':
+        pts = [p for p in pts if p['ptype'] == 'day' or day_from.strftime('%Y-%m') <= p['period'] <= day_to.strftime('%Y-%m')]
+        send(pts, 'пересчёт сделок %s—%s' % (day_from, day_to))
+        return
     pp = participants_points(values, today)
     log("точек по участникам: %d" % len(pp))
     ap = activity_points(values, day_from, day_to)

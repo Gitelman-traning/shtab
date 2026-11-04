@@ -48,50 +48,72 @@
 <script>
 var SRC = "Сайт";
 function api(q){ return fetch("/api/points?" + q, { credentials: "same-origin" }).then(function(r){ return r.json(); }); }
-var today = new Date(); today.setHours(0,0,0,0);
+var moscow = new Date(Date.now() + 3 * 3600000);
+var today = new Date(moscow.getUTCFullYear(), moscow.getUTCMonth(), moscow.getUTCDate());
 var yesterday = addDays(today, -1);
 var wkStart = monday(yesterday), wkPrevStart = addDays(wkStart,-7), wkPrevEnd = addDays(yesterday,-7);
-var monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-var pmStart = new Date(today.getFullYear(), today.getMonth()-1, 1);
+var monthStart = new Date(yesterday.getFullYear(), yesterday.getMonth(), 1);
+var pmStart = new Date(monthStart.getFullYear(), monthStart.getMonth()-1, 1);
 var pmEnd = new Date(pmStart.getFullYear(), pmStart.getMonth(), Math.min(yesterday.getDate(), new Date(pmStart.getFullYear(), pmStart.getMonth()+1, 0).getDate()));
 var histStart = addDays(wkStart, -7*8);
 var from = pmStart < histStart ? pmStart : histStart;
 
-Promise.all([
-  api("metric=mkt.leads&ptype=day&dim=" + encodeURIComponent(SRC) + "&from=" + iso(from) + "&to=" + iso(yesterday)),
-  api("metric=mkt.qual,l1.booked,l2.held,l2.sales&ptype=day&dim=" + encodeURIComponent("src:" + SRC) + "&from=" + iso(from) + "&to=" + iso(yesterday)),
-  api("metric=mkt.leads&ptype=day&dim=&from=" + iso(from) + "&to=" + iso(yesterday))
-]).then(function(res){
-  if (!res[0].ok) { document.getElementById("kpis").innerHTML = '<div class="kpi"><span class="nm">Нет доступа к витрине</span></div>'; return; }
-  var day = { "mkt.leads": {}, "all": {} };
-  res[0].rows.forEach(function(r){ day["mkt.leads"][r.period] = r.value; });
-  res[1].rows.forEach(function(r){ (day[r.metric] = day[r.metric] || {})[r.period] = r.value; });
-  res[2].rows.forEach(function(r){ day["all"][r.period] = r.value; });
-  render(day);
-});
-function sum(tbl, metric, a, b){ var s = 0, d = new Date(a); while (d <= b) { s += (tbl[metric] && tbl[metric][iso(d)]) || 0; d = addDays(d,1); } return s; }
+function dayValue(tbl, metric, date) {
+  var value = (tbl[metric] || {})[iso(date)];
+  return typeof value === "number" ? value : null;
+}
+function sum(tbl, metric, a, b) {
+  var total = 0;
+  for (var d = new Date(a); d <= b; d = addDays(d, 1)) {
+    var value = dayValue(tbl, metric, d);
+    if (value === null) return null;
+    total += value;
+  }
+  return total;
+}
+function shown(value) { return value == null ? "—" : value; }
+function sourcePct(value, base) { return value == null || base == null ? null : pct(value, base); }
 
-function render(day){
-  var last = Object.keys(day["all"]||{}).sort().pop();
-  document.getElementById("stamp").textContent = last ? "данные по " + last.split("-").reverse().join(".") : "данных нет";
-  var y = day["mkt.leads"][iso(yesterday)] || 0;
+var seriesQueries = [
+  ["mkt.leads","mkt.leads",SRC], ["mkt.qual","mkt.qual","src:"+SRC],
+  ["l1.booked","l1.booked","src:"+SRC], ["l2.held","l2.held","src:"+SRC],
+  ["l2.sales","l2.sales","src:"+SRC], ["all","mkt.leads",""]
+];
+Promise.all(seriesQueries.map(function(query) {
+  return api("metric="+query[1]+"&ptype=day&dim="+encodeURIComponent(query[2])+"&from="+iso(from)+"&to="+iso(yesterday))
+    .catch(function(){ return {ok:false}; });
+})).then(function(results) {
+  var day = {}, unavailable = false;
+  results.forEach(function(result, i) {
+    var key = seriesQueries[i][0];
+    day[key] = {};
+    if (!result.ok || !Array.isArray(result.rows)) { unavailable = true; return; }
+    result.rows.forEach(function(row) { day[key][row.period] = row.value; });
+  });
+  render(day, unavailable);
+});
+
+function render(day, unavailable){
+  var last = Object.keys(day["mkt.leads"]).sort().pop();
+  document.getElementById("stamp").textContent = (last ? (last < iso(yesterday) ? "данные устарели · по " : "данные по ") + last.split("-").reverse().join(".") : "нет данных источника") + (unavailable ? " · часть показателей недоступна" : "");
+  var y = dayValue(day,"mkt.leads",yesterday);
   var w = sum(day,"mkt.leads",wkStart,yesterday), wp = sum(day,"mkt.leads",wkPrevStart,wkPrevEnd);
   var mt = sum(day,"mkt.leads",monthStart,yesterday), mp = sum(day,"mkt.leads",pmStart,pmEnd);
-  var allM = sum(day,"all",monthStart,yesterday), allP = sum(day,"all",pmStart,pmEnd);
-  var share = pct(mt, allM), shareP = pct(mp, allP);
+  var allM = sum(day,"all",monthStart,yesterday);
+  var share = sourcePct(mt, allM);
   document.getElementById("kpis").innerHTML =
-    '<div class="kpi"><span class="nm">Лиды источника</span><span class="v">' + y + ' <span class="plan">вчера</span></span>'
-    + '<span class="row"><span>неделя ' + dmy(wkStart) + '—' + dmy(yesterday) + '</span><b>' + w + delta(w, wp) + '</b></span>'
-    + '<span class="row"><span>месяц по ' + dmy(yesterday) + '</span><b>' + mt + delta(mt, mp) + '</b></span><span class="row"><span>доля от всех лидов</span><b>' + fmtPct(share) + '</b></span></div>'
+    '<div class="kpi"><span class="nm">Лиды источника</span><span class="v">' + shown(y) + ' <span class="plan">вчера</span></span>'
+    + '<span class="row"><span>неделя ' + dmy(wkStart) + '—' + dmy(yesterday) + '</span><b>' + shown(w) + delta(w, wp) + '</b></span>'
+    + '<span class="row"><span>месяц по ' + dmy(yesterday) + '</span><b>' + shown(mt) + delta(mt, mp) + '</b></span><span class="row"><span>доля от всех лидов</span><b>' + fmtPct(share) + '</b></span></div>'
     + kpi3("mkt.qual","ЦА лиды","квалифицированы ЦА / УЦА",day) + kpi3("l1.booked","Назначено диагностик","встреча назначена",day) + kpi3("l2.sales","Продажи","прислали чек",day);
   var L = mt, Q = sum(day,"mkt.qual",monthStart,yesterday), B = sum(day,"l1.booked",monthStart,yesterday), H = sum(day,"l2.held",monthStart,yesterday), S = sum(day,"l2.sales",monthStart,yesterday);
   document.getElementById("funnel-sub").textContent = "месяц, с " + dmy(monthStart) + " по " + dmy(yesterday);
   document.getElementById("funnel").innerHTML =
-    '<div class="step"><div class="nm">Лиды</div><div class="v">' + L + '</div><div class="cr">источник «' + esc(SRC) + '»</div></div>'
-    + '<div class="step"><div class="nm">ЦА</div><div class="v">' + Q + '</div><div class="cr">лид → ЦА <b>' + fmtPct(pct(Q,L)) + '</b></div></div>'
-    + '<div class="step"><div class="nm">Назначено</div><div class="v">' + B + '</div><div class="cr">ЦА → назначено <b>' + fmtPct(pct(B,Q)) + '</b></div></div>'
-    + '<div class="step"><div class="nm">Проведено</div><div class="v">' + H + '</div><div class="cr">назначено → проведено <b>' + fmtPct(pct(H,B)) + '</b></div></div>'
-    + '<div class="step"><div class="nm">Продажи</div><div class="v">' + S + '</div><div class="cr">проведено → продажа <b>' + fmtPct(pct(S,H)) + '</b></div></div>';
+    '<div class="step"><div class="nm">Лиды</div><div class="v">' + shown(L) + '</div><div class="cr">источник «' + esc(SRC) + '»</div></div>'
+    + '<div class="step"><div class="nm">ЦА</div><div class="v">' + shown(Q) + '</div><div class="cr">лид → ЦА <b>' + fmtPct(sourcePct(Q,L)) + '</b></div></div>'
+    + '<div class="step"><div class="nm">Назначено</div><div class="v">' + shown(B) + '</div><div class="cr">ЦА → назначено <b>' + fmtPct(sourcePct(B,Q)) + '</b></div></div>'
+    + '<div class="step"><div class="nm">Проведено</div><div class="v">' + shown(H) + '</div><div class="cr">назначено → проведено <b>' + fmtPct(sourcePct(H,B)) + '</b></div></div>'
+    + '<div class="step"><div class="nm">Продажи</div><div class="v">' + shown(S) + '</div><div class="cr">проведено → продажа <b>' + fmtPct(sourcePct(S,H)) + '</b></div></div>';
   var hasDown = Object.keys(day["l1.booked"]||{}).length || Object.keys(day["l2.held"]||{}).length;
   document.getElementById("fnote").innerHTML = hasDown ? 'Каждая ступень считается по своей дате внутри месяца: ЦА по дате квалификации, встречи по дате встречи, чеки по дате чека. Поэтому назначенные в сентябре могут быть лидами августа, а конверсии здесь — оценка по потоку событий. Точная когортная воронка по месяцу лида — в срезах ниже.' : 'Назначенные, проведённые и продажи в разрезе источника появятся после ближайшего ночного сбора.';
   var weeks = [];
@@ -99,20 +121,21 @@ function render(day){
   weeks.push({ s: wkStart, e: yesterday, partial: true });
   document.getElementById("weeks").innerHTML = '<table><thead><tr><th>Неделя</th><th class="num">Лиды</th><th class="num">Доля</th><th class="num">ЦА</th><th class="num">Назнач.</th><th class="num">Провед.</th><th class="num">Продажи</th></tr></thead><tbody>'
     + weeks.map(function(wk){ var l = sum(day,"mkt.leads",wk.s,wk.e), a = sum(day,"all",wk.s,wk.e);
-      return '<tr' + (wk.partial?' style="color:var(--gold)"':'') + '><td class="k">' + dmy(wk.s) + (wk.partial?' · идёт':'') + '</td><td class="num">' + l + '</td><td class="num">' + fmtPct(pct(l,a)) + '</td><td class="num">' + sum(day,"mkt.qual",wk.s,wk.e) + '</td><td class="num">' + sum(day,"l1.booked",wk.s,wk.e) + '</td><td class="num">' + sum(day,"l2.held",wk.s,wk.e) + '</td><td class="num">' + sum(day,"l2.sales",wk.s,wk.e) + '</td></tr>'; }).join("")
+      return '<tr' + (wk.partial?' style="color:var(--gold)"':'') + '><td class="k">' + dmy(wk.s) + (wk.partial?' · идёт':'') + '</td><td class="num">' + shown(l) + '</td><td class="num">' + fmtPct(sourcePct(l,a)) + '</td><td class="num">' + shown(sum(day,"mkt.qual",wk.s,wk.e)) + '</td><td class="num">' + shown(sum(day,"l1.booked",wk.s,wk.e)) + '</td><td class="num">' + shown(sum(day,"l2.held",wk.s,wk.e)) + '</td><td class="num">' + shown(sum(day,"l2.sales",wk.s,wk.e)) + '</td></tr>'; }).join("")
     + '</tbody></table>';
   var series = [["mkt.leads","Лиды","var(--gold-b)"],["share","Доля, %","var(--blue-bar)"]];
-  weeks.forEach(function(wk){ wk["mkt.leads"] = sum(day,"mkt.leads",wk.s,wk.e); wk["share"] = pct(wk["mkt.leads"], sum(day,"all",wk.s,wk.e)) || 0; });
+  weeks.forEach(function(wk){ wk["mkt.leads"] = sum(day,"mkt.leads",wk.s,wk.e); wk["share"] = sourcePct(wk["mkt.leads"], sum(day,"all",wk.s,wk.e)); });
   document.getElementById("trend").innerHTML = trendSvg(weeks, series);
 }
 // срезы источника: когорта по месяцу лида за последние 3 месяца, теги по справочнику и правилам раздела «Теги»
 (function(){
-  var m0 = new Date(today.getFullYear(), today.getMonth() - 2, 1), mFrom = m0.getFullYear() + "-" + String(m0.getMonth() + 1).padStart(2, "0");
+  var m0 = new Date(yesterday.getFullYear(), yesterday.getMonth() - 2, 1), mFrom = m0.getFullYear() + "-" + String(m0.getMonth() + 1).padStart(2, "0");
   Promise.all([
     api("metric=seg.leads,seg.answered,seg.q3,seg.qual,seg.booked,seg.held,seg.sales&ptype=month&from=" + mFrom + "&dimlike=" + encodeURIComponent(SRC + "|%")),
     fetch("/api/tags", { credentials: "same-origin" }).then(function(r){ return r.json(); }).catch(function(){ return {}; })
   ]).then(function(res){
-    var rows = (res[0] && res[0].rows) || [], tg = res[1] || {}, rules = (tg.rules || []).map(function(r){ try { return new RegExp(r.pattern, "i"); } catch (e) { return null; } }).filter(Boolean), kinds = tg.kinds || {};
+    if (!res[0].ok) { document.getElementById("segs").textContent = "Срезы источника недоступны."; return; }
+    var rows = res[0].rows || [], tg = res[1] || {}, rules = (tg.rules || []).map(function(r){ try { return new RegExp(r.pattern, "i"); } catch (e) { return null; } }).filter(Boolean), kinds = tg.kinds || {};
     function isService(tag){ var k = kinds[tag] && kinds[tag].kind; if (k === "s") return true; if (k === "m" || (kinds[tag] && kinds[tag].owner)) return false; return rules.some(function(re){ return re.test(tag); }); }
     function isNew(tag){ return !(kinds[tag] && (kinds[tag].kind || kinds[tag].owner)) && !rules.some(function(re){ return re.test(tag); }); }
     var by = {};   // code → name → {metric → value}
@@ -129,28 +152,28 @@ function render(day){
       return '<div class="mini"><h3>' + title + '<small>' + list.length + ' сегм.</small></h3>' + (list.length ? rowsHtml + (list.length > 6 ? '<div class="foot"><a class="more-tg" data-n="' + (list.length - 6) + '">ещё ' + (list.length - 6) + '</a></div>' : '') : '<p class="empty">нет данных</p>')
         + (code === "t" && hidden ? '<div class="foot">скрыто служебных тегов: ' + hidden + ' · настраивается в разделе «Теги»</div>' : '') + '</div>';
     }
-    document.getElementById("seg-sub").textContent = "лиды с " + dmy(m0) + " по " + dmy(yesterday) + " и что с ними стало · лид → ЦА по источнику " + Math.round(avg) + "%";
+    document.getElementById("seg-sub").textContent = "лиды с " + dmy(m0) + " по " + dmy(yesterday) + " и что с ними стало · лид → ЦА по источнику " + (rows.length ? Math.round(avg) + "%" : "—");
     document.getElementById("segs").innerHTML = rows.length ? card("t", "Теги") + card("s", "utm_source") + card("m", "utm_medium") + card("c", "utm_campaign") : '<p class="empty">срезы появятся после ближайшего ночного сбора</p>';
     document.querySelectorAll("#segs .more-tg").forEach(function(a){ a.onclick = function(){ var card = a.closest(".mini"), open = a.textContent.indexOf("ещё") === 0; card.querySelectorAll(".seg-row.more").forEach(function(r){ r.hidden = !open; }); a.textContent = open ? "свернуть" : "ещё " + a.dataset.n; }; });
     document.getElementById("seg-note").textContent = rows.length ? "Считается по лидам: берутся сделки, вступившие в чат за период, и по каждой смотрится, дошла ли она до ЦА, встречи и чека, когда бы это ни случилось. «Не задан» — сделки без UTM. Процент — конверсия лид → ЦА: зелёным выше средней по источнику на 10%, красным ниже на 15%." : "";
-  });
+  }).catch(function(){ document.getElementById("segs").textContent = "Не удалось загрузить срезы источника."; });
 })();
 function kpi3(id, name, sub, day){
-  var y = (day[id] && day[id][iso(yesterday)]) || 0, w = sum(day,id,wkStart,yesterday), wp = sum(day,id,wkPrevStart,wkPrevEnd), mt = sum(day,id,monthStart,yesterday), mp = sum(day,id,pmStart,pmEnd);
-  return '<div class="kpi"><span class="nm">' + name + ' <span class="plan">· ' + sub + '</span></span><span class="v">' + y + ' <span class="plan">вчера</span></span>'
-    + '<span class="row"><span>неделя</span><b>' + w + delta(w, wp) + '</b></span><span class="row"><span>месяц</span><b>' + mt + delta(mt, mp) + '</b></span></div>';
+  var y = dayValue(day,id,yesterday), w = sum(day,id,wkStart,yesterday), wp = sum(day,id,wkPrevStart,wkPrevEnd), mt = sum(day,id,monthStart,yesterday), mp = sum(day,id,pmStart,pmEnd);
+  return '<div class="kpi"><span class="nm">' + name + ' <span class="plan">· ' + sub + '</span></span><span class="v">' + shown(y) + ' <span class="plan">вчера</span></span>'
+    + '<span class="row"><span>неделя</span><b>' + shown(w) + delta(w, wp) + '</b></span><span class="row"><span>месяц</span><b>' + shown(mt) + delta(mt, mp) + '</b></span></div>';
 }
 function trendSvg(weeks, series){
   var W = 640, rowH = 64, padL = 96, padR = 14, padB = 22, H = rowH * series.length + padB;
   var x = function(i){ return padL + (W - padL - padR) * (i + 0.5) / weeks.length; };
-  var out = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" role="img" aria-label="Тренд">';
+  var out = '<svg viewBox="0 0 ' + W + ' ' + shown(H) + '" width="100%" height="' + shown(H) + '" role="img" aria-label="Тренд">';
   series.forEach(function(sr, si){
     var top = si * rowH, max = 1; weeks.forEach(function(w){ max = Math.max(max, w[sr[0]]); });
     var y = function(v){ return top + 18 + (rowH - 30) * (1 - v / max); };
     out += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + (top + rowH - 8) + '" y2="' + (top + rowH - 8) + '" stroke="var(--line-2)"/>'
       + '<text x="' + (padL - 10) + '" y="' + (top + rowH/2 + 2) + '" font-size="12" fill="var(--dim)" text-anchor="end">' + sr[1] + '</text>'
-      + '<polyline points="' + weeks.map(function(w,i){ return x(i) + "," + y(w[sr[0]]); }).join(" ") + '" fill="none" stroke="' + sr[2] + '" stroke-width="2" stroke-linejoin="round"/>';
-    weeks.forEach(function(w,i){ out += '<circle cx="' + x(i) + '" cy="' + y(w[sr[0]]) + '" r="3" fill="' + sr[2] + '"' + (w.partial?' opacity=".5"':'') + '/><text x="' + x(i) + '" y="' + (y(w[sr[0]]) - 6) + '" font-size="10" fill="var(--dim)" text-anchor="middle">' + w[sr[0]] + (sr[0]==="share"?"%":"") + '</text>'; });
+      + '<path d="' + weeks.map(function(w,i){ return w[sr[0]] == null ? "" : (i && weeks[i-1][sr[0]] != null ? "L" : "M") + x(i) + "," + y(w[sr[0]]); }).join(" ") + '" fill="none" stroke="' + sr[2] + '" stroke-width="2" stroke-linejoin="round"/>';
+    weeks.forEach(function(w,i){ if(w[sr[0]] == null) return; out += '<circle cx="' + x(i) + '" cy="' + y(w[sr[0]]) + '" r="3" fill="' + sr[2] + '"' + (w.partial?' opacity=".5"':'') + '/><text x="' + x(i) + '" y="' + (y(w[sr[0]]) - 6) + '" font-size="10" fill="var(--dim)" text-anchor="middle">' + w[sr[0]] + (sr[0]==="share"?"%":"") + '</text>'; });
   });
   weeks.forEach(function(w,i){ out += '<text x="' + x(i) + '" y="' + (H - 6) + '" font-size="10.5" fill="' + (w.partial?'var(--gold)':'var(--faint)') + '" text-anchor="middle">' + dmy(w.s) + '</text>'; });
   return out + '</svg>';

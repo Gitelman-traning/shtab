@@ -5,6 +5,14 @@ on:
     - cron: '0 2 * * *'     # 05:00 МСК, после ночной выгрузки amo
   workflow_dispatch:
     inputs:
+      deals_only:
+        description: 'Recalculate only deal metrics (1 = yes)'
+        required: false
+        default: ''
+      report_sheet_id:
+        description: 'Optional verified monthly report ID for historical repair'
+        required: false
+        default: ''
       from:
         description: 'From date, YYYY-MM-DD (empty = 14 days back)'
         required: false
@@ -36,6 +44,9 @@ jobs:
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           LAYOUT_JSON: ${{ secrets.LAYOUT_JSON }}
+          REPORT_SHEET_ID: ${{ inputs.report_sheet_id || vars.REPORT_SHEET_ID }}
+          REPORT_STAMP_RANGE: ${{ vars.REPORT_STAMP_RANGE }}
+          DEALS_ONLY: ${{ inputs.deals_only }}
           SHTAB_URL: ${{ secrets.SHTAB_URL }}
           SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
           METRIKA_TOKEN: ${{ secrets.METRIKA_TOKEN }}
@@ -52,7 +63,7 @@ jobs:
           SYNC_METRICS: ${{ inputs.sync_metrics }}
       # расходы на модели из листов ОКК → раздел «Бюджет и расходы»
       - run: python collector/expenses.py
-        if: always()
+        if: always() && inputs.deals_only != '1'
         env:
           SHEET_ID: ${{ secrets.SHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
@@ -60,7 +71,7 @@ jobs:
           SHTAB_TOKEN: ${{ secrets.SHTAB_TOKEN }}
       # окна менеджеров Первой линии: срез на 00:00 сегодняшнего дня, прямо из amo (только чтение)
       - run: python collector/okna.py
-        if: always()
+        if: always() && inputs.deals_only != '1'
         env:
           AMO_TOKEN: ${{ secrets.AMO_TOKEN }}
           AMO_TOKEN_REPORTS: ${{ secrets.AMO_TOKEN_REPORTS }}

@@ -14,15 +14,15 @@ const FUN = [["fun.l1.leads", "Лиды"], ["fun.l1.reached", "Дозвон/от
 function iso(d) { return d.toISOString().slice(0, 10); }
 function addDays(d, n) { const x = new Date(d); x.setUTCDate(x.getUTCDate() + n); return x; }
 function dmy(s) { return s.slice(8, 10) + "." + s.slice(5, 7); }
-function pct(a, b) { return b ? Math.round(100 * a / b) + "%" : "—"; }
+function pct(a, b) { return a != null && b ? Math.round(100 * a / b) + "%" : "—"; }
 
 async function digest(env, user, allowed) {
   const has = (...ids) => ids.every(id => allowed.has(id));
   const dayMetrics = DAY_METRICS.filter(id => allowed.has(id));
   const today = new Date(); today.setUTCHours(0, 0, 0, 0);
   const yesterday = addDays(today, -1);
-  const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-  const pmStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
+  const monthStart = new Date(Date.UTC(yesterday.getUTCFullYear(), yesterday.getUTCMonth(), 1));
+  const pmStart = new Date(Date.UTC(yesterday.getUTCFullYear(), yesterday.getUTCMonth() - 1, 1));
   const from = addDays(yesterday, -70);
   const month = iso(monthStart).slice(0, 7), pmonth = iso(pmStart).slice(0, 7);
   const q = (sql, ...args) => env.DB.prepare(sql).bind(...args).all().then((r) => r.results || []);
@@ -39,8 +39,18 @@ async function digest(env, user, allowed) {
     isAdmin(user) ? env.DB.prepare("SELECT title, text FROM knowledge ORDER BY id").all().then((r) => r.results || []).catch(() => []) : Promise.resolve([]),
   ]);
   const byDay = {}; days.forEach((r) => { (byDay[r.metric] = byDay[r.metric] || {})[r.period] = r.value; });
-  const sum = (m, a, b) => { let s = 0; for (let d = new Date(a); d <= b; d = addDays(d, 1)) s += (byDay[m] && byDay[m][iso(d)]) || 0; return s; };
-  const lastDay = Object.keys(byDay["mkt.leads"] || {}).sort().pop() || iso(yesterday);
+  const valueOn = (metric, date) => byDay[metric]?.[iso(date)] ?? null;
+  const display = value => value == null ? "нет данных" : value;
+  const sum = (metric, start, end) => {
+    let total = 0;
+    for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
+      const value = valueOn(metric, d);
+      if (value == null) return null;
+      total += value;
+    }
+    return total;
+  };
+  const lastDay = days.map(row => row.period).sort().pop();
   const mtdDays = yesterday.getUTCDate();
   const pmEnd = new Date(Date.UTC(pmStart.getUTCFullYear(), pmStart.getUTCMonth(), Math.min(mtdDays, new Date(Date.UTC(pmStart.getUTCFullYear(), pmStart.getUTCMonth() + 1, 0)).getUTCDate())));
   // неделя как на страницах: с понедельника по вчера; прошлая — те же дни неделей раньше; полные недели пн–вс
@@ -48,27 +58,28 @@ async function digest(env, user, allowed) {
   const wk = (k) => k === 0 ? [wkStart, yesterday] : [addDays(wkStart, -7 * k), addDays(wkStart, -7 * k + 6)];
   const wkPrevSame = [addDays(wkStart, -7), addDays(yesterday, -7)];
   const L = [];
-  L.push("ДАННЫЕ ПО " + dmy(lastDay) + "." + lastDay.slice(0, 4) + " (сегодня " + dmy(iso(today)) + "). Месяц = с 1-го числа по вчера; прошлый месяц взят по то же число.");
+  L.push(lastDay ? "Суточные показатели по " + lastDay + (lastDay < iso(yesterday) ? " (данные устарели)." : ".") : "Суточные показатели: данных нет.");
+  L.push("Сегодня " + iso(today) + ". Неполное покрытие периода отмечено как «нет данных».");
   L.push("Итоги по дням (все источники):");
   for (const m of dayMetrics) {
-    const y = (byDay[m] && byDay[m][iso(yesterday)]) || 0;
+    const y = valueOn(m, yesterday);
     const [ws, we] = wk(0);
-    L.push(`- ${NAMES[m]} [${m}]: вчера ${y}; неделя с ${dmy(iso(ws))} по ${dmy(iso(we))}: ${sum(m, ws, we)} (та же часть прошлой недели ${sum(m, wkPrevSame[0], wkPrevSame[1])}); месяц ${sum(m, monthStart, yesterday)} (прошлый месяц по то же число ${sum(m, pmStart, pmEnd)})`);
+    L.push(`- ${NAMES[m]} [${m}]: вчера ${display(y)}; неделя с ${dmy(iso(ws))} по ${dmy(iso(we))}: ${display(sum(m, ws, we))} (та же часть прошлой недели ${display(sum(m, wkPrevSame[0], wkPrevSame[1]))}); месяц ${display(sum(m, monthStart, yesterday))} (прошлый месяц по то же число ${display(sum(m, pmStart, pmEnd))})`);
   }
   const mL = sum("mkt.leads", monthStart, yesterday), mQ = sum("mkt.qual", monthStart, yesterday), mB = sum("l1.booked", monthStart, yesterday), mH = sum("l2.held", monthStart, yesterday), mS = sum("l2.sales", monthStart, yesterday);
   if (DAY_METRICS.every(id => allowed.has(id))) L.push(`Конверсии за месяц (по датам событий, не когорта): лид→ЦА ${pct(mQ, mL)}, лид→назначено ${pct(mB, mL)}, назначено→проведено ${pct(mH, mB)}, проведено→продажа ${pct(mS, mH)}.`);
   if (["mkt.leads", "l1.booked", "l2.held", "l2.sales"].every(id => allowed.has(id))) {
   L.push("Недели (пн–вс; первая — текущая, неполная; лиды / назначено / проведено / продажи), от свежей к старой:");
-  for (let k = 0; k < 8; k++) { const [s, e] = wk(k); L.push(`- ${dmy(iso(s))}–${dmy(iso(e))}: ${sum("mkt.leads", s, e)} / ${sum("l1.booked", s, e)} / ${sum("l2.held", s, e)} / ${sum("l2.sales", s, e)}`); }
+  for (let k = 0; k < 8; k++) { const [s, e] = wk(k); L.push(`- ${dmy(iso(s))}–${dmy(iso(e))}: ${display(sum("mkt.leads", s, e))} / ${display(sum("l1.booked", s, e))} / ${display(sum("l2.held", s, e))} / ${display(sum("l2.sales", s, e))}`); }
   }
-  if (srcs.length) L.push("Лиды по источникам за месяц: " + srcs.map((r) => `${r.dim} ${r.v}`).join(", ") + ".");
+  if (srcs.length && mL != null) L.push("Лиды по источникам за месяц: " + srcs.map((r) => `${r.dim} ${r.v}`).join(", ") + ".");
   const m2 = {}; mgr2.forEach((r) => { (m2[r.dim] = m2[r.dim] || {})[r.metric] = r.v; });
   if (Object.keys(m2).length) L.push("Вторая линия за месяц по менеджерам (проведено / продажи): " + Object.keys(m2).map((n) => `${n} ${m2[n]["l2.held"] || 0}/${m2[n]["l2.sales"] || 0}`).join(", ") + ".");
   const m1 = {}; mgr1.forEach((r) => { (m1[r.dim] = m1[r.dim] || {})[r.metric] = r.v; });
   if (Object.keys(m1).length) L.push("Первая линия за месяц по менеджерам (лиды / проведено встреч): " + Object.keys(m1).map((n) => `${n} ${m1[n]["l1m.leads"] || 0}/${m1[n]["l1m.held"] || 0}`).join(", ") + ".");
   if (fun.length) {
     const f = {}; fun.forEach((r) => { f[r.metric] = r.value; }); const p = {}; plans.forEach((r) => { p[r.metric] = r.value; });
-    const dim = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)).getUTCDate(), done = mtdDays;
+    const dim = new Date(Date.UTC(yesterday.getUTCFullYear(), yesterday.getUTCMonth() + 1, 0)).getUTCDate(), done = mtdDays;
     L.push(`План/факт воронки за ${month} из листа «Общ экран» (факт → план на месяц → прогноз при текущем темпе = факт/${done}×${dim}):`);
     for (const [id, name] of FUN) if (f[id] != null) L.push(`- ${name}: факт ${f[id]}, план ${p[id] ?? "—"}, прогноз ${Math.round(f[id] / done * dim)}${p[id] ? " (" + pct(Math.round(f[id] / done * dim), p[id]) + " плана)" : ""}`);
   }
