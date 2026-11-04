@@ -61,12 +61,17 @@ export async function verifyPassword(password, salt, stored) {
 export const SESSION_COOKIE = "shtab_s";
 const SESSION_DAYS = 30;
 
-export async function createSession(env, login) {
+export function sessionTicket() {
   const id = randomId(32);
   const expires = new Date(Date.now() + SESSION_DAYS * 864e5).toISOString();
+  return { id, expires, cookie: `${SESSION_COOKIE}=${id}; Path=/; Max-Age=${SESSION_DAYS * 86400}; HttpOnly; Secure; SameSite=Lax` };
+}
+
+export async function createSession(env, login) {
+  const ticket = sessionTicket(), { id, expires } = ticket;
   await env.DB.prepare("INSERT INTO sessions (id, login, expires) VALUES (?,?,?)").bind(id, login, expires).run();
   await env.DB.prepare("UPDATE users SET last_login = ? WHERE login = ?").bind(now(), login).run();
-  return { id, cookie: `${SESSION_COOKIE}=${id}; Path=/; Max-Age=${SESSION_DAYS * 86400}; HttpOnly; Secure; SameSite=Lax` };
+  return ticket;
 }
 
 export async function dropSession(env, request) {

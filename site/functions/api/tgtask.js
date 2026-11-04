@@ -1,3 +1,4 @@
+import { reserveCode, confirmCode } from "./_tg-login.js";
 // /api/tgtask — задачи из Telegram для личного дашборда Никиты (Настройки → Дашборд проектов).
 // Вебхук бота Штаба (TG_BOT_TOKEN — тот же, что у входа через Telegram). Слушает только администраторов:
 // отправитель ищется в users по tg_id с role = admin, остальные сообщения молча пропускаются.
@@ -596,18 +597,18 @@ export async function onRequestPost({ request, env }) {
   // вход с сайта: «/start <код>» — код выдан страницей входа (/__tglink), привязываем к нему аккаунт
   const start = /^\/start\s+([a-f0-9]{32})\s*$/.exec(String(msg.text || ""));
   if (start && env.DB) {
-    const key = "tglogin:" + start[1];
-    const st = await env.OKK_KV.get(key);
-    if (!st) { await tgSend(env, msg.chat.id, "Ссылка для входа устарела. Откройте " + url.origin + " и нажмите «Войти через Telegram» ещё раз."); return json({ ok: true }); }
+    if (!(await reserveCode(env, start[1], msg.from.id))) {
+      await tgSend(env, msg.chat.id, "Ссылка устарела. Откройте Штаб и начните вход ещё раз."); return json({ok:true});
+    }
     try {
       const req = await tgRequestAccess(env, msg.from, url.origin);
+      const goKey = await confirmCode(env, start[1], msg.from.id, req.status === "active");
+      if (!goKey) return json({ok:true});
       if (req.status === "active") {
-        await env.OKK_KV.put(key, JSON.stringify({ status: "ok", login: req.login }), { expirationTtl: 600 });
         await env.DB.prepare("UPDATE users SET tg_username = ? WHERE login = ?").bind(msg.from.username || "", req.login).run();
-        await tgSend(env, msg.chat.id, "Готово: вернитесь во вкладку Штаба, она откроется сама. Если Штаб открыт на другом устройстве или вкладка закрылась — войдите по ссылке (одноразовая, 10 минут): " + url.origin + "/__tglink?go=" + start[1]);
+        await tgSend(env, msg.chat.id, "Готово: вернитесь во вкладку Штаба, она откроется сама. Если Штаб открыт на другом устройстве или вкладка закрылась — войдите по ссылке (одноразовая, 10 минут): " + url.origin + "/__tglink?go=" + goKey);
       } else {
         // tg — чтобы ждущая вкладка вошла сама, как только администратор подтвердит заявку; ждём до суток
-        await env.OKK_KV.put(key, JSON.stringify({ status: "pending", tg: msg.from.id }), { expirationTtl: 86400 });
         if (req.status === "pending") await tgSend(env, msg.chat.id, "Заявка уже отправлена, ждёт подтверждения администратора. Напишем, когда доступ откроют.");
       }
     } catch (e) { await tgSend(env, msg.chat.id, "Не получилось: " + (e.message || e)); }

@@ -1,5 +1,6 @@
 /** Персональный вход по паролю или Telegram; общий пароль и публичный setup отключены. */
 
+import { beginLogin, redeemCode } from "./api/_tg-login.js";
 import { loadSecrets } from "./_secrets.js";
 import { currentUser, createSession, dropSession, verifyPassword, hashPassword, randomId, audit, tgVerify, tgSend, tgRequestAccess, now, level, sectionOf } from "./api/_lib.js";
 
@@ -185,34 +186,19 @@ export async function onRequest(context) {
     return new Response(null, { status: 303, headers: [["Location", "/"], ["Set-Cookie", `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`], ["Set-Cookie", gone], ["Cache-Control", "no-store"]] });
   }
 
-  // вход через бота: POST выдаёт одноразовый код (KV tglogin:<code>, 10 мин), кнопка открывает t.me/<бот>?start=<код>,
-  // бот (вебхук /api/tgtask) привязывает аккаунт к коду, а страница опрашивает GET ?code= и получает сессию — браузер и cookie
-  // Telegram здесь не участвуют, поэтому работает в Safari и Яндекс Браузере
   if (url.pathname === "/__tglink") {
-    if (!env.TG_BOT_TOKEN || !env.DB || !env.OKK_KV) return jsonResp({ status: "off" }, 503);
+    if (!env.TG_BOT_TOKEN || !env.DB) return jsonResp({ status: "off" }, 503);
     if (request.method === "POST") {
-      const code = randomId(16);
-      await env.OKK_KV.put("tglogin:" + code, JSON.stringify({ status: "wait" }), { expirationTtl: 600 });
-      return jsonResp({ code });
+      const grant = await beginLogin(env, request);
+      return jsonResp({ code: grant.code }, 200, { "Set-Cookie": grant.cookie });
     }
-    // ?go=<код> — ссылка из сообщения бота «Готово»: впускает тот браузер, где её открыли (Telegram на телефоне, Штаб на компьютере)
-    const go = url.searchParams.has("go");
-    const code = String(url.searchParams.get(go ? "go" : "code") || "");
-    const back = (cookie) => new Response(null, { status: 303, headers: cookie ? { Location: "/shtab", "Set-Cookie": cookie, "Cache-Control": "no-store" } : { Location: "/", "Cache-Control": "no-store" } });
-    if (!/^[a-f0-9]{32}$/.test(code)) return go ? back() : jsonResp({ status: "expired" });
-    let st = null;
-    try { st = JSON.parse((await env.OKK_KV.get("tglogin:" + code)) || ""); } catch (e) { st = null; }
-    if (!st) return go ? back() : jsonResp({ status: "expired" });
-    // заявка ждала подтверждения: если администратор уже открыл доступ этому Telegram-аккаунту — впускаем без повторного «Start»
-    if (st.status === "pending" && st.tg) {
-      const u = await env.DB.prepare("SELECT login FROM users WHERE tg_id = ? AND active = 1 AND role <> 'pending'").bind(Number(st.tg)).first();
-      if (u) st = { status: "ok", login: u.login };
-    }
-    if (st.status !== "ok" || !st.login) return go ? back() : jsonResp({ status: st.status || "wait" });
-    await env.OKK_KV.delete("tglogin:" + code);
-    const s = await createSession(env, st.login);
-    await audit(env, st.login, "login.tg");
-    return go ? back(s.cookie) : jsonResp({ status: "ok" }, 200, { "Set-Cookie": s.cookie });
+    if (request.method !== "GET") return jsonResp({ status: "invalid" }, 405);
+    const direct = url.searchParams.has("go");
+    const result = await redeemCode(env, request, url.searchParams.get(direct ? "go" : "code") || "", direct);
+    const headers = { "Cache-Control": "no-store" };
+    if (result.cookie) headers["Set-Cookie"] = result.cookie;
+    if (direct) return new Response(null, {status:303, headers:{...headers, Location:result.returnTo || "/"}});
+    return jsonResp({status:result.status, returnTo:result.returnTo}, 200, headers);
   }
 
   // вход через Telegram: виджет возвращает сюда подписанные данные аккаунта

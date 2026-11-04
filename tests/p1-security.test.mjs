@@ -4,6 +4,7 @@ import { runInNewContext } from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fixture, request, rows, root } from './helpers.mjs';
 import * as lib from '../site/functions/api/_lib.js';
+import {beginLogin,reserveCode,confirmCode,redeemCode} from '../site/functions/api/_tg-login.js';
 import { canReadMetric } from '../site/functions/api/_metric-access.js';
 import { onRequest } from '../site/functions/_middleware.js';
 import * as points from '../site/functions/api/points.js';
@@ -200,8 +201,28 @@ test('P1-4 personal password and Telegram login still issue personal sessions',a
   const e=env();const salt='fixture-salt',hash=await lib.hashPassword('fixture-password',salt);e.sqlite.prepare("UPDATE users SET pass_hash=?,salt=? WHERE login='reader'").run(hash,salt);
   const req=new Request('https://audit.invalid/__login',{method:'POST',body:new URLSearchParams({login:'reader',password:'fixture-password'})});
   const r=await onRequest({request:req,env:e,next:async()=>new Response('unused')});assert.equal(r.status,303);assert.match(r.headers.get('set-cookie'),/^shtab_s=/);
-  const code='a'.repeat(32);e.TG_BOT_TOKEN='fixture';e.kv.set('tglogin:'+code,JSON.stringify({status:'ok',login:'reader'}));
-  const t=await onRequest({request:request('/__tglink?code='+code,undefined,{auth:'none'}),env:e,next:async()=>new Response('unused')});assert.equal(t.status,200);assert.match(t.headers.get('set-cookie'),/^shtab_s=/);
+  e.TG_BOT_TOKEN='fixture';e.sqlite.prepare("UPDATE users SET tg_id=1234 WHERE login='reader'").run();
+  const grant=await beginLogin(e,request('/__tglink'));assert(await reserveCode(e,grant.code,1234));await confirmCode(e,grant.code,1234,true);
+  const poll=new Request('https://audit.invalid/__tglink?code='+grant.code,{headers:{cookie:grant.cookie.split(';')[0]}});
+  const t=await onRequest({request:poll,env:e,next:async()=>new Response('unused')});assert.equal(t.status,200);assert.match(t.headers.get('set-cookie'),/^shtab_s=/);
+});
+test('P2-7 concurrent browser and Telegram redemption issues exactly one session',async()=>{
+  const e=env();e.sqlite.prepare("UPDATE users SET tg_id=1234 WHERE login='reader'").run();
+  const grant=await beginLogin(e,request('/__tglink')),plain=request('/__tglink');
+  const browser=new Request(plain.url,{headers:{cookie:grant.cookie.split(';')[0]}});
+  assert(await reserveCode(e,grant.code,1234));assert.equal(await reserveCode(e,grant.code,5678),false);
+  const go=await confirmCode(e,grant.code,1234,true);
+  assert.equal((await redeemCode(e,plain,grant.code,false)).status,'expired');
+  assert.equal((await redeemCode(e,plain,grant.code,true)).status,'expired');
+  const before=rows(e,'sessions').length;
+  const results=await Promise.all([redeemCode(e,browser,grant.code,false),redeemCode(e,plain,go,true),redeemCode(e,browser,grant.code,false)]);
+  assert.equal(results.filter(r=>r.cookie).length,1);assert.equal(rows(e,'sessions').length,before+1);
+  assert.equal((await redeemCode(e,plain,go,true)).status,'expired');
+});
+test('P2-7 server expiry and pending-account state cannot issue a session',async()=>{
+  const e=env();const grant=await beginLogin(e,request('/__tglink'));assert(await reserveCode(e,grant.code,1234));
+  const go=await confirmCode(e,grant.code,1234,false);assert.equal((await redeemCode(e,request('/'),go,true)).status,'pending');
+  e.sqlite.exec("UPDATE tg_login_codes SET expires='2000-01-01'");assert.equal((await redeemCode(e,request('/'),go,true)).status,'expired');
 });
 test('P1-4 section checks cover trailing slash and meeting endpoint',async()=>{
   const e=env({'sales.l2.okk':0});for(const path of ['/users/','/users.html','/__ask'])assert.equal((await onRequest({request:request(path),env:e,next:async()=>new Response('unexpected')})).status,403);
