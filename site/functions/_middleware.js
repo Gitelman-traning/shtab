@@ -59,8 +59,8 @@ const STYLE = `<link rel="preconnect" href="https://fonts.googleapis.com">
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
   .tg{display:flex;justify-content:center;min-height:40px}
-  .tgbtn{display:block;text-align:center;text-decoration:none;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:11px;background:#2aabee;color:#fff}
-  .tgbtn:hover{background:#1c9ad8}
+  .tgbtn{display:block;text-align:center;text-decoration:none;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:11px;background:#145d83;color:#fff}
+  .tgbtn:hover,.tgbtn:focus-visible{background:#104b6b}
 </style>`;
 
 function returnField(target) {

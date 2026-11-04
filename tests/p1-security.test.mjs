@@ -318,6 +318,21 @@ test('P2-17 login rate limit expires; AI concurrency and global token budgets st
   e.AI_DAILY_TOKEN_BUDGET='1';e.LLM_API_KEY='fixture';const calls=llm();const response=await chat.onRequestPost({request:request('/api/chat',{messages:[{role:'user',content:'test'}]}),env:e});
   assert.equal(response.status,429);assert.equal(calls.length,0);assert(+response.headers.get('Retry-After')>0);
 });
+test('P2-20 Telegram login text and keyboard focus have sufficient contrast in both themes',async()=>{
+  const e=env();e.TG_BOT_NAME='testbot';
+  const html=await (await onRequest({request:request('/',undefined,{auth:'none'}),env:e,next:()=>new Response('unused')})).text();
+  function luminance(hex) {
+    const full=hex.length===3?hex.split('').map(c=>c+c).join(''):hex;
+    return full.match(/../g).map(c=>parseInt(c,16)/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[0.2126,0.7152,0.0722][i],0);
+  }
+  function contrast(a,b){const x=luminance(a),y=luminance(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);}
+  const base=html.match(/\.tgbtn\{[^}]*background:#(\w+);color:#(\w+)/);
+  const hover=html.match(/\.tgbtn:hover,\.tgbtn:focus-visible\{background:#(\w+)/);
+  assert(contrast(base[1],base[2])>=4.5);assert(contrast(hover[1],base[2])>=4.5);
+  const themes=[...html.matchAll(/:root\{[^}]*--surface:#(\w+);[^}]*--accent:#(\w+)/g)];
+  assert.equal(themes.length,2);assert(themes.every(t=>contrast(t[1],t[2])>=3));
+  assert.match(html,/:focus-visible\{outline:2px solid var\(--accent\)/);
+});
 test('P2-16 login, success, denied and error responses have headers; custom sandbox is preserved',async()=>{
   const e=env();e.TG_BOT_NAME='testbot';
   const call=(path,auth,next)=>onRequest({request:request(path,undefined,{auth}),env:e,next});
