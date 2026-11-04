@@ -3,6 +3,7 @@
 //        "okna": [{"day","mgr","key","n","items"}, ...], "goals": [{"mgr","month","goal","base","rate","note"}, ...]}
 import { json, bad, hasIngestToken, now, tgSend } from "./_lib.js";
 import { replacementPlan } from "./_replace.js";
+import { inspectIngest } from "./_ingest-input.js";
 
 // диагносту в Telegram: «подготовка готова». Пользователь Штаба ищется по имени (все слова его имени есть в имени диагноста из amo);
 // шлём, только если совпадение одно. PREP_TG_CC — чат, которому дублировать всё (пилот).
@@ -49,6 +50,8 @@ export async function onRequestPost({ request, env }) {
   } catch (e) {
     return bad("тело не JSON");
   }
+  const input = inspectIngest(body);
+  if (input.error) return json({ok:false,error:input.error,received:input.received,written:0,rejected:input.received},input.status);
   const points = Array.isArray(body.points) ? body.points : [];
   const plans = Array.isArray(body.plans) ? body.plans : [];
   const collector = String(body.collector || "unknown").slice(0, 60);
@@ -87,7 +90,7 @@ export async function onRequestPost({ request, env }) {
       "INSERT INTO plans (metric, ptype, period, dim, value, set_by, updated_at) VALUES (?,?,?,?,?,?,?) " +
       "ON CONFLICT(metric, ptype, period, dim) DO UPDATE SET value = excluded.value, set_by = excluded.set_by, updated_at = excluded.updated_at");
     const batch = [];
-    for (const p of plans.slice(0, 500)) {
+    for (const p of plans) {
       if (!p || !p.metric || !p.ptype || !p.period || typeof p.value !== "number" || !isFinite(p.value)) continue;
       batch.push(ps.bind(String(p.metric), String(p.ptype), String(p.period), String(p.dim || ""), p.value, "collector:" + collector, stamp));
     }
@@ -100,7 +103,7 @@ export async function onRequestPost({ request, env }) {
       "INSERT INTO okna (day, mgr, key, n, items, updated_at) VALUES (?,?,?,?,?,?) " +
       "ON CONFLICT(day, mgr, key) DO UPDATE SET n = excluded.n, items = excluded.items, updated_at = excluded.updated_at");
     const batch = [];
-    for (const r of okna.slice(0, 200)) {
+    for (const r of okna) {
       if (!r || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.day || "")) || !r.mgr || !r.key) continue;
       const items = Array.isArray(r.items) ? r.items : [];
       batch.push(os.bind(String(r.day), String(r.mgr).slice(0, 40), String(r.key).slice(0, 40), Number(r.n) || items.length, JSON.stringify(items), stamp));
@@ -114,7 +117,7 @@ export async function onRequestPost({ request, env }) {
       "INSERT INTO pings (day, manager, deal, text, reason, updated_at) VALUES (?,?,?,?,?,?) " +
       "ON CONFLICT(day, manager, deal) DO UPDATE SET text = excluded.text, reason = excluded.reason, updated_at = excluded.updated_at");
     const batch = [];
-    for (const r of pings.slice(0, 200)) {
+    for (const r of pings) {
       if (!r || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.day || "")) || !r.manager || !Number(r.deal)) continue;
       batch.push(ps2.bind(String(r.day), String(r.manager).slice(0, 40), Number(r.deal), String(r.text || "").slice(0, 2000), String(r.reason || "").slice(0, 200), stamp));
     }
@@ -132,11 +135,11 @@ export async function onRequestPost({ request, env }) {
       "status = excluded.status, facts = CASE WHEN excluded.status = 'ready' THEN excluded.facts ELSE prep.facts END, sources = CASE WHEN excluded.status = 'ready' THEN excluded.sources ELSE prep.sources END, " +
       "cases = CASE WHEN excluded.status = 'ready' THEN excluded.cases ELSE prep.cases END, brief = CASE WHEN excluded.status = 'ready' THEN excluded.brief ELSE prep.brief END, " +
       "model = excluded.model, tokens_in = excluded.tokens_in, tokens_out = excluded.tokens_out, searches = excluded.searches, amo_url = excluded.amo_url, error = excluded.error, updated_at = excluded.updated_at, inputs = CASE WHEN excluded.inputs != '' THEN excluded.inputs ELSE prep.inputs END");
-    for (const r of prep.slice(0, 50)) {
+    for (const r of prep) {
       if (!r || !Number(r.deal)) continue;
       const status = ["ready", "error", "queued"].includes(r.status) ? r.status : "ready";
       await st.bind(Number(r.deal), Number(r.contact) || null, s(r.meet_at, 20), s(r.manager, 80), s(r.client, 80), s(r.company), s(r.niche), s(r.turn, 20), s(r.staff, 20), s(r.geo, 120), s(r.quiz_url, 300),
-        status, s(r.facts, 60000), JSON.stringify(Array.isArray(r.sources) ? r.sources.slice(0, 60) : []), JSON.stringify(Array.isArray(r.cases) ? r.cases.slice(0, 10) : []), s(r.brief, 80000),
+        status, s(r.facts, 60000), JSON.stringify(Array.isArray(r.sources) ? r.sources.slice(0, 60) : []), JSON.stringify(Array.isArray(r.cases) ? r.cases : []), s(r.brief, 80000),
         s(r.model, 60), Number(r.tokens_in) || 0, Number(r.tokens_out) || 0, Number(r.searches) || 0, s(r.amo_url, 200), s(r.error, 300), stamp, stamp,
         r.inputs && typeof r.inputs === "object" ? JSON.stringify(r.inputs).slice(0, 1000) : "").run();
       written++;
@@ -158,7 +161,7 @@ export async function onRequestPost({ request, env }) {
       "INSERT INTO prep_cases (deal, pipeline, name, company, niche, sphere, turn, staff, site, role, city, country, paid_at, source, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) " +
       "ON CONFLICT(deal) DO UPDATE SET pipeline = excluded.pipeline, name = excluded.name, company = excluded.company, niche = excluded.niche, sphere = excluded.sphere, turn = excluded.turn, staff = excluded.staff, site = excluded.site, role = excluded.role, city = excluded.city, country = excluded.country, paid_at = excluded.paid_at, source = excluded.source, updated_at = excluded.updated_at");
     const batch = [];
-    for (const r of cases.slice(0, 200)) {
+    for (const r of cases) {
       if (!r || !Number(r.deal)) continue;
       batch.push(cs.bind(Number(r.deal), Number(r.pipeline) || null, s(r.name), s(r.company), s(r.niche), s(r.sphere), s(r.turn, 20), s(r.staff, 20), s(r.site), s(r.role, 60), s(r.city), s(r.country), s(r.paid_at, 10), r.source === "sheet" ? "sheet" : "amo", stamp));
     }
@@ -171,7 +174,7 @@ export async function onRequestPost({ request, env }) {
       "INSERT INTO expenses (day, service, item, kind, amount, currency, amount_orig, qty, note, source, ref, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) " +
       "ON CONFLICT(ref) WHERE ref IS NOT NULL DO UPDATE SET day = excluded.day, amount = excluded.amount, qty = excluded.qty, note = excluded.note, item = excluded.item");
     const batch = [];
-    for (const r of expenses.slice(0, 500)) {
+    for (const r of expenses) {
       if (!r || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.day || "")) || !r.service || typeof r.amount !== "number" || !isFinite(r.amount)) continue;
       batch.push(es.bind(String(r.day), String(r.service).slice(0, 60), String(r.item || "").slice(0, 200), String(r.kind || "spend"), r.amount,
         String(r.currency || "RUB"), r.amount_orig == null ? null : Number(r.amount_orig), r.qty == null ? null : Number(r.qty),
@@ -183,14 +186,14 @@ export async function onRequestPost({ request, env }) {
   if (body.notify && env.TG_ADMIN_CHAT) await tgSend(env, env.TG_ADMIN_CHAT, String(body.notify).slice(0, 3500));
   // диагност, определённый сборщиком позже (копия на Второй линии появилась после подготовки)
   const pm = Array.isArray(body.prep_manager) ? body.prep_manager : [];
-  for (const r of pm.slice(0, 50)) {
+  for (const r of pm) {
     if (!r || !Number(r.deal) || !r.manager) continue;
     await env.DB.prepare("UPDATE prep SET manager = ?, updated_at = ? WHERE deal = ? AND manager IN ('', 'Администратор')").bind(String(r.manager).slice(0, 80), stamp, Number(r.deal)).run();
     written++;
   }
   // стиль вопросов диагноста (prep.py style)
   const pst = Array.isArray(body.prep_style) ? body.prep_style : [];
-  for (const r of pst.slice(0, 20)) {
+  for (const r of pst) {
     if (!r || !r.manager || !r.text) continue;
     await env.DB.prepare("INSERT INTO prep_style (manager, text, meetings, updated_at) VALUES (?,?,?,?) ON CONFLICT(manager) DO UPDATE SET text = excluded.text, meetings = excluded.meetings, updated_at = excluded.updated_at")
       .bind(String(r.manager).slice(0, 80), String(r.text).slice(0, 8000), Number(r.meetings) || 0, stamp).run();
@@ -198,7 +201,7 @@ export async function onRequestPost({ request, env }) {
   }
   // разбор встречи (13.10.2026): лояльность, ключ для следующей встречи, PING_CONTEXT — одна строка на сделку
   const deb = Array.isArray(body.prep_debrief) ? body.prep_debrief : [];
-  for (const r of deb.slice(0, 20)) {
+  for (const r of deb) {
     if (!r || !Number(r.deal) || !r.text) continue;
     const v = (x, n) => String(x || "").slice(0, n);
     await env.DB.prepare("INSERT INTO prep_debrief (deal, text, loyalty, client, company, manager, meeting_at, model, cost, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) " +
@@ -215,7 +218,7 @@ export async function onRequestPost({ request, env }) {
     const q = env.DB.prepare("INSERT INTO debrief_queue (deal, l2, status, note, client, company, manager, meet_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?) " +
       "ON CONFLICT(deal) DO UPDATE SET l2 = COALESCE(excluded.l2, debrief_queue.l2), status = excluded.status, note = excluded.note, client = excluded.client, " +
       "company = excluded.company, manager = excluded.manager, meet_at = excluded.meet_at, updated_at = excluded.updated_at");
-    const batch = dst.slice(0, 200).filter((r) => r && Number(r.deal))
+    const batch = dst.filter((r) => r && Number(r.deal))
       .map((r) => q.bind(Number(r.deal), Number(r.l2) || null, v(r.status, 20), v(r.note, 300), v(r.client, 80), v(r.company, 120), v(r.manager, 80), v(r.meet_at, 20), stamp));
     try { for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); } } catch (e) { /* таблицы может ещё не быть */ }
   }
@@ -225,19 +228,19 @@ export async function onRequestPost({ request, env }) {
     const F = ["file_id", "stream", "company", "person", "niche", "region", "size", "evidence", "problems", "results", "grow", "pct",
                "changed", "say", "confirmed", "cannot", "when_use", "transition", "takeaway", "question", "ask_alumni"];
     const q = env.DB.prepare("INSERT INTO prep_alumni (" + F.join(", ") + ", updated_at) VALUES (" + F.map(() => "?").join(",") + ",?)");
-    const batch = body.prep_alumni.rows.slice(0, 1000).filter((r) => r && (r.say || r.changed))
+    const batch = body.prep_alumni.rows.filter((r) => r && (r.say || r.changed))
       .map((r) => q.bind(...F.map((k) => v(r[k], k === "say" || k === "changed" || k === "confirmed" || k === "cannot" ? 1500 : 600)), stamp));
     for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); }
   }
   // версии разбора без смены текущего (сравнение моделей, ручные эталоны)
   const dver = Array.isArray(body.prep_debrief_versions) ? body.prep_debrief_versions : [];
-  for (const r of dver.slice(0, 30)) { if (r && Number(r.deal) && r.text) { await saveDebriefVersion(env, r, stamp); written++; } }
+  for (const r of dver) { if (r && Number(r.deal) && r.text) { await saveDebriefVersion(env, r, stamp); written++; } }
   // база «было → стало»: результат проверки роста участника (prep.py growth), ночная пересборка базы его не трогает
   const growth = Array.isArray(body.prep_growth) ? body.prep_growth : [];
   if (growth.length) {
     const gs2 = env.DB.prepare("UPDATE prep_cases SET result = ?, checked_at = ?, updated_at = ? WHERE deal = ?");
     const batch = [];
-    for (const r of growth.slice(0, 200)) {
+    for (const r of growth) {
       if (!r || !Number(r.deal)) continue;
       batch.push(gs2.bind(String(r.result || "").slice(0, 3000), String(r.checked_at || stamp.slice(0, 10)).slice(0, 10), stamp, Number(r.deal)));
     }
@@ -254,13 +257,13 @@ export async function onRequestPost({ request, env }) {
       "pipeline_id = excluded.pipeline_id, status_id = excluded.status_id, price = excluded.price, contact_id = excluded.contact_id, src = excluded.src, " +
       "utm_source = excluded.utm_source, utm_medium = excluded.utm_medium, utm_campaign = excluded.utm_campaign, utm_content = excluded.utm_content, " +
       "channel = excluded.channel, meeting = excluded.meeting, paid = excluded.paid, name = excluded.name, contact_name = excluded.contact_name, stage = excluded.stage, updated_at = excluded.updated_at");
-    const batch = ytl.slice(0, 1000).filter((r) => r && int(r.id) && int(r.created_at))
+    const batch = ytl.filter((r) => r && int(r.id) && int(r.created_at))
       .map((r) => q.bind(int(r.id), int(r.created_at), int(r.closed_at), int(r.pipeline_id) || 0, int(r.status_id) || 0, int(r.price) || 0, int(r.contact_id),
         v(r.src || "YouTube", 40), v(r.utm_source, 120), v(r.utm_medium, 120), v(r.utm_campaign, 120), v(r.utm_content, 120), v(r.channel, 120),
         r.meeting ? 1 : 0, r.paid ? 1 : 0, v(r.name, 160), v(r.contact_name, 160), v(r.stage, 160), stamp));
     for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); }
   }
-  const ytd = (Array.isArray(body.yt_drop) ? body.yt_drop : []).map(Number).filter((x) => Number.isInteger(x) && x > 0).slice(0, 5000);
+  const ytd = (Array.isArray(body.yt_drop) ? body.yt_drop : []).map(Number).filter((x) => Number.isInteger(x) && x > 0);
   for (let i = 0; i < ytd.length; i += 90) {   // D1: до 100 параметров в запросе
     const part = ytd.slice(i, i + 90);
     await env.DB.prepare("DELETE FROM yt_leads WHERE id IN (" + part.map(() => "?").join(",") + ")").bind(...part).run();
@@ -271,7 +274,7 @@ export async function onRequestPost({ request, env }) {
     const q = env.DB.prepare("INSERT INTO yt_paid (id, contact_id, pipeline_id, price, created_at, closed_at, name, contact_name, updated_at) VALUES (?,?,?,?,?,?,?,?,?) " +
       "ON CONFLICT(id) DO UPDATE SET contact_id = excluded.contact_id, pipeline_id = excluded.pipeline_id, price = excluded.price, " +
       "created_at = excluded.created_at, closed_at = excluded.closed_at, name = excluded.name, contact_name = excluded.contact_name, updated_at = excluded.updated_at");
-    const batch = body.yt_paid.rows.slice(0, 5000).filter((r) => r && int(r.id) && int(r.created_at))
+    const batch = body.yt_paid.rows.filter((r) => r && int(r.id) && int(r.created_at))
       .map((r) => q.bind(int(r.id), int(r.contact_id), int(r.pipeline_id) || 0, int(r.price) || 0, int(r.created_at), int(r.closed_at), v(r.name, 160), v(r.contact_name, 160), stamp));
     for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); }
   }
@@ -281,7 +284,7 @@ export async function onRequestPost({ request, env }) {
       "INSERT INTO okna_goals (mgr, month, goal, base, rate, note, set_by, updated_at) VALUES (?,?,?,?,?,?,?,?) " +
       "ON CONFLICT(mgr, month) DO UPDATE SET goal = excluded.goal, base = excluded.base, rate = excluded.rate, note = excluded.note, set_by = excluded.set_by, updated_at = excluded.updated_at");
     const batch = [];
-    for (const g of goals.slice(0, 50)) {
+    for (const g of goals) {
       if (!g || !g.mgr || !/^\d{4}-\d{2}$/.test(String(g.month || "")) || typeof g.goal !== "number") continue;
       batch.push(gs.bind(String(g.mgr).slice(0, 40), String(g.month), g.goal, Number(g.base) || 25000, Number(g.rate) || 1500, String(g.note || "").slice(0, 200), "collector:" + collector, stamp));
     }
@@ -291,5 +294,5 @@ export async function onRequestPost({ request, env }) {
     await env.DB.prepare("INSERT INTO runs (collector, started, finished, points, note) VALUES (?,?,?,?,?)")
       .bind(collector, body.started || stamp, stamp, body.total_points || written, String(body.run_note || "")).run();
   }
-  return json({ ok: true, written });
+  return json({ ok: true, received:input.received, written, rejected:0 });
 }

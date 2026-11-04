@@ -276,6 +276,20 @@ test('P1-5 HR editor can update private fields and remove a person with leave',a
 });
 
 const put=(e,body)=>ingest.onRequestPost({request:request('/api/ingest',body,{auth:'collector'}),env:e});
+test('P2-10 oversized and malformed batches fail before writing sibling records',async()=>{
+  const e=env();const row={metric:'l1.booked',ptype:'month',period:'2026-11',value:5};
+  const r=await put(e,{points:[row],plans:Array(501).fill(row)});assert.equal(r.status,413);
+  const b=await r.json();assert.equal(b.received,502);assert.equal(b.rejected,502);assert.equal(rows(e,'points').length,0);
+  assert.equal((await put(e,{points:[row],plans:[{}]})).status,400);assert.equal(rows(e,'points').length,0);
+});
+test('P2-10 points never report a truncated response as complete',async()=>{
+  const e=env();e.sqlite.exec("WITH RECURSIVE n(v) AS (VALUES(1) UNION ALL SELECT v+1 FROM n WHERE v<20001) INSERT INTO points(metric,ptype,period,dim,value) SELECT 'l1.booked','day','2026-11-01',printf('%05d',v),v FROM n");
+  const get=q=>points.onRequestGet({request:request('/api/points?metric=l1.booked'+q),env:e});
+  const r=await get('');assert.equal(r.status,413);assert.equal((await r.json()).truncated,true);
+  const a=await(await get('&page=1&page_size=2')).json(), b=await(await get('&page=2&page_size=2')).json();
+  assert.deepEqual(a.rows.map(r=>r.value),[1,2]);assert.equal(a.next_page,2);assert.deepEqual(b.rows.map(r=>r.value),[3,4]);
+  const last=await(await get('&page=10001&page_size=2')).json();assert.deepEqual(last.rows.map(r=>r.value),[20001]);assert.equal(last.has_more,false);
+});
 const paid=(id)=>({id,created_at:100,price:id});
 test('P1-6 failed paid replacement rolls back real SQLite deletion and preceding inserts',async()=>{
   const e=env();assert.equal((await put(e,{yt_paid:{replace:true,rows:[paid(1)]}})).status,200);
