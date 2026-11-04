@@ -39,6 +39,20 @@ class ReportTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.select(stamp)
 
+    def test_cross_month_days_use_their_own_verified_report(self):
+        start, end = dt.date(2026,10,30), self.day
+        calls = []
+        def read_days(first,last,sheet):
+            calls.append((first,last,sheet))
+            return [dict(ptype='day',period=first.isoformat(),value=sheet),
+                    dict(ptype='month',period='2026-10',value=sheet)]
+        def report(last): return last.strftime('%Y-%m')
+        points = collect.monthly_points(start,end,report,read_days)
+        self.assertEqual(calls,[(start,dt.date(2026,10,31),'2026-10'),(dt.date(2026,11,1),end,'2026-11')])
+        self.assertEqual([p['value'] for p in points],['2026-10','2026-11','2026-11'])
+        repaired = collect.monthly_points(start,end,report,read_days,repair=True)
+        self.assertEqual([p['value'] for p in repaired if p['ptype']=='month'],['2026-10'])
+
     def test_failed_read_and_partial_write_get_distinct_status(self):
         statuses=[]
         report=lambda source,state,error: statuses.append(state)

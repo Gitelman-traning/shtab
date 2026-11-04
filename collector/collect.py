@@ -17,6 +17,7 @@
 """
 
 import datetime as dt
+import calendar
 import io
 import json
 import os
@@ -127,10 +128,10 @@ def cell(row, idx):
 
 # ---------- сделки → точки по дням ----------
 
-def deal_points(values, day_from, day_to):
+def deal_points(values, day_from, day_to, sheet_id=None):
     L = LAYOUT
     c = {k: col_index(v) for k, v in L["cols"].items()}
-    rows = read(values, L["sheet_id"], "'%s'!A%d:%s" % (L["export_tab"], L["first_row"], L.get("last_col", "AZ")))
+    rows = read(values, sheet_id or L["sheet_id"], "'%s'!A%d:%s" % (L["export_tab"], L["first_row"], L.get("last_col", "AZ")))
     log("строк выгрузки: %d" % len(rows))
     lead_funnel = L["lead_funnel"]
     prefix = L["first_line_prefix"]
@@ -272,12 +273,13 @@ def parse_any_date(s):
     return None
 
 
-def activity_points(values, day_from, day_to):
+def activity_points(values, day_from, day_to, sheet_id=None):
+    sheet_id = sheet_id or LAYOUT["sheet_id"]
     points = []
     ev = LAYOUT.get("events")
     if ev:
         c = {k: col_index(v) for k, v in ev["cols"].items()}
-        rows = read(values, LAYOUT["sheet_id"], "'%s'!A%d:%s" % (ev["tab"], ev.get("first_row", 2), ev.get("last_col", "K")))
+        rows = read(values, sheet_id, "'%s'!A%d:%s" % (ev["tab"], ev.get("first_row", 2), ev.get("last_col", "K")))
         counts = {}
         for r in rows:
             d = parse_any_date(cell(r, c["date"]))
@@ -294,7 +296,7 @@ def activity_points(values, day_from, day_to):
         # выгрузка АТС: у исходящих внутренний номер в «Кто», у входящих — в «Кому»; дата «[hh:mm:ss] YYYY-MM-DD», «Время разговора» в секундах
         c = {k: col_index(v) for k, v in ca["cols"].items()}
         ext_map = ca.get("ext_map") or {}
-        rows = read(values, ca.get("sheet_id") or LAYOUT["sheet_id"], "'%s'!A%d:%s" % (ca["tab"], ca.get("first_row", 2), ca.get("last_col", "I")))
+        rows = read(values, ca.get("sheet_id") or sheet_id, "'%s'!A%d:%s" % (ca["tab"], ca.get("first_row", 2), ca.get("last_col", "I")))
         calls, talk = {}, {}
         for r in rows:
             raw = cell(r, c["date"])
@@ -327,7 +329,7 @@ def activity_points(values, day_from, day_to):
     if tc:
         # «Работа с базой» → «активность 1 линия»: контакт, менеджер, дата последнего касания
         c = {k: col_index(v) for k, v in tc["cols"].items()}
-        rows = read(values, tc.get("sheet_id") or LAYOUT["sheet_id"], "'%s'!A%d:%s" % (tc["tab"], tc.get("first_row", 2), tc.get("last_col", "E")))
+        rows = read(values, tc.get("sheet_id") or sheet_id, "'%s'!A%d:%s" % (tc["tab"], tc.get("first_row", 2), tc.get("last_col", "E")))
         counts = {}
         for r in rows:
             d = parse_date(cell(r, c["date"]))
@@ -489,6 +491,19 @@ def run_feed(source, period, producer, report, publish):
     return state
 
 
+def monthly_points(day_from, day_to, sheet_for, collect, repair=False):
+    points = []
+    start = day_from
+    while start <= day_to:
+        end = min(day_to, start.replace(day=calendar.monthrange(start.year, start.month)[1]))
+        for p in collect(start, end, sheet_for(end)):
+            # Дневные значения принадлежат своему отчёту. Историю когорт обновляет последний снимок.
+            if p['ptype'] == 'day' or (end == day_to and not repair) or (repair and p['period'] == end.strftime('%Y-%m')):
+                points.append(p)
+        start = end + dt.timedelta(days=1)
+    return points
+
+
 def main():
     missing = [n for n, v in [("LAYOUT_JSON", LAYOUT), ("SHTAB_URL", URL), ("SHTAB_TOKEN", TOKEN)] if not v]
     if missing or not (SA_JSON or SA_FILE):
@@ -525,11 +540,16 @@ def main():
         reg = json.load(io.open(os.path.join(here, "metrics.json"), encoding="utf-8"))
         log("реестр: %s" % post("/api/metrics", reg))
     only = os.environ.get('DEALS_ONLY') == '1'
+    sheets = {day_to: LAYOUT.get('sheet_id')}
+    def sheet_for(end):
+        verified_sheet()
+        if end not in sheets:
+            sheets[end] = monthly_report(service, credentials, end)
+        return sheets[end]
+    def per_month(producer):
+        return monthly_points(day_from, day_to, sheet_for, lambda start,end,sheet: producer(values,start,end,sheet), repair=only)
     def deals(issue):
-        pts = deal_points(verified_sheet(), day_from, day_to)
-        if only:
-            pts = [p for p in pts if p['ptype'] == 'day' or day_from.strftime('%Y-%m') <= p['period'] <= day_to.strftime('%Y-%m')]
-        return pts, []
+        return per_month(deal_points), []
     feeds = [('deals', deals)]
     if not only:
         from metrika import metrika_points
@@ -538,7 +558,7 @@ def main():
         from serp import gsc_points, webmaster_points
         feeds.extend([
             ('participants', lambda issue: (participants_points(verified_sheet(), today), [])),
-            ('activity', lambda issue: (activity_points(verified_sheet(), day_from, day_to), [])),
+            ('activity', lambda issue: (per_month(activity_points), [])),
             ('plans', lambda issue: plan_points(verified_sheet(), today)),
             ('metrika', lambda issue: (metrika_points(day_from,day_to,log,on_issue=issue), [])),
             ('ads', lambda issue: (gads_points(day_from,day_to,log,on_issue=issue), [])),
