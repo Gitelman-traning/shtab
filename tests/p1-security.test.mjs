@@ -13,6 +13,7 @@ import * as status from '../site/functions/api/status.js';
 import * as view from '../site/functions/api/sections/[id]/view.js';
 import * as data from '../site/functions/api/sections/[id]/data.js';
 import * as versions from '../site/functions/api/sections/[id]/versions.js';
+import * as draft from '../site/functions/api/sections/[id]/draft.js';
 import * as users from '../site/functions/api/users.js';
 import * as me from '../site/functions/api/me.js';
 import * as okna from '../site/functions/api/okna.js';
@@ -295,6 +296,22 @@ test('P2-10 points never report a truncated response as complete',async()=>{
   const last=await(await get('&page=10001&page_size=2')).json();assert.deepEqual(last.rows.map(r=>r.value),[20001]);assert.equal(last.has_more,false);
 });
 const paid=(id)=>({id,created_at:100,price:id});
+test('P2-15 a completed draft can be recovered and retried without a second model call',async()=>{
+  const e=env({sales:2});section(e);e.LLM_API_KEY='fixture';e.LLM_BASE_URL='https://model.invalid';let calls=0;
+  globalThis.fetch=async()=>{calls++;return Response.json({choices:[{message:{content:'<!doctype html><html><body>'+ 'Synthetic '.repeat(70)+'</body></html>'}}]});};
+  const id=crypto.randomUUID();const submit=()=>{const r=request('/api/sections/sales/draft',{prompt:'Synthetic dashboard'});r.headers.set('x-draft-job',id);return draft.onRequestPost({request:r,env:e,params:{id:'sales'}});};
+  const a=await submit(),b=await submit();assert.equal(a.status,200);assert.equal(b.status,200);assert.deepEqual(await a.json(),await b.json());assert.equal(calls,1);
+  const get=await draft.onRequestGet({request:request('/api/sections/sales/draft?job='+id),env:e,params:{id:'sales'}});assert.equal((await get.json()).state,'done');
+  const ctl=new AbortController();ctl.abort();await assert.rejects(lib.llmChat(e,[],{signal:ctl.signal}),/время ожидания/);assert.equal(calls,1);
+});
+test('P2-15 editor offers retry on offline, timeout, HTML and service failure',async()=>{
+  const code=readFileSync(new URL('site/public/section-editor.js',root),'utf8');
+  for(const fail of [async()=>{throw TypeError('offline');},async()=>{throw new DOMException('expired','AbortError');},async()=>new Response('<html>Error</html>'),async()=>Response.json({error:'Unavailable'},{status:503})]){
+    const box={innerHTML:'',getAttribute:()=> 'hub',addEventListener(){}};
+    const document={getElementById:()=>box,createElement:()=>({}),head:{appendChild(){}}};
+    runInNewContext(code,{document,fetch:fail,AbortController,setTimeout,clearTimeout});await new Promise(r=>setImmediate(r));assert.match(box.innerHTML,/Повторить загрузку/);
+  }
+});
 test('P2-14 password login returns to the original task; external and normalized redirects are refused',async()=>{
   const dest='/tasks/?filter=mine#task-123';assert.equal(safeReturn(dest),dest);
   for(const bad of ['https://evil.invalid','//evil.invalid','/a/..//evil.invalid','/%2fevil.invalid','/\\evil.invalid','/__logout','/api/users'])assert.equal(safeReturn(bad),'/');

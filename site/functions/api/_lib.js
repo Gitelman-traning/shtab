@@ -207,6 +207,7 @@ const DEFAULT_BASE = "https://openrouter.ai/api/v1";
 const FREE_MODELS = ["minimax/minimax-m3:free", "z-ai/glm-5.2:free"];
 
 export async function llmChat(env, messages, opts = {}) {
+  const signal=opts.signal || AbortSignal.timeout(60000);
   const base = (env.LLM_BASE_URL || DEFAULT_BASE).replace(/\/+$/, "");
   const key = env.LLM_API_KEY || env.OPENROUTER_API_KEY;
   if (!key) throw new Error("ключ модели не настроен");
@@ -219,9 +220,10 @@ export async function llmChat(env, messages, opts = {}) {
   for (const m of models) { attempts.push(m); attempts.push(m); }
   let last = "";
   for (const model of attempts) {
+    if (signal.aborted) throw new Error('истекло время ожидания модели');
     try {
       const r = await fetch(base + "/chat/completions", {
-        method: "POST",
+        method: "POST", signal,
         headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json", "Accept": "text/event-stream",
                    "HTTP-Referer": "https://okk-dashboard.pages.dev", "X-Title": "Shtab edit" },
         body: JSON.stringify({ model, temperature: opts.temperature ?? 0.2, max_tokens: opts.max_tokens || 16000, messages, stream: true }),
@@ -268,6 +270,7 @@ export async function llmChat(env, messages, opts = {}) {
       if (!text) { last = "пустой ответ"; continue; }
       return { text, model, finish };
     } catch (e) {
+      if (signal.aborted) throw new Error('истекло время ожидания модели');
       last = String(e).slice(0, 120);
     }
   }

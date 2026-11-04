@@ -82,10 +82,11 @@ export async function onRequestPost(context) {
   };
 
   let lastError = "";
+  const signal=AbortSignal.timeout(60000);
   for (const model of models) {
     try {
       const r = await fetch(OR, {
-        method: "POST",
+        method: "POST", signal,
         headers,
         body: JSON.stringify({
           model,
@@ -104,6 +105,7 @@ export async function onRequestPost(context) {
       if (!answer) { lastError = "пустой ответ"; continue; }
       return json({ answer, model });
     } catch (e) {
+      if (signal.aborted) return json({error:'Истекло время ожидания модели. Попробуйте ещё раз.'},504);
       lastError = String(e).slice(0, 120);
     }
   }

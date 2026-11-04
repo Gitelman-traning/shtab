@@ -89,29 +89,34 @@ ${STYLE}</head><body>
          autocomplete="${autocomplete}" aria-label="Пароль">
   <button type="submit">${button}</button>
   ${tgBot ? `<div class="or"><span>или</span></div>
-  <a class="tgbtn" id="tgbtn" href="https://t.me/${tgBot}" target="_blank" rel="noopener">Войти через Telegram</a>
+  <a class="tgbtn" id="tgbtn" role="link" aria-disabled="true" tabindex="0" target="_blank" rel="noopener">Войти через Telegram</a>
   <p class="hint" id="tgst">Кнопка откроет бота @${tgBot}: нажмите в нём «Start», и эта вкладка впустит вас сама.
   Первый раз — заявка, администратор подтверждает доступ.</p>
+  <button type="button" id="tg-retry" hidden>Повторить вход через Telegram</button>
   <script>
   (function(){
     var bot=${JSON.stringify(tgBot)}, btn=document.getElementById("tgbtn"), st=document.getElementById("tgst"), code="", timer=0, slow=0;
     // код живёт в sessionStorage: мобильный браузер, пока человек в Telegram, может перезагрузить вкладку — она продолжит ждать тот же код
     function keep(c){ try{ c?sessionStorage.setItem("tgcode",c):sessionStorage.removeItem("tgcode"); }catch(e){} }
-    function setCode(c){ code=c||""; keep(code); if(code) btn.href="https://t.me/"+bot+"?start="+code; }
-    function fresh(){ return fetch("/__tglink?returnTo="+encodeURIComponent(document.getElementById("return-to").value),{method:"POST"}).then(function(r){return r.json()}).then(function(d){ setCode(d.code); }).catch(function(){}); }
-    function start(ms){ clearInterval(timer); timer=setInterval(poll,ms||2500); }
-    function poll(){
-      if(!code) return;
-      fetch("/__tglink?code="+code).then(function(r){return r.json()}).then(function(d){
-        if(d.status==="ok"){ clearInterval(timer); keep(""); st.textContent="Готово, открываем Штаб…"; location.href=d.returnTo||"/"; return; }
-        // заявка ждёт администратора: продолжаем опрашивать — после подтверждения вкладка войдёт сама
-        if(d.status==="pending"){ st.textContent="Заявка отправлена. Как только администратор подтвердит доступ, эта вкладка откроет Штаб сама — держите её открытой."; if(!slow){ slow=1; start(10000); } return; }
-        if(d.status==="expired"){ clearInterval(timer); timer=0; st.textContent="Код устарел, нажмите кнопку ещё раз."; fresh(); return; }
-      }).catch(function(){});
+    var retry=document.getElementById("tg-retry"), polling=false;
+    async function call(url,opt){var ctrl=new AbortController(),timer=setTimeout(function(){ctrl.abort();},12000);try{var r=await fetch(url,Object.assign({signal:ctrl.signal},opt));if(!r.ok)throw Error("HTTP "+r.status);return await r.json();}finally{clearTimeout(timer);}}
+    function setCode(c){code=c||"";keep(code);btn.setAttribute("aria-disabled",code?"false":"true");if(code)btn.href="https://t.me/"+bot+"?start="+code;else btn.removeAttribute("href");}
+    function failed(){clearInterval(timer);timer=0;retry.hidden=false;btn.removeAttribute("href");btn.setAttribute("aria-disabled","true");st.textContent="Не удалось связаться со Штабом. Проверьте соединение и повторите вход.";}
+    async function fresh(){retry.hidden=true;setCode("");st.textContent="Получаем ссылку для входа…";try{var d=await call("/__tglink?returnTo="+encodeURIComponent(document.getElementById("return-to").value),{method:"POST"});if(!/^[a-f0-9]{32}$/.test(d.code))throw Error();setCode(d.code);st.textContent="Нажмите «Войти через Telegram», затем «Start» в боте.";}catch(e){failed();}}
+    function start(ms){clearInterval(timer);timer=setInterval(poll,ms||2500);}
+    async function poll(){
+      if(!code||polling)return;polling=true;
+      try{var d=await call("/__tglink?code="+code);
+        if(d.status==="ok"){clearInterval(timer);keep("");location.href=d.returnTo||"/";return;}
+        if(d.status==="pending"){st.textContent="Заявка ждёт подтверждения администратора.";if(!slow){slow=1;start(10000);}return;}
+        if(d.status==="expired"){clearInterval(timer);timer=0;setCode("");retry.hidden=false;st.textContent="Ссылка устарела. Получите новую.";return;}
+        if(d.status!=="wait")throw Error();
+      }catch(e){failed();}finally{polling=false;}
     }
+    retry.onclick=function(){if(code){retry.hidden=true;setCode(code);start();poll();}else{fresh();}};
     var saved=""; try{ saved=sessionStorage.getItem("tgcode")||""; }catch(e){}
     if(/^[a-f0-9]{32}$/.test(saved)){ setCode(saved); start(); poll(); } else fresh();
-    btn.addEventListener("click",function(){ st.textContent="Ждём ответа от Telegram: в боте нажмите «Start»…"; slow=0; start(); });
+    btn.addEventListener("click",function(e){ if(!btn.hasAttribute("href")){e.preventDefault();return;} st.textContent="Ждём ответа от Telegram: в боте нажмите «Start»…"; slow=0; start(); });
     document.addEventListener("visibilitychange",function(){ if(!document.hidden && timer) poll(); });
   })();
   </script>` : ""}

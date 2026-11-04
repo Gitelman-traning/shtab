@@ -20,10 +20,34 @@
   var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
-  function api(path, opt) { opt = opt || {}; opt.credentials = "same-origin"; if (opt.body) { opt.headers = { "content-type": "application/json" }; opt.body = JSON.stringify(opt.body); } return fetch(path, opt).then(function (r) { return r.json(); }); }
+  async function api(path,opt) {
+    opt=opt||{};opt.credentials="same-origin";
+    var ctrl=new AbortController(),timer=setTimeout(function(){ctrl.abort();},opt.method==="POST" && path.endsWith("/draft") ? 190000 : 15000);
+    opt.signal=ctrl.signal;
+    try {
+      if(opt.body){opt.headers=Object.assign({},opt.headers,{"content-type":"application/json"});opt.body=JSON.stringify(opt.body);}
+      var response=await fetch(path,opt), result;
+      try{result=await response.json();}catch(e){return {ok:false,status:response.status,error:"Сервер вернул неожиданный ответ. Повторите запрос."};}
+      if(!response.ok)return {ok:false,status:response.status,error:result.error||"Сервер временно недоступен. Повторите запрос."};
+      return result;
+    } catch(e){return {ok:false,status:0,error:e.name==="AbortError"?"Время ожидания истекло. Повторите запрос.":"Не удалось связаться со Штабом. Проверьте соединение и повторите запрос."};}
+    finally{clearTimeout(timer);}
+  }
   function dt(s) { return s ? String(s).replace("T", " ").slice(0, 16) : ""; }
 
   var state = { canEdit: false, versions: [], active: null, mode: "standard", preview: null, files: [] };
+  var jobKey="shtab-draft:"+SEC, job="";
+  try{job=sessionStorage.getItem(jobKey)||"";}catch(e){}
+  function saveJob(id){job=id||"";try{job?sessionStorage.setItem(jobKey,job):sessionStorage.removeItem(jobKey);}catch(e){}}
+  function jobMessage(text){var el=document.getElementById("se-msg");if(el)el.textContent=text;}
+  async function checkJob(){
+    if(!job)return;
+    var id=job,r=await api("/api/sections/"+SEC+"/draft?job="+encodeURIComponent(id));
+    if(id!==job)return;
+    if(r.state==="running"){jobMessage("Модель готовит вариант…");setTimeout(checkJob,3000);return;}
+    if(!r.ok){if(r.status===404||r.status===502||r.status===504){saveJob("");render();}jobMessage(r.error);return;}
+    saveJob("");state.mode="versions";await load();showCustom(r.version);jobMessage("Черновик v"+r.version+" готов.");
+  }
   var MAX_FILES = 4, MAX_IMG = 1600, MAX_TEXT = 60000;
 
   // картинки ужимаем до 1600px по большей стороне, текст режем до 30 тыс. символов
@@ -69,7 +93,7 @@
       + '<button class="ghost' + (state.mode === "standard" ? " on" : "") + '" data-a="standard">Стандартный вид</button>'
       + (act ? '<button class="ghost' + (state.mode === "custom" ? " on" : "") + '" data-a="custom">Свой вид · v' + act.version + '</button>' : '<span class="sub">своего вида пока нет</span>')
       + (state.canEdit ? '<button data-a="edit">Изменить через Claude</button><button class="ghost" data-a="versions">Версии (' + v.length + ')</button>' : '')
-      + '<span class="sub" id="se-msg"></span></div>';
+       + (job ? '<button class="ghost" data-a="checkDraft">Проверить вариант</button>' : '') + '<span class="sub" id="se-msg" role="status"></span></div>';
     if (state.canEdit && state.mode === "edit") {
       h += '<div><textarea id="se-prompt" placeholder="Что изменить? Например: «покажи источники кругом вместо таблицы» или «добавь сравнение с прошлым месяцем в каждую карточку»"></textarea></div>'
         + '<div class="row"><button data-a="draft">Сделать вариант</button>'
@@ -91,7 +115,7 @@
 
   function load() {
     return api("/api/sections/" + SEC + "/versions").then(function (r) {
-      if (!r.ok) { box.className = "se"; box.innerHTML = '<span class="sub">' + esc(r.error) + '</span>'; return; }
+      if (!r.ok) { box.className = "se"; box.innerHTML = '<span class="sub">' + esc(r.error) + '</span> <button data-a="retry">Повторить загрузку</button>'; return; }
       state.canEdit = !!r.can_edit; state.versions = r.versions || [];
       state.active = state.versions.filter(function (x) { return x.active; })[0] || null;
       if (state.active && state.mode === "standard" && !state.touched) { state.mode = "custom"; showCustom(); }
@@ -115,6 +139,8 @@
     var b = e.target.closest("button[data-a]"); if (!b) return;
     var a = b.getAttribute("data-a"), msg = function (t, cls) { var m = document.getElementById("se-msg"); if (m) { m.textContent = t; m.className = "sub " + (cls || ""); } };
     state.touched = true;
+    if (a === "retry") { load(); return; }
+    if (a === "checkDraft") { checkJob(); return; }
     if (a === "standard") { state.mode = "standard"; showStandard(); render(); }
     else if (a === "custom") { state.mode = "custom"; showCustom(); render(); }
     else if (a === "edit") { state.mode = "edit"; render(); }
@@ -123,12 +149,14 @@
     else if (a === "preview") { showCustom(b.getAttribute("data-v")); msg("предпросмотр v" + b.getAttribute("data-v")); }
     else if (a === "draft") {
       var p = document.getElementById("se-prompt").value.trim(); if (p.length < 5) { msg("опишите, что изменить", "err"); return; }
-      b.disabled = true; msg("модель пишет страницу…");
-      api("/api/sections/" + SEC + "/draft", { method: "POST", body: { prompt: p, attachments: state.files } }).then(function (r) {
-        if (!r.ok) { msg(r.error, "err"); b.disabled = false; return; }
-        state.files = [];
-        state.mode = "versions"; load().then(function () { showCustom(r.version); msg("черновик v" + r.version + " готов (" + r.model + "), это предпросмотр — опубликуйте, если подходит", "ok"); });
-      });
+      var id=job||crypto.randomUUID();saveJob(id);b.disabled=true;msg("Модель пишет страницу…");
+      api("/api/sections/"+SEC+"/draft",{method:"POST",headers:{"x-draft-job":id},body:{prompt:p,attachments:state.files}})
+        .then(async function(r){
+          if(!r.ok){if(r.status===0 || r.status>=500){render();jobMessage(r.error+" Можно проверить состояние варианта.");return;}saveJob("");msg(r.error,"err");return;}
+          if(r.state==="running"){checkJob();return;}
+          saveJob("");state.files=[];state.mode="versions";await load();showCustom(r.version);jobMessage("Черновик v"+r.version+" готов.");
+        }).catch(function(){msg("Не удалось показать результат. Повторите проверку.","err");})
+        .finally(function(){b.disabled=false;});
     }
     else if (a === "publish") {
       api("/api/sections/" + SEC + "/versions", { method: "POST", body: { action: "publish", version: b.getAttribute("data-v") } }).then(function (r) {
@@ -143,5 +171,5 @@
       });
     }
   });
-  load();
+  load().then(function(){if(job)checkJob();});
 })();

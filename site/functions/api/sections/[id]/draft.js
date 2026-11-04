@@ -49,7 +49,36 @@ function stripFences(t) {
   return i > 0 ? t.slice(i) : t;
 }
 
-export async function onRequestPost({ request, env, params }) {
+async function jobResult(env, id, section, login) {
+  const job=await env.DB.prepare('SELECT result,status,deadline FROM section_draft_jobs WHERE id=? AND section=? AND login=?').bind(id,section,login).first();
+  if(!job)return bad("задание не найдено",404);
+  if(job.result)return json(JSON.parse(job.result),job.status);
+  return job.deadline<=now() ? bad("Время ожидания истекло. Создайте вариант повторно.",504) : json({ok:true,state:"running",job:id},202);
+}
+
+export async function onRequestGet({request,env,params}) {
+  const user=await canRead(request,env);
+  if(!user || !canEdit(user,params.id)) return bad("раздел закрыт",403);
+  return jobResult(env,new URL(request.url).searchParams.get("job"),params.id,user.login);
+}
+
+export async function onRequestPost(context) {
+  const {request,env,params}=context, user=await canRead(request,env);
+  if(!user || !canEdit(user,params.id)) return bad("раздел закрыт",403);
+  const job=request.headers.get("x-draft-job") || crypto.randomUUID();
+  if(!/^[a-f0-9-]{36}$/.test(job))return bad("неверный идентификатор задания");
+  await env.DB.prepare("DELETE FROM section_draft_jobs WHERE created<?").bind(new Date(Date.now()-86400000).toISOString()).run();
+  const inserted=await env.DB.prepare("INSERT OR IGNORE INTO section_draft_jobs(id,section,login,created,deadline) VALUES(?,?,?,?,?)")
+    .bind(job,params.id,user.login,now(),new Date(Date.now()+180000).toISOString()).run();
+  if(!inserted.meta.changes)return jobResult(env,job,params.id,user.login);
+  let result;
+  try {result=await generate(context,job,AbortSignal.timeout(175000));}
+  catch {result=bad("Не удалось создать вариант. Попробуйте ещё раз.",503);}
+  if(!result.ok)await env.DB.prepare("UPDATE section_draft_jobs SET result=?,status=? WHERE id=? AND result IS NULL").bind(await result.clone().text(),result.status,job).run();
+  return result;
+}
+
+async function generate({ request, env, params },job,signal) {
   const user = await canRead(request, env);
   if (!user || !canEdit(user, params.id)) return bad("менять этот раздел могут его владельцы и администратор", 403);
   const sec = await env.DB.prepare("SELECT id, name, config FROM sections WHERE id = ?").bind(params.id).first();
@@ -91,14 +120,14 @@ export async function onRequestPost({ request, env, params }) {
   ];
   let out, html = "";
   try {
-    out = await llmChat(env, messages, { max_tokens: 14000, temperature: 0.2 });
+    out = await llmChat(env, messages, { max_tokens: 14000, temperature: 0.2, signal });
     html = stripFences(out.text);
     // поток у провайдера иногда обрывается на середине: просим дописать с места обрыва, до трёх раз
     for (let i = 0; i < 3 && !/<\/html>\s*$/i.test(html); i++) {
       const more = await llmChat(env, messages.concat([
         { role: "assistant", content: html },
         { role: "user", content: "Ответ оборвался. Продолжи РОВНО с того места, где остановился — с первого недостающего символа, без повтора уже написанного, без пояснений и без ограждений. Доведи документ до </html>." },
-      ]), { max_tokens: 14000, temperature: 0.2 });
+      ]), { max_tokens: 14000, temperature: 0.2, signal });
       let add = more.text.replace(/^```(?:html)?\s*/i, "").replace(/\s*```$/, "");
       // модель могла повторить хвост — срезаем пересечение
       for (let k = Math.min(400, add.length); k > 20; k--) { if (html.endsWith(add.slice(0, k))) { add = add.slice(k); break; } }
@@ -114,11 +143,14 @@ export async function onRequestPost({ request, env, params }) {
   }
   if (!/<!doctype html/i.test(html) || html.length < 500) return bad("модель вернула не страницу, попробуйте переформулировать", 502);
   if (/<script[^>]+src=|<link[^>]+href=|@import/i.test(html)) return bad("модель подключила внешние файлы — это запрещено, попробуйте ещё раз", 502);
-  const last = await env.DB.prepare("SELECT MAX(version) AS v FROM section_versions WHERE section = ?").bind(sec.id).first();
-  const version = ((last && last.v) || 0) + 1;
-  await env.DB.prepare(
-    "INSERT INTO section_versions (section, version, html, prompt, author, created_at, active) VALUES (?,?,?,?,?,?,0)")
-    .bind(sec.id, version, html.slice(0, 60000), prompt, user.login, now()).run();
-  await audit(env, user.login, "section.draft", sec.id, "v" + version + " · " + out.model + (attachments.length ? " · вложений " + attachments.length : "") + " · " + prompt.slice(0, 120));
-  return json({ ok: true, version, model: out.model, size: html.length });
+  if (html.length>60000) return bad("Вариант слишком большой. Сократите просьбу.",422);
+  if (signal.aborted) return bad("Время ожидания истекло. Попробуйте ещё раз.",504);
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO section_versions(section,version,html,prompt,author,created_at,active) SELECT ?,COALESCE(MAX(version),0)+1,?,?,?,?,0 FROM section_versions WHERE section=?")
+      .bind(sec.id,html,prompt,user.login,now(),sec.id),
+    env.DB.prepare("UPDATE section_draft_jobs SET result=json_object('ok',json('true'),'state','done','version',(SELECT MAX(version) FROM section_versions WHERE section=?),'model',?,'size',?),status=200 WHERE id=?")
+      .bind(sec.id,out.model,html.length,job),
+  ]);
+  await audit(env,user.login,"section.draft",sec.id,job);
+  return jobResult(env,job,sec.id,user.login);
 }
