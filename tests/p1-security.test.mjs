@@ -20,6 +20,7 @@ import * as okna from '../site/functions/api/okna.js';
 import {teamOf,cleanDue} from '../site/functions/api/tasks/_tasks.js';
 import {cleanDate} from '../site/functions/api/hr/_hr.js';
 import {safeReturn} from '../site/functions/api/_return-to.js';
+import {withAiSlot} from '../site/functions/api/_quota.js';
 import * as leave from '../site/functions/api/hr/leave.js';
 import * as structure from '../site/functions/api/hr/structure.js';
 import * as prep from '../site/functions/api/prep.js';
@@ -296,6 +297,18 @@ test('P2-10 points never report a truncated response as complete',async()=>{
   const last=await(await get('&page=10001&page_size=2')).json();assert.deepEqual(last.rows.map(r=>r.value),[20001]);assert.equal(last.has_more,false);
 });
 const paid=(id)=>({id,created_at:100,price:id});
+test('P2-17 login rate limit expires; AI concurrency and global token budgets stop extra provider calls',async()=>{
+  const e=env();e.LOGIN_ATTEMPTS='2';
+  const login=()=>onRequest({request:new Request('https://audit.invalid/__login',{method:'POST',body:new URLSearchParams({login:'reader',password:'wrong'})}),env:e,next:()=>new Response('unused')});
+  assert.equal((await login()).status,401);assert.equal((await login()).status,401);const blocked=await login();assert.equal(blocked.status,429);assert(+blocked.headers.get('Retry-After')>0);
+  e.sqlite.exec('UPDATE security_usage SET at=at-901');assert.equal((await login()).status,401);
+  e.AI_USER_CONCURRENCY='1';let release,started;const running=new Promise(r=>started=r),finish=new Promise(r=>release=r);
+  const user={login:'reader'}, req=request('/api/chat');const first=withAiSlot(e,req,user,'chat',async()=>{started();await finish;return new Response('done');});await running;
+  assert.equal((await withAiSlot(e,req,user,'chat',()=>new Response('unexpected'))).status,429);release();await first;
+  assert.equal((await withAiSlot(e,req,user,'chat',()=>new Response('allowed'))).status,200);
+  e.AI_DAILY_TOKEN_BUDGET='1';e.LLM_API_KEY='fixture';const calls=llm();const response=await chat.onRequestPost({request:request('/api/chat',{messages:[{role:'user',content:'test'}]}),env:e});
+  assert.equal(response.status,429);assert.equal(calls.length,0);assert(+response.headers.get('Retry-After')>0);
+});
 test('P2-16 login, success, denied and error responses have headers; custom sandbox is preserved',async()=>{
   const e=env();e.TG_BOT_NAME='testbot';
   const call=(path,auth,next)=>onRequest({request:request(path,undefined,{auth}),env:e,next});

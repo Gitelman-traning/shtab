@@ -1,3 +1,4 @@
+import {withAiSlot,QuotaError,quotaResponse} from "../../_quota.js";
 // POST /api/sections/<id>/draft {prompt, base_version?} — модель пишет новую страницу раздела по просьбе словами.
 // Результат сохраняется как новая версия (active = 0): редактор смотрит предпросмотр и публикует отдельно.
 import { json, bad, canRead, canEdit, audit, now, llmChat } from "../../_lib.js";
@@ -68,14 +69,18 @@ export async function onRequestPost(context) {
   const job=request.headers.get("x-draft-job") || crypto.randomUUID();
   if(!/^[a-f0-9-]{36}$/.test(job))return bad("неверный идентификатор задания");
   await env.DB.prepare("DELETE FROM section_draft_jobs WHERE created<?").bind(new Date(Date.now()-86400000).toISOString()).run();
+  const previous=await env.DB.prepare("SELECT id FROM section_draft_jobs WHERE id=?").bind(job).first();
+  if(previous)return jobResult(env,job,params.id,user.login);
+  return withAiSlot(env,request,user,"draft",async()=>{
   const inserted=await env.DB.prepare("INSERT OR IGNORE INTO section_draft_jobs(id,section,login,created,deadline) VALUES(?,?,?,?,?)")
     .bind(job,params.id,user.login,now(),new Date(Date.now()+180000).toISOString()).run();
   if(!inserted.meta.changes)return jobResult(env,job,params.id,user.login);
   let result;
   try {result=await generate(context,job,AbortSignal.timeout(175000));}
-  catch {result=bad("Не удалось создать вариант. Попробуйте ещё раз.",503);}
+  catch(e) {result=e instanceof QuotaError ? quotaResponse(e) : bad("Не удалось создать вариант. Попробуйте ещё раз.",503);}
   if(!result.ok)await env.DB.prepare("UPDATE section_draft_jobs SET result=?,status=? WHERE id=? AND result IS NULL").bind(await result.clone().text(),result.status,job).run();
   return result;
+  });
 }
 
 async function generate({ request, env, params },job,signal) {
@@ -134,6 +139,7 @@ async function generate({ request, env, params },job,signal) {
       html += add;
     }
   } catch (e) {
+    if(e instanceof QuotaError)throw e;
     await audit(env, user.login, "section.draft.fail", sec.id, e.message.slice(0, 120) + " · " + prompt.slice(0, 120));
     return bad("модель не успела: " + e.message + ". Нажмите «Сделать вариант» ещё раз или сократите просьбу.", 502);
   }

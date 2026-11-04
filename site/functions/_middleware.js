@@ -1,3 +1,4 @@
+import {reserve,QuotaError,quotaResponse} from "./api/_quota.js";
 import { safeReturn } from "./api/_return-to.js";
 /** Персональный вход по паролю или Telegram; общий пароль и публичный setup отключены. */
 
@@ -147,8 +148,11 @@ export async function onRequest(context) {
   let response;
   try { response=await handle(context); }
   catch(error) {
+    if(error instanceof QuotaError) response=quotaResponse(error);
+    else {
     console.error('shtab.request_failed',error?.name || 'Error');
     response=new URL(context.request.url).pathname.startsWith('/api/') ? jsonResp({ok:false,error:'Сервер временно недоступен'},500) : html('<!doctype html><meta charset=utf-8><p>Сервер временно недоступен. Попробуйте позже.</p>',500);
+    }
   }
   const out=new Response(response.body,response);
   out.headers.set('X-Content-Type-Options','nosniff');
@@ -236,6 +240,7 @@ async function handle(context) {
   if (url.pathname === "/__tglink") {
     if (!env.TG_BOT_TOKEN || !env.DB) return jsonResp({ status: "off" }, 503);
     if (request.method === "POST") {
+      await reserve(env,request,"tg",getCookie(request,"__Host-shtab_tg"));
       const grant = await beginLogin(env, request,returnTo);
       return jsonResp({ code: grant.code }, 200, { "Set-Cookie": grant.cookie });
     }
@@ -270,6 +275,7 @@ async function handle(context) {
 
   // именной пользователь: проверяем только базу пользователей, сессия в cookie shtab_s
   if (posted && url.pathname === "/__login") {
+    const attempt=await reserve(env,request,"password",login);
     const row = env.DB ? await env.DB.prepare("SELECT login, pass_hash, salt, active, role,must_change,temp_expires FROM users WHERE login = ?").bind(login).first() : null;
     if (row && row.role === "pending" && await verifyPassword(value, row.salt, row.pass_hash)) {
       return html(page({returnTo, tgBot: env.TG_BOT_NAME, message: "Заявка ещё не подтверждена администратором. Попробуйте позже." }), 403);
@@ -280,6 +286,7 @@ async function handle(context) {
     }
     const s = await createSession(env, row.login, row.pass_hash);
     if (!s) return html(page({returnTo,message:"Срок доступа истёк. Обратитесь к администратору."}),403);
+    await env.DB.prepare("DELETE FROM security_usage WHERE id=?").bind(attempt).run();
     await audit(env, row.login, "login");
     return new Response(null, { status: 303, headers: { Location: returnTo, "Set-Cookie": s.cookie, "Cache-Control": "no-store" } });
   }

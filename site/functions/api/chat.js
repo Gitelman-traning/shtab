@@ -1,3 +1,4 @@
+import {withAiSlot,QuotaError} from "./_quota.js";
 // Чат с ИИ на общем экране: вопросы по цифрам Штаба и по компании.
 //   POST /api/chat {messages:[{role:"user"|"assistant", content}]} → {ok, answer}
 // Модель получает сводку витрины (последние два месяца, источники, менеджеры, план/факт, участники, сайт),
@@ -168,6 +169,7 @@ export async function onRequestPost({ request, env }) {
     .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return bad("нужен вопрос");
   if (!canView(user, "hub")) return bad("общий экран закрыт", 403);
+  return withAiSlot(env,request,user,"chat",async()=>{
   const allowed = new Map((await readableMetrics(env, user)).map(m => [m.id, m]));
   const d = await digest(env, user, allowed);
   const m0 = new Date(); m0.setUTCDate(1); m0.setUTCMonth(m0.getUTCMonth() - 2);
@@ -179,9 +181,11 @@ export async function onRequestPost({ request, env }) {
     const r = await llmChat(env, [{ role: "system", content: system }, ...msgs], { max_tokens: 1200, temperature: 0.3 });
     answer = r.text;
   } catch (e) {
+    if(e instanceof QuotaError)throw e;
     await audit(env, user.login, "chat.fail", msgs[msgs.length - 1].content.slice(0, 120), String(e.message || e).slice(0, 200));
     return bad("модель не ответила: " + (e.message || e), 502);
   }
   await audit(env, user.login, "chat.ask", msgs[msgs.length - 1].content.slice(0, 200));
   return json({ ok: true, answer: String(answer || "").trim() });
+  });
 }

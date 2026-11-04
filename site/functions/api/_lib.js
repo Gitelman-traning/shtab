@@ -1,3 +1,4 @@
+import {reserveTokens} from "./_quota.js";
 // Общие помощники для API Штаба. Файлы с подчёркиванием маршрутами не становятся.
 
 export function json(data, status = 200, extra = {}) {
@@ -221,6 +222,7 @@ export async function llmChat(env, messages, opts = {}) {
   let last = "";
   for (const model of attempts) {
     if (signal.aborted) throw new Error('истекло время ожидания модели');
+    await reserveTokens(env,messages,opts.max_tokens || 16000);
     try {
       const r = await fetch(base + "/chat/completions", {
         method: "POST", signal,

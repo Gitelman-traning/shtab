@@ -1,3 +1,4 @@
+import {withAiSlot,reserveTokens} from "./api/_quota.js";
 /**
  * Вопрос по конкретной встрече.
  *
@@ -64,6 +65,7 @@ export async function onRequestPost(context) {
   const question = String(body.question || "").trim().slice(0, 500);
   if (!deal || !question) return json({ error: "Нужны сделка и вопрос" }, 400);
 
+  return withAiSlot(env,request,user,"meeting",async()=>{
   const transcript = await env.OKK_KV.get("t:" + deal);
   if (!transcript) {
     return json({ error: "Расшифровка этой встречи ещё не загружена" }, 404);
@@ -84,13 +86,15 @@ export async function onRequestPost(context) {
   let lastError = "";
   const signal=AbortSignal.timeout(60000);
   for (const model of models) {
+    if(signal.aborted)return json({error:"Истекло время ожидания модели"},504);
+    await reserveTokens(env,[SYSTEM,text,question],1200);
     try {
       const r = await fetch(OR, {
         method: "POST", signal,
         headers,
         body: JSON.stringify({
           model,
-          temperature: 0.2,
+          temperature: 0.2, max_tokens:1200,
           messages: [
             { role: "system", content: SYSTEM },
             { role: "user", content: "Расшифровка встречи:\n\n" + text + "\n\nВопрос: " + question },
@@ -110,4 +114,5 @@ export async function onRequestPost(context) {
     }
   }
   return json({ error: "Модель не ответила (" + lastError + "). Попробуйте ещё раз." }, 502);
+  });
 }
