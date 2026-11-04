@@ -58,7 +58,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install requests
+      - run: pip install --require-hashes -r collector/requirements.txt
       - name: Participants base
         if: github.event.schedule == '10 2 * * *' || inputs.cases == '1'
         run: python collector/prep.py cases && python collector/prep.py sheet
@@ -78,7 +78,7 @@ jobs:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
       - name: Transcript links of a diagnostician
         if: inputs.zoomdocs != ''
-        run: pip install google-api-python-client google-auth && python collector/zoom_docs.py "${{ inputs.zoomdocs }}" docs.json
+        run: pip install --require-hashes -r collector/requirements.txt && python collector/zoom_docs.py "${{ inputs.zoomdocs }}" docs.json
         env:
           SHEET_ID: ${{ secrets.SHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}

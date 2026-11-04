@@ -34,7 +34,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install requests
+      - run: pip install --require-hashes -r collector/requirements.txt
       - uses: actions/download-artifact@v4
         if: github.event.inputs.from_run != ''
         with:

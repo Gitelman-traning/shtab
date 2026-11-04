@@ -5,6 +5,8 @@
 # PYTHON_VERSION=3.12, по желанию DOCS_TOKEN.
 set -euo pipefail
 cd "$(dirname "$0")"
+# Ошибка тестов, миграций или шаблонов останавливает сборку до публикации Pages.
+bash tools/predeploy.sh
 echo "переменные окружения сборки (только имена): $(env | cut -d= -f1 | grep -E '^(SHEET_ID|GOOGLE_|PYTHON_VERSION|INGEST_TOKEN|LLM_|ASK_MODEL|EDIT_MODEL|CF_PAGES)' | sort | tr '
 ' ' ')"
 # секреты сборки из Doppler: если задан DOPPLER_TOKEN, тянем конфиг и экспортируем всё, чего нет в окружении
@@ -29,20 +31,35 @@ for v in SHEET_ID GOOGLE_SERVICE_ACCOUNT_JSON; do
 done
 ROOT="$(pwd)"
 rm -rf .okk .okk-docs .shtab-docs
-git clone --depth 1 https://github.com/Gitelman-traning/okk.git .okk
+checkout_locked() {
+  local repo="$1" dest="$2" private="${3:-}" ref auth
+  ref="$(python3 -c 'import json,re,sys; v=json.load(open("build-refs.json"))[sys.argv[1]]; assert re.fullmatch("[0-9a-f]{40}",v); print(v)' "$repo")"
+  git init --quiet "$dest"
+  git -C "$dest" remote add origin "https://github.com/Gitelman-traning/$repo.git"
+  if [ "$private" = private ]; then
+    auth="$(printf 'x-access-token:%s' "$DOCS_TOKEN" | base64 | tr -d '\r\n')"
+    git -C "$dest" -c "http.extraHeader=Authorization: Basic $auth" fetch --quiet --depth 1 origin "$ref" || return 1
+  else
+    git -C "$dest" fetch --quiet --depth 1 origin "$ref" || return 1
+  fi
+  git -C "$dest" checkout --quiet --detach FETCH_HEAD || return 1
+  test "$(git -C "$dest" rev-parse HEAD)" = "$ref"
+}
+checkout_locked okk .okk
 if [ -n "${DOCS_TOKEN:-}" ]; then
-  git clone --depth 1 "https://x-access-token:${DOCS_TOKEN}@github.com/Gitelman-traning/okk-docs.git" .okk-docs && echo "okk-docs: есть"
+  checkout_locked okk-docs .okk-docs private
 else
   echo "okk-docs: без токена, страница «Сверка» без оценок человека"
 fi
 PY="${PY:-$(command -v python3 || command -v python)}"   # локально на Windows: PY=python bash cf-build.sh
-"$PY" -m pip install --quiet -r .okk/requirements.txt
+"$PY" -m pip install --quiet --require-hashes -r build-requirements.lock
 export PYTHONIOENCODING=utf-8
 export OKK_DIR="$ROOT/.okk"
 export MANUAL_SCORES="$ROOT/.okk-docs/manual-scores.json"
 "$PY" build.py
 # сводка по сайтам (Маркетинг → Сайт): данные с заявками и оплатами живут в приватном shtab-docs/site-svodka
-if [ -n "${DOCS_TOKEN:-}" ] && git clone --depth 1 "https://x-access-token:${DOCS_TOKEN}@github.com/Gitelman-traning/shtab-docs.git" .shtab-docs; then
+if [ -n "${DOCS_TOKEN:-}" ]; then
+  checkout_locked shtab-docs .shtab-docs private
   mkdir -p site/public/marketing/site/svodka/data && cp .shtab-docs/site-svodka/*.json site/public/marketing/site/svodka/data/ && echo "сводка по сайтам: $(ls .shtab-docs/site-svodka/*.json | wc -l) файлов"
 else
   echo "сводка по сайтам: нет доступа к shtab-docs, страница покажет «Сводок пока нет»"

@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install requests
+      - run: pip install --require-hashes -r collector/requirements.txt
       - run: python collector/youtube.py
         env:
           AMO_TOKEN: ${{ secrets.AMO_TOKEN }}
