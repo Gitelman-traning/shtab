@@ -296,6 +296,18 @@ test('P2-10 points never report a truncated response as complete',async()=>{
   const last=await(await get('&page=10001&page_size=2')).json();assert.deepEqual(last.rows.map(r=>r.value),[20001]);assert.equal(last.has_more,false);
 });
 const paid=(id)=>({id,created_at:100,price:id});
+test('P2-16 login, success, denied and error responses have headers; custom sandbox is preserved',async()=>{
+  const e=env();e.TG_BOT_NAME='testbot';
+  const call=(path,auth,next)=>onRequest({request:request(path,undefined,{auth}),env:e,next});
+  const login=await call('/','none',()=>new Response('unused'));assert.equal(login.status,401);
+  const policy=login.headers.get('content-security-policy'), body=await login.text();const nonce=policy.match(/'nonce-([^']+)'/)[1];
+  assert.match(policy,/frame-ancestors 'none'/);assert.equal(login.headers.get('x-frame-options'),'DENY');
+  assert([...body.matchAll(/<script([^>]*)>/g)].every(m=>m[1].includes(nonce)));
+  for(const r of [login,await call('/','personal',()=>new Response('ok')),await call('/users','personal',()=>new Response('unused')),await call('/api/test','none',()=>{throw Error('synthetic');})]){
+    assert.equal(r.headers.get('x-content-type-options'),'nosniff');assert(r.headers.get('referrer-policy'));assert(r.headers.get('content-security-policy'));
+  }
+  const v=await call('/api/sections/hub/view','personal',()=>new Response('test',{headers:{'content-security-policy':VIEW_CSP}}));assert.equal(v.headers.get('content-security-policy'),VIEW_CSP);
+});
 test('P2-15 a completed draft can be recovered and retried without a second model call',async()=>{
   const e=env({sales:2});section(e);e.LLM_API_KEY='fixture';e.LLM_BASE_URL='https://model.invalid';let calls=0;
   globalThis.fetch=async()=>{calls++;return Response.json({choices:[{message:{content:'<!doctype html><html><body>'+ 'Synthetic '.repeat(70)+'</body></html>'}}]});};

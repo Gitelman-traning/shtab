@@ -9,7 +9,7 @@ import { getCookie, currentUser, createSession, dropSession, verifyPassword, has
 const RE_LOGIN = /^[a-z0-9._-]{3,32}$/;
 
 function registerPage(message, values = {}, tgBot = "") {
-  const v = (k) => String(values[k] || "").replace(/"/g, "&quot;");
+  const v = (k) => String(values[k] || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
   const note = message ? `<p class="err">${message}</p>` : `<p class="hint">Заявка уйдёт администратору. После подтверждения войдёте с этим логином и паролем.</p>`;
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -64,7 +64,7 @@ const STYLE = `<link rel="preconnect" href="https://fonts.googleapis.com">
 
 function returnField(target) {
   const escaped=safeReturn(target).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-  return `<input id="return-to" type="hidden" name="returnTo" value="${escaped}"><script>(function(){var el=document.getElementById("return-to");if(!location.pathname.startsWith("/__"))el.value=location.pathname+location.search+location.hash;else if(location.hash&&!el.value.includes("#"))el.value+=location.hash;document.cookie="__Host-shtab_return="+encodeURIComponent(el.value)+"; Path=/; Max-Age=600; Secure; SameSite=Lax";})();</script>`;
+  return `<input id="return-to" type="hidden" name="returnTo" value="${escaped}"><script nonce="__AUTH_NONCE__">(function(){var el=document.getElementById("return-to");if(!location.pathname.startsWith("/__"))el.value=location.pathname+location.search+location.hash;else if(location.hash&&!el.value.includes("#"))el.value+=location.hash;document.cookie="__Host-shtab_return="+encodeURIComponent(el.value)+"; Path=/; Max-Age=600; Secure; SameSite=Lax";})();</script>`;
 }
 
 function page({ message, tgBot, returnTo="/" }) {
@@ -93,7 +93,7 @@ ${STYLE}</head><body>
   <p class="hint" id="tgst">Кнопка откроет бота @${tgBot}: нажмите в нём «Start», и эта вкладка впустит вас сама.
   Первый раз — заявка, администратор подтверждает доступ.</p>
   <button type="button" id="tg-retry" hidden>Повторить вход через Telegram</button>
-  <script>
+  <script nonce="__AUTH_NONCE__">
   (function(){
     var bot=${JSON.stringify(tgBot)}, btn=document.getElementById("tgbtn"), st=document.getElementById("tgst"), code="", timer=0, slow=0;
     // код живёт в sessionStorage: мобильный браузер, пока человек в Telegram, может перезагрузить вкладку — она продолжит ждать тот же код
@@ -129,17 +129,36 @@ function jsonResp(data, status = 200, extra = {}) {
 }
 
 function html(body, status = 200) {
+  const nonce=randomId(16);
+  body=body.replaceAll('nonce="__AUTH_NONCE__"', 'nonce="'+nonce+'"');
   return new Response(body, {
     status,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Robots-Tag": "noindex, nofollow",
+      "Content-Security-Policy": "default-src 'none'; script-src 'nonce-"+nonce+"'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+      "X-Frame-Options":"DENY", "Referrer-Policy":"no-referrer", "X-Content-Type-Options":"nosniff",
     },
   });
 }
 
 export async function onRequest(context) {
+  let response;
+  try { response=await handle(context); }
+  catch(error) {
+    console.error('shtab.request_failed',error?.name || 'Error');
+    response=new URL(context.request.url).pathname.startsWith('/api/') ? jsonResp({ok:false,error:'Сервер временно недоступен'},500) : html('<!doctype html><meta charset=utf-8><p>Сервер временно недоступен. Попробуйте позже.</p>',500);
+  }
+  const out=new Response(response.body,response);
+  out.headers.set('X-Content-Type-Options','nosniff');
+  if(!out.headers.has('Referrer-Policy'))out.headers.set('Referrer-Policy','strict-origin-when-cross-origin');
+  if(!out.headers.has('Content-Security-Policy'))out.headers.set('Content-Security-Policy',"frame-ancestors 'self'; base-uri 'self'");
+  if(!out.headers.has('X-Frame-Options'))out.headers.set('X-Frame-Options','SAMEORIGIN');
+  return out;
+}
+
+async function handle(context) {
   const { request, env, next } = context;
   const url = new URL(request.url);
   let returnTo=safeReturn(url.pathname.startsWith("/__") ? url.searchParams.get("returnTo") || getCookie(request,"__Host-shtab_return") : url.pathname+url.search+url.hash);
