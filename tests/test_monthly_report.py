@@ -39,6 +39,15 @@ class ReportTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.select(stamp)
 
+    def test_failed_read_and_partial_write_get_distinct_status(self):
+        statuses=[]
+        report=lambda source,state,error: statuses.append(state)
+        def fail_read(issue): raise RuntimeError('fixture')
+        def fail_write(*args): raise RuntimeError('fixture')
+        self.assertEqual(collect.run_feed('deals',self.day,fail_read,report,fail_write),'failed')
+        self.assertEqual(collect.run_feed('deals',self.day,lambda issue: ([{}],[]),report,fail_write),'partial')
+        self.assertEqual(statuses,['running','failed','running','partial'])
+
     def test_completed_export_distinguishes_an_empty_source_from_an_event(self):
         layout={'cols':dict(funnel='A',lead_date='B',source='C',manager='D',booked_date='E',held_date='F',sale_date='G'), 'sheet_id':'verified','export_tab':'export','first_row':5,'lead_funnel':'L1','first_line_prefix':'L1'}
         with patch.object(collect,'LAYOUT',layout), patch.object(collect,'read',return_value=[['L1','03.11.2026','Телеграм канал']]):

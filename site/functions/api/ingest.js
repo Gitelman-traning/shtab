@@ -34,11 +34,9 @@ async function notifyPrepError(env, origin, rows) {
 }
 
 async function saveDebriefVersion(env, r, stamp) {
-  try {
-    await env.DB.prepare("INSERT INTO prep_debrief_ver (deal, label, text, loyalty, model, cost, created_at) VALUES (?,?,?,?,?,?,?)")
+  await env.DB.prepare("INSERT INTO prep_debrief_ver (deal, label, text, loyalty, model, cost, created_at) VALUES (?,?,?,?,?,?,?)")
       .bind(Number(r.deal), String(r.label || r.model || "").slice(0, 80), String(r.text).slice(0, 30000), Number(r.loyalty) || null,
             String(r.model || "").slice(0, 120), String(r.cost || "").slice(0, 60), stamp).run();
-  } catch (e) { /* таблицы версий может ещё не быть */ }
 }
 
 const CHUNK = 80;   // D1 принимает пачки запросов; держим их небольшими
@@ -221,7 +219,7 @@ export async function onRequestPost({ request, env }) {
       "company = excluded.company, manager = excluded.manager, meet_at = excluded.meet_at, updated_at = excluded.updated_at");
     const batch = dst.filter((r) => r && Number(r.deal))
       .map((r) => q.bind(Number(r.deal), Number(r.l2) || null, v(r.status, 20), v(r.note, 300), v(r.client, 80), v(r.company, 120), v(r.manager, 80), v(r.meet_at, 20), stamp));
-    try { for (let i = 0; i < batch.length; i += 40) { await env.DB.batch(batch.slice(i, i + 40)); written += Math.min(40, batch.length - i); } } catch (e) { /* таблицы может ещё не быть */ }
+    for (let i=0;i<batch.length;i+=40) { await env.DB.batch(batch.slice(i,i+40));written+=Math.min(40,batch.length-i); }
   }
   // база кейсов выпускников из отчётных презентаций (19.10.2026): {replace: true, rows: [...]} — заливается целиком
   if (body.prep_alumni && !body.prep_alumni.replace && Array.isArray(body.prep_alumni.rows)) {

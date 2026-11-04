@@ -49,9 +49,10 @@ def _snapshot(points, engine, day, queries):
         points.append({"metric": "web.kw", "ptype": "day", "period": day, "dim": engine + "|" + q, "value": round(pos, 1)})
 
 
-def gsc_points(day_from, day_to, log=print):
+def gsc_points(day_from, day_to, log=print, on_issue=None):
     sa = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
     if not sa:
+        if on_issue: on_issue("skipped")
         log("Search Console: нет GOOGLE_SERVICE_ACCOUNT_JSON — пропуск")
         return []
     from google.oauth2.service_account import Credentials
@@ -62,6 +63,7 @@ def gsc_points(day_from, day_to, log=print):
     dom = [s for s in sites if s == "sc-domain:gitelman.team"]
     props = dom or [s for s in sites if _host(s)]
     if not props:
+        if on_issue: on_issue("partial")
         log("Search Console: сервисному аккаунту не открыт ни один из сайтов — добавьте %s пользователем в Search Console"
             % json.loads(sa).get("client_email", "?"))
         return []
@@ -105,9 +107,10 @@ def gsc_points(day_from, day_to, log=print):
     return points
 
 
-def webmaster_points(day_from, day_to, log=print):
+def webmaster_points(day_from, day_to, log=print, on_issue=None):
     token = os.environ.get("YANDEX_WEBMASTER_TOKEN", "").strip()
     if not token:
+        if on_issue: on_issue("skipped")
         log("Вебмастер: нет YANDEX_WEBMASTER_TOKEN — пропуск")
         return []
     h = {"Authorization": "OAuth " + token}

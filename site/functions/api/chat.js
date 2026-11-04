@@ -1,3 +1,4 @@
+import {sourceHealth} from "./source-status.js";
 import {withAiSlot,QuotaError} from "./_quota.js";
 // Чат с ИИ на общем экране: вопросы по цифрам Штаба и по компании.
 //   POST /api/chat {messages:[{role:"user"|"assistant", content}]} → {ok, answer}
@@ -89,6 +90,9 @@ async function digest(env, user, allowed) {
     L.push("Участники по потокам (снимок " + (pay[0].asof || "") + "; участники = полные + предоплаты; чек = прислали чек): " + Object.keys(byP).map((k) => `${k}: участников ${byP[k]["pay.participants"] ?? "—"}, полных ${byP[k]["pay.full"] ?? "—"}, предоплат ${byP[k]["pay.prepaid"] ?? "—"}, чеков ${byP[k]["pay.receipts"] ?? "—"}`).join("; ") + ".");
   }
   if (web.length) L.push("Визиты за месяц по Яндекс Метрике: " + web.map((r) => `${r.dim === "site" ? "сайт gitelman.team" : r.dim === "journal" ? "журнал" : r.dim} ${r.v}`).join(", ") + ".");
+  for(const feed of await sourceHealth(env,user)){
+    if(feed.stale || feed.state==='partial' || feed.state==='failed')L.push(feed.name+': данные неполны. Последняя подтверждённая дата: '+(feed.last_period || 'нет данных')+'.');
+  }
   const regText = reg.map((r) => `${r.id} — ${r.name}: ${r.definition}`).join("\n");
   const knowText = know.map((r) => `### ${r.title}\n${r.text}`).join("\n\n");
   return { data: L.join("\n"), reg: regText, know: knowText };

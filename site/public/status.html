@@ -48,6 +48,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}.sub{color:var(--dim);
 <div class="pane">
 <header><div><h1>Штаб · Витрина показателей</h1><p class="sub">что собрано и когда: прогоны сборщиков и покрытие по показателям</p></div><div class="spacer"></div></header>
 <main>
+  <div class="card"><h2>Состояние источников</h2><div id="source-t" class="sub">загрузка…</div></div>
   <div class="card"><h2>Последние прогоны</h2><div id="runs-t" class="sub">загрузка…</div></div>
   <div class="card"><h2>Покрытие по показателям</h2><div id="cov-t" class="sub">загрузка…</div></div>
   <div class="card"><h2>Последние 14 дней</h2><div id="week-t" class="sub">загрузка…</div></div>
@@ -69,6 +70,9 @@ function table(rows,cols){return '<table><thead><tr>'+cols.map(function(c){retur
   +rows.map(function(r){return '<tr>'+cols.map(function(c){var v=r[c[1]];return '<td class="'+(typeof v==="number"?"num":"")+'">'+esc(v)+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table>'}
 api("/api/status").then(function(s){
   if(!s.ok){document.getElementById("runs-t").innerHTML='<span class="err">нет доступа: '+esc(s.error)+'</span>';return}
+  var names={running:"собирается",success:"готово",failed:"ошибка",partial:"неполно",skipped:"не настроен",empty:"нет данных"};
+  var health=(s.sources||[]).map(function(x){return Object.assign({},x,{label:names[x.state]+(x.stale?" · данные устарели":"")});});
+  document.getElementById("source-t").innerHTML=health.length?table(health,[["источник","name"],["состояние","label"],["проверяемая дата","period"],["последние полные данные по","last_period"],["последний успех","last_success"],["причина","detail"]]):"Сборщики ещё не передали состояние.";
   document.getElementById("runs-t").innerHTML=s.runs.length?table(s.runs,[["сборщик","collector"],["начало","started"],["конец","finished"],["точек","points"],["заметка","note"]]):"прогонов ещё не было";
   document.getElementById("cov-t").innerHTML=s.coverage.length?table(s.coverage,[["показатель","metric"],["тип","ptype"],["точек","n"],["с","first"],["по","last"],["снимок","asof"],["обновлено","updated"]]):"точек ещё нет";
   var to=new Date();to.setDate(to.getDate()-1);var from=new Date(to);from.setDate(from.getDate()-13);

@@ -21,6 +21,7 @@ import {teamOf,cleanDue} from '../site/functions/api/tasks/_tasks.js';
 import {cleanDate} from '../site/functions/api/hr/_hr.js';
 import {safeReturn} from '../site/functions/api/_return-to.js';
 import {withAiSlot} from '../site/functions/api/_quota.js';
+import * as sourceStatus from '../site/functions/api/source-status.js';
 import * as leave from '../site/functions/api/hr/leave.js';
 import * as structure from '../site/functions/api/hr/structure.js';
 import * as prep from '../site/functions/api/prep.js';
@@ -297,6 +298,14 @@ test('P2-10 points never report a truncated response as complete',async()=>{
   const last=await(await get('&page=10001&page_size=2')).json();assert.deepEqual(last.rows.map(r=>r.value),[20001]);assert.equal(last.has_more,false);
 });
 const paid=(id)=>({id,created_at:100,price:id});
+test('P2-18 partial collection retains its last successful date and failed auditing emits a technical signal',async()=>{
+  const e=env();const record=(state,period,attempt)=>sourceStatus.onRequestPost({request:request('/api/source-status',{source:'deals',state,period,attempt},{auth:'collector'}),env:e});
+  await record('success','2026-11-01','2026-11-02T05:00:00Z');await record('partial','2026-11-02','2026-11-03T05:00:00Z');await record('success','2026-10-31','2026-11-01T05:00:00Z');
+  const body=await(await sourceStatus.onRequestGet({request:request('/api/source-status'),env:e})).json();assert.equal(body.sources[0].state,'partial');assert.equal(body.sources[0].last_period,'2026-11-01');
+  const messages=[], original=console.error;e.sqlite.exec('DROP TABLE audit');console.error=(...args)=>messages.push(args);
+  try{await lib.audit(e,'reader','test','private-value');}finally{console.error=original;}
+  assert.match(JSON.stringify(messages),/audit_write_failed/);assert(!JSON.stringify(messages).includes('private-value'));
+});
 test('P2-17 login rate limit expires; AI concurrency and global token budgets stop extra provider calls',async()=>{
   const e=env();e.LOGIN_ATTEMPTS='2';
   const login=()=>onRequest({request:new Request('https://audit.invalid/__login',{method:'POST',body:new URLSearchParams({login:'reader',password:'wrong'})}),env:e,next:()=>new Response('unused')});

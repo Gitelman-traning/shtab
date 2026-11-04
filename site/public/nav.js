@@ -237,3 +237,19 @@
     });
   }).catch(function () {});
 })();
+
+// Предупреждение о неполной загрузке рядом с показателями, без раскрытия закрытых источников.
+(function(){
+  var path=location.pathname, ids=path==="/" || path==="/shtab" ? ["deals","participants","plans"] :
+    path.startsWith("/sales/l1") ? ["deals","activity"] : path.startsWith("/sales/l2") ? ["deals","participants"] :
+    path.startsWith("/marketing/site/") ? ["deals","metrika","ads","articles","gsc","webmaster"] :
+    path.startsWith("/marketing/") ? ["deals"] : [];
+  var host=document.querySelector("main");if(!ids.length || !host)return;
+  fetch("/api/source-status",{credentials:"same-origin"}).then(function(r){if(!r.ok)throw Error();return r.json();}).then(function(data){
+    var problems=(data.sources||[]).filter(function(s){return ids.includes(s.source) && (s.stale || s.state==="failed" || s.state==="partial");});
+    if(!problems.length)return;
+    var note=document.createElement("p");note.className="note";note.setAttribute("role","status");
+    note.textContent=problems.map(function(s){return s.name+" — данные неполны. Последняя подтверждённая дата: "+(s.last_period || "нет данных")+".";}).join(" ");
+    host.prepend(note);
+  }).catch(function(){/* основная страница остаётся доступной */});
+})();

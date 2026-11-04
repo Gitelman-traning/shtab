@@ -37,13 +37,14 @@ CHECKS = {
 }
 
 
-def articles_points(day, log=print):
+def articles_points(day, log=print, on_issue=None):
     points, d = [], day.isoformat()
     for key, url in SITEMAPS.items():
         try:
             r = requests.get(url, timeout=30)
             r.raise_for_status()
         except Exception as e:      # один сайт недоступен — остальные всё равно считаем
+            if on_issue: on_issue("partial")
             log("статьи %s: ошибка %s" % (key, e))
             continue
         locs = [u.strip() for u in re.findall(r"<loc>([^<]+)</loc>", r.text)]
@@ -54,6 +55,7 @@ def articles_points(day, log=print):
             try:
                 h = requests.get(u, timeout=30).text
             except Exception as e:
+                if on_issue: on_issue("partial")
                 log("статьи %s: %s не открылась (%s)" % (key, u, e))
                 continue
             checked += 1

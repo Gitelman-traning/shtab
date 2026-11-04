@@ -61,10 +61,11 @@ def _rows(token, counter, dims, metrics, d1, d2, filters=""):
         offset += 10000
 
 
-def metrika_points(day_from, day_to, log=print):
+def metrika_points(day_from, day_to, log=print, on_issue=None):
     token = os.environ.get("METRIKA_TOKEN", "").strip()
     counters = os.environ.get("METRIKA_COUNTERS", "").strip()
     if not token or not counters:
+        if on_issue: on_issue("skipped")
         log("Метрика: METRIKA_TOKEN / METRIKA_COUNTERS не заданы — пропуск")
         return []
     counters = dict(DEFAULT_COUNTERS, **json.loads(counters))
@@ -76,6 +77,7 @@ def metrika_points(day_from, day_to, log=print):
         try:
             points.extend(_counter_points(token, key, cid, day_from, day_to, log, filters.get(key, "")))
         except Exception as e:      # один недоступный счётчик не роняет остальные
+            if on_issue: on_issue("partial")
             log("Метрика %s (%s): ошибка %s" % (key, cid, e))
     return points
 

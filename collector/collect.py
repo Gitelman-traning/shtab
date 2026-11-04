@@ -77,6 +77,10 @@ def google_service(name, version, credentials):
     return build(name, version, credentials=credentials, cache_discovery=False)
 
 
+class CoverageError(ValueError):
+    pass
+
+
 def monthly_report(service, credentials, day_to):
     """Choose the matching monthly report and verify the exporter's own coverage marker."""
     base_id = LAYOUT["sheet_id"]
@@ -84,7 +88,7 @@ def monthly_report(service, credentials, day_to):
         return service.get(spreadsheetId=file_id, fields="properties/title").execute()["properties"]["title"]
     base_title = title(base_id)
     if not re.match(r"^\d{2}\.\d{2}\b", base_title):
-        raise ValueError("В названии базового отчёта нет месяца; публикация остановлена")
+        raise CoverageError("В названии базового отчёта нет месяца; публикация остановлена")
     expected = day_to.strftime("%m.%y") + base_title[5:]
     selected = os.environ.get("REPORT_SHEET_ID") or base_id
     current_title = base_title if selected == base_id else title(selected)
@@ -93,15 +97,15 @@ def monthly_report(service, credentials, day_to):
         escaped = expected.replace("\\", "\\\\").replace("'", "\\'")
         matches = drive.files().list(q="trashed = false and mimeType = 'application/vnd.google-apps.spreadsheet' and name = '" + escaped + "'", fields="nextPageToken,files(id)", pageSize=2, includeItemsFromAllDrives=True, supportsAllDrives=True).execute()
         if matches.get("nextPageToken") or len(matches.get("files", [])) != 1:
-            raise ValueError("Не найден единственный отчёт за " + day_to.strftime("%m.%Y") + "; проверьте REPORT_SHEET_ID")
+            raise CoverageError("Не найден единственный отчёт за " + day_to.strftime("%m.%Y") + "; проверьте REPORT_SHEET_ID")
         selected = matches["files"][0]["id"]
     marker_range = os.environ.get("REPORT_STAMP_RANGE")
     if not marker_range:
-        raise ValueError("Не задан REPORT_STAMP_RANGE с отметкой export_date исходной выгрузки")
+        raise CoverageError("Не задан REPORT_STAMP_RANGE с отметкой export_date исходной выгрузки")
     marker = read(service.values(), selected, marker_range)
     dates = [parse_date(r[1]) for r in marker if len(r) >= 2 and r[0] == 'export_date']
     if len(dates) != 1 or dates[0] is None or dates[0] < day_to:
-        raise ValueError("Выгрузка не подтверждает данные по " + day_to.isoformat() + "; публикация остановлена")
+        raise CoverageError("Выгрузка не подтверждает данные по " + day_to.isoformat() + "; публикация остановлена")
     log("месячный отчёт %s, выгрузка по %s" % (day_to.strftime("%m.%Y"), dates[0]))
     return selected
 
@@ -131,7 +135,7 @@ def deal_points(values, day_from, day_to):
     lead_funnel = L["lead_funnel"]
     prefix = L["first_line_prefix"]
     if not any(cell(r, c['funnel']) == lead_funnel and parse_date(cell(r, c['lead_date'])) for r in rows):
-        raise ValueError("Нет распознаваемых сделок целевой воронки; публикация остановлена")
+        raise CoverageError("Нет распознаваемых сделок целевой воронки; публикация остановлена")
 
     def in_range(d):
         return d is not None and day_from <= d <= day_to
@@ -455,6 +459,36 @@ def send(points, note, plans=None):
         log("отправлено %d/%d (записано %s)" % (min(i + 500, total), total, res.get("written")))
 
 
+def run_feed(source, period, producer, report, publish):
+    """Публикуем только проверенный источник. Последняя успешная дата переживает частичный сбой."""
+    issues = []
+    report(source, 'running', '')
+    try:
+        points, plans = producer(issues.append)
+    except Exception as exc:
+        report(source, 'failed', str(exc) if isinstance(exc, CoverageError) else 'Ошибка чтения: ' + type(exc).__name__)
+        return 'failed'
+    if points or plans:
+        try:
+            publish(points, '%s · %s' % (source, period), plans)
+        except Exception as exc:
+            report(source, 'partial', 'Ошибка записи: ' + type(exc).__name__)
+            return 'partial'
+    if 'partial' in issues or 'failed' in issues:
+        state = 'partial' if points or plans else 'failed'
+        report(source, state, 'Часть данных источника не получена')
+    elif 'skipped' in issues:
+        state = 'skipped'
+        report(source, state, 'Источник не настроен')
+    elif not points and not plans:
+        state = 'empty'
+        report(source, state, 'Источник не вернул показателей')
+    else:
+        state = 'success'
+        report(source, state, '')
+    return state
+
+
 def main():
     missing = [n for n, v in [("LAYOUT_JSON", LAYOUT), ("SHTAB_URL", URL), ("SHTAB_TOKEN", TOKEN)] if not v]
     if missing or not (SA_JSON or SA_FILE):
@@ -467,52 +501,54 @@ def main():
 
     if day_from > day_to or day_to >= today:
         raise ValueError("Нужен законченный период до вчерашнего дня включительно")
-    credentials = sheet_credentials()
-    service = google_service("sheets", "v4", credentials).spreadsheets()
-    LAYOUT['sheet_id'] = monthly_report(service, credentials, day_to)
-    values = service.values()
+    attempt = dt.datetime.now(dt.timezone.utc).isoformat()
+    historical = day_to < today - dt.timedelta(days=1)
+    def report(source, state, detail):
+        log('%s: %s %s' % (source, state, detail))
+        if not historical:
+            post('/api/source-status', dict(source=source, state=state, detail=detail, period=day_to.isoformat(), attempt=attempt))
+
+    values, sheet_error = None, None
+    try:
+        credentials = sheet_credentials()
+        service = google_service("sheets", "v4", credentials).spreadsheets()
+        LAYOUT['sheet_id'] = monthly_report(service, credentials, day_to)
+        values = service.values()
+    except Exception as exc:
+        sheet_error = exc
+    def verified_sheet():
+        if sheet_error is not None:
+            raise sheet_error
+        return values
     if SYNC_METRICS:
         here = os.path.dirname(os.path.abspath(__file__))
-        reg = json.load(io.open(os.path.join(here, "..", "metrics.json"), encoding="utf-8"))
+        reg = json.load(io.open(os.path.join(here, "metrics.json"), encoding="utf-8"))
         log("реестр: %s" % post("/api/metrics", reg))
-
-    pts = deal_points(values, day_from, day_to)
-    log("точек по сделкам: %d" % len(pts))
-    if os.environ.get('DEALS_ONLY') == '1':
-        pts = [p for p in pts if p['ptype'] == 'day' or day_from.strftime('%Y-%m') <= p['period'] <= day_to.strftime('%Y-%m')]
-        send(pts, 'пересчёт сделок %s—%s' % (day_from, day_to))
-        return
-    pp = participants_points(values, today)
-    log("точек по участникам: %d" % len(pp))
-    ap = activity_points(values, day_from, day_to)
-    try:
+    only = os.environ.get('DEALS_ONLY') == '1'
+    def deals(issue):
+        pts = deal_points(verified_sheet(), day_from, day_to)
+        if only:
+            pts = [p for p in pts if p['ptype'] == 'day' or day_from.strftime('%Y-%m') <= p['period'] <= day_to.strftime('%Y-%m')]
+        return pts, []
+    feeds = [('deals', deals)]
+    if not only:
         from metrika import metrika_points
-        mp = metrika_points(day_from, day_to, log)
-    except Exception as e:      # Метрика не должна ронять весь сбор
-        log("Метрика: ошибка %s" % e)
-        mp = []
-    try:
         from gads import gads_points
-        gp = gads_points(day_from, day_to, log)
-    except Exception as e:      # реклама тоже не роняет сбор
-        log("Google Ads: ошибка %s" % e)
-        gp = []
-    try:
         from articles import articles_points
-        sp = articles_points(day_to, log)
-    except Exception as e:      # и счёт статей тоже
-        log("статьи: ошибка %s" % e)
-        sp = []
-    sr = []
-    for name, fn in (("Search Console", "gsc_points"), ("Вебмастер", "webmaster_points")):
-        try:
-            import serp
-            sr += getattr(serp, fn)(day_from, day_to, log)
-        except Exception as e:  # выдача тоже не роняет сбор
-            log("%s: ошибка %s" % (name, e))
-    ap = ap + mp + gp + sp + sr
-    fp, plans = plan_points(values, today)
-    send(pts + pp + ap + fp, "период %s—%s" % (day_from, day_to), plans)
+        from serp import gsc_points, webmaster_points
+        feeds.extend([
+            ('participants', lambda issue: (participants_points(verified_sheet(), today), [])),
+            ('activity', lambda issue: (activity_points(verified_sheet(), day_from, day_to), [])),
+            ('plans', lambda issue: plan_points(verified_sheet(), today)),
+            ('metrika', lambda issue: (metrika_points(day_from,day_to,log,on_issue=issue), [])),
+            ('ads', lambda issue: (gads_points(day_from,day_to,log,on_issue=issue), [])),
+            ('articles', lambda issue: (articles_points(day_to,log,on_issue=issue), [])),
+            ('gsc', lambda issue: (gsc_points(day_from,day_to,log,on_issue=issue), [])),
+            ('webmaster', lambda issue: (webmaster_points(day_from,day_to,log,on_issue=issue), [])),
+        ])
+    states=[run_feed(name,day_to,producer,report,send) for name,producer in feeds]
+    if any(state in ('partial','failed') for state in states):
+        raise SystemExit('Часть источников не собрана. Подробности на странице статуса Штаба.')
     log("ГОТОВО")
 
 

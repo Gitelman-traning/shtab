@@ -26,10 +26,11 @@ def _access_token():
     return r.json()["access_token"]
 
 
-def gads_points(day_from, day_to, log=print):
+def gads_points(day_from, day_to, log=print, on_issue=None):
     need = ["GADS_DEVELOPER_TOKEN", "GADS_CLIENT_ID", "GADS_CLIENT_SECRET", "GADS_REFRESH_TOKEN", "GADS_CUSTOMER_ID"]
     missing = [n for n in need if not os.environ.get(n, "").strip()]
     if missing:
+        if on_issue: on_issue("skipped")
         log("Google Ads: не заданы %s — пропуск" % ", ".join(missing))
         return []
     cid = os.environ["GADS_CUSTOMER_ID"].replace("-", "").strip()

@@ -200,7 +200,7 @@ export async function audit(env, login, action, target = "", note = "") {
   try {
     await env.DB.prepare("INSERT INTO audit (at, login, action, target, note) VALUES (?,?,?,?,?)")
       .bind(now(), login || "?", action, String(target || "").slice(0, 120), String(note || "").slice(0, 400)).run();
-  } catch (e) { /* журнал не должен ломать действие */ }
+  } catch (e) { console.error('shtab.audit_write_failed',{action:String(action).slice(0,60),type:e?.name || 'Error'}); }
 }
 
 // ---------- модель (тот же провайдер, что у «вопроса по встрече») ----------
