@@ -1,9 +1,10 @@
+import { safeReturn } from "./api/_return-to.js";
 /** Персональный вход по паролю или Telegram; общий пароль и публичный setup отключены. */
 
 import { changePassword } from "./api/me.js";
 import { beginLogin, redeemCode } from "./api/_tg-login.js";
 import { loadSecrets } from "./_secrets.js";
-import { currentUser, createSession, dropSession, verifyPassword, hashPassword, randomId, audit, tgVerify, tgSend, tgRequestAccess, now, level, sectionOf } from "./api/_lib.js";
+import { getCookie, currentUser, createSession, dropSession, verifyPassword, hashPassword, randomId, audit, tgVerify, tgSend, tgRequestAccess, now, level, sectionOf } from "./api/_lib.js";
 
 const RE_LOGIN = /^[a-z0-9._-]{3,32}$/;
 
@@ -61,7 +62,12 @@ const STYLE = `<link rel="preconnect" href="https://fonts.googleapis.com">
   .tgbtn:hover{background:#1c9ad8}
 </style>`;
 
-function page({ message, tgBot }) {
+function returnField(target) {
+  const escaped=safeReturn(target).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  return `<input id="return-to" type="hidden" name="returnTo" value="${escaped}"><script>(function(){var el=document.getElementById("return-to");if(!location.pathname.startsWith("/__"))el.value=location.pathname+location.search+location.hash;else if(location.hash&&!el.value.includes("#"))el.value+=location.hash;document.cookie="__Host-shtab_return="+encodeURIComponent(el.value)+"; Path=/; Max-Age=600; Secure; SameSite=Lax";})();</script>`;
+}
+
+function page({ message, tgBot, returnTo="/" }) {
   const title = "Вход";
   const hint = "Страница закрыта: внутри данные компании. Входите по своему логину и паролю или через Telegram.";
   const action = "/__login";
@@ -74,6 +80,7 @@ function page({ message, tgBot }) {
 <title>Штаб · Вход</title>
 ${STYLE}</head><body>
 <form method="POST" action="${action}">
+  ${returnField(returnTo)}
   <div class="mark">12</div>
   <h1>Штаб · ${title}</h1>
   ${note}
@@ -91,12 +98,12 @@ ${STYLE}</head><body>
     // код живёт в sessionStorage: мобильный браузер, пока человек в Telegram, может перезагрузить вкладку — она продолжит ждать тот же код
     function keep(c){ try{ c?sessionStorage.setItem("tgcode",c):sessionStorage.removeItem("tgcode"); }catch(e){} }
     function setCode(c){ code=c||""; keep(code); if(code) btn.href="https://t.me/"+bot+"?start="+code; }
-    function fresh(){ return fetch("/__tglink",{method:"POST"}).then(function(r){return r.json()}).then(function(d){ setCode(d.code); }).catch(function(){}); }
+    function fresh(){ return fetch("/__tglink?returnTo="+encodeURIComponent(document.getElementById("return-to").value),{method:"POST"}).then(function(r){return r.json()}).then(function(d){ setCode(d.code); }).catch(function(){}); }
     function start(ms){ clearInterval(timer); timer=setInterval(poll,ms||2500); }
     function poll(){
       if(!code) return;
       fetch("/__tglink?code="+code).then(function(r){return r.json()}).then(function(d){
-        if(d.status==="ok"){ clearInterval(timer); keep(""); st.textContent="Готово, открываем Штаб…"; location.href="/shtab"; return; }
+        if(d.status==="ok"){ clearInterval(timer); keep(""); st.textContent="Готово, открываем Штаб…"; location.href=d.returnTo||"/"; return; }
         // заявка ждёт администратора: продолжаем опрашивать — после подтверждения вкладка войдёт сама
         if(d.status==="pending"){ st.textContent="Заявка отправлена. Как только администратор подтвердит доступ, эта вкладка откроет Штаб сама — держите её открытой."; if(!slow){ slow=1; start(10000); } return; }
         if(d.status==="expired"){ clearInterval(timer); timer=0; st.textContent="Код устарел, нажмите кнопку ещё раз."; fresh(); return; }
@@ -130,6 +137,7 @@ function html(body, status = 200) {
 export async function onRequest(context) {
   const { request, env, next } = context;
   const url = new URL(request.url);
+  let returnTo=safeReturn(url.pathname.startsWith("/__") ? url.searchParams.get("returnTo") || getCookie(request,"__Host-shtab_return") : url.pathname+url.search+url.hash);
   await loadSecrets(env, context);   // секреты из Doppler (если задан DOPPLER_TOKEN) — для всех маршрутов, включая /api/*
   // старый адрес okk-dashboard.pages.dev: всех, кроме координатора, переводим на новый сайт (решение Никиты 05.10.2026)
   const OLD_HOST = "okk-dashboard.pages.dev", NEW_SITE = env.SITE_URL || "https://shtab-20v.pages.dev";
@@ -147,18 +155,18 @@ export async function onRequest(context) {
 
   if (url.pathname === "/__password") {
     const user = await currentUser(request,env,true);
-    if (!user) return html(page({tgBot:env.TG_BOT_NAME,message:"Войдите для смены пароля."}),401);
+    if (!user) return html(page({returnTo,tgBot:env.TG_BOT_NAME,message:"Войдите для смены пароля."}),401);
     const passwordSet = await env.DB.prepare("SELECT pass_hash != '' AS present FROM users WHERE login=?").bind(user.login).first();
     let error="", status=200;
     if (request.method === "POST") {
       const form=await request.formData();
       const result=await changePassword(request,env,{password:form.get("password"),new_password:form.get("new_password")});
-      if (result.ok) return new Response(null,{status:303,headers:{Location:"/","Set-Cookie":result.headers.get("Set-Cookie"),"Cache-Control":"no-store"}});
+      if (result.ok) return new Response(null,{status:303,headers:{Location:safeReturn(form.get("returnTo") || returnTo),"Set-Cookie":result.headers.get("Set-Cookie"),"Cache-Control":"no-store"}});
       error=(await result.json()).error;status=result.status;
     }
-    return html(`<!doctype html><html lang="ru"><meta charset=utf-8><meta name="viewport" content="width=device-width,initial-scale=1"><title>Штаб · Смена пароля</title>${STYLE}<form method="post"><h1>Смена пароля</h1><p class="hint">${user.must_change ? "Замените временный пароль, чтобы открыть Штаб." : "После смены пароля другие устройства выйдут из аккаунта."}</p>${error ? '<p class="err">'+error+'</p>' : ''}${passwordSet.present ? '<label>Текущий пароль<input name="password" type="password" required autocomplete="current-password"></label>' : ''}<label>Новый пароль<input name="new_password" type="password" required minlength="8" maxlength="1024" autocomplete="new-password"></label><button>Сохранить пароль</button><a href="/__logout">Выйти</a></form></html>`,status);
+    return html(`<!doctype html><html lang="ru"><meta charset=utf-8><meta name="viewport" content="width=device-width,initial-scale=1"><title>Штаб · Смена пароля</title>${STYLE}<form method="post">${returnField(returnTo)}<h1>Смена пароля</h1><p class="hint">${user.must_change ? "Замените временный пароль, чтобы открыть Штаб." : "После смены пароля другие устройства выйдут из аккаунта."}</p>${error ? '<p class="err">'+error+'</p>' : ''}${passwordSet.present ? '<label>Текущий пароль<input name="password" type="password" required autocomplete="current-password"></label>' : ''}<label>Новый пароль<input name="new_password" type="password" required minlength="8" maxlength="1024" autocomplete="new-password"></label><button>Сохранить пароль</button><a href="/__logout">Выйти</a></form></html>`,status);
   }
-  if (url.pathname === "/__setup") return html(page({ tgBot: env.TG_BOT_NAME, message: "Общий вход отключён. Войдите под личным аккаунтом." }), 410);
+  if (url.pathname === "/__setup") return html(page({returnTo, tgBot: env.TG_BOT_NAME, message: "Общий вход отключён. Войдите под личным аккаунтом." }), 410);
   // тело читаем только у форм входа: иначе запрос уйдёт дальше уже «пустым»
   const isForm = request.method === "POST" &&
     (url.pathname === "/__login" || url.pathname === "/__register");
@@ -166,6 +174,7 @@ export async function onRequest(context) {
   let value = "", login = "", reg = null;
   if (isForm) {
     const form = await request.formData();
+    returnTo=safeReturn(form.get("returnTo") || returnTo);
     value = String(form.get("password") || "");
     login = String(form.get("login") || "").trim().toLowerCase();
     if (url.pathname === "/__register") reg = { name: String(form.get("name") || "").trim().slice(0, 80), password2: String(form.get("password2") || "") };
@@ -191,7 +200,7 @@ export async function onRequest(context) {
       .bind(login, await hashPassword(value, salt), salt, reg.name, now()).run();
     await audit(env, login, "register", login, reg.name);
     await tgSend(env, env.TG_ADMIN_CHAT, "Штаб: заявка на доступ — " + reg.name + " (" + login + "). Подтвердить: " + url.origin + "/users");
-    return html(page({ tgBot: env.TG_BOT_NAME, message: "Заявка отправлена. Когда администратор подтвердит доступ, входите с этим логином и паролем." }), 202);
+    return html(page({returnTo, tgBot: env.TG_BOT_NAME, message: "Заявка отправлена. Когда администратор подтвердит доступ, входите с этим логином и паролем." }), 202);
   }
 
   // выход: снимаем и общую cookie, и именную сессию
@@ -203,7 +212,7 @@ export async function onRequest(context) {
   if (url.pathname === "/__tglink") {
     if (!env.TG_BOT_TOKEN || !env.DB) return jsonResp({ status: "off" }, 503);
     if (request.method === "POST") {
-      const grant = await beginLogin(env, request);
+      const grant = await beginLogin(env, request,returnTo);
       return jsonResp({ code: grant.code }, 200, { "Set-Cookie": grant.cookie });
     }
     if (request.method !== "GET") return jsonResp({ status: "invalid" }, 405);
@@ -211,47 +220,47 @@ export async function onRequest(context) {
     const result = await redeemCode(env, request, url.searchParams.get(direct ? "go" : "code") || "", direct);
     const headers = { "Cache-Control": "no-store" };
     if (result.cookie) headers["Set-Cookie"] = result.cookie;
-    if (direct) return new Response(null, {status:303, headers:{...headers, Location:result.returnTo || "/"}});
+    if (direct) return new Response(null, {status:303, headers:{...headers, Location:safeReturn(result.returnTo)}});
     return jsonResp({status:result.status, returnTo:result.returnTo}, 200, headers);
   }
 
   // вход через Telegram: виджет возвращает сюда подписанные данные аккаунта
   if (url.pathname === "/__tg") {
-    if (!env.TG_BOT_TOKEN || !env.DB) return html(page({ tgBot: env.TG_BOT_NAME, message: "Вход через Telegram не настроен." }), 503);
+    if (!env.TG_BOT_TOKEN || !env.DB) return html(page({returnTo, tgBot: env.TG_BOT_NAME, message: "Вход через Telegram не настроен." }), 503);
     const tg = await tgVerify(url.searchParams, env.TG_BOT_TOKEN);
-    if (!tg) return html(page({ tgBot: env.TG_BOT_NAME, message: "Подпись Telegram не сошлась или устарела. Попробуйте ещё раз." }), 403);
+    if (!tg) return html(page({returnTo, tgBot: env.TG_BOT_NAME, message: "Подпись Telegram не сошлась или устарела. Попробуйте ещё раз." }), 403);
     const req = await tgRequestAccess(env, tg, url.origin);
     if (req.status === "created") {
-      return html(page({ tgBot: env.TG_BOT_NAME, message: "Заявка отправлена. Администратор подтвердит доступ, и вы сможете войти этой же кнопкой." }), 202);
+      return html(page({returnTo, tgBot: env.TG_BOT_NAME, message: "Заявка отправлена. Администратор подтвердит доступ, и вы сможете войти этой же кнопкой." }), 202);
     }
     if (req.status === "pending") {
-      return html(page({ tgBot: env.TG_BOT_NAME, message: "Заявка ещё не подтверждена. Мы напишем в Telegram, когда доступ откроют." }), 403);
+      return html(page({returnTo, tgBot: env.TG_BOT_NAME, message: "Заявка ещё не подтверждена. Мы напишем в Telegram, когда доступ откроют." }), 403);
     }
     const row = { login: req.login };
     await env.DB.prepare("UPDATE users SET tg_username = ?, photo = ? WHERE login = ?").bind(tg.username || "", tg.photo_url || "", row.login).run();
     const s = await createSession(env, row.login);
-    if (!s) return html(page({message:"Срок доступа истёк. Обратитесь к администратору."}),403);
+    if (!s) return html(page({returnTo,message:"Срок доступа истёк. Обратитесь к администратору."}),403);
     await audit(env, row.login, "login.tg");
-    return new Response(null, { status: 303, headers: { Location: "/shtab", "Set-Cookie": s.cookie, "Cache-Control": "no-store" } });
+    return new Response(null, { status: 303, headers: { Location: returnTo, "Set-Cookie": s.cookie, "Cache-Control": "no-store" } });
   }
 
   // именной пользователь: проверяем только базу пользователей, сессия в cookie shtab_s
   if (posted && url.pathname === "/__login") {
     const row = env.DB ? await env.DB.prepare("SELECT login, pass_hash, salt, active, role,must_change,temp_expires FROM users WHERE login = ?").bind(login).first() : null;
     if (row && row.role === "pending" && await verifyPassword(value, row.salt, row.pass_hash)) {
-      return html(page({ tgBot: env.TG_BOT_NAME, message: "Заявка ещё не подтверждена администратором. Попробуйте позже." }), 403);
+      return html(page({returnTo, tgBot: env.TG_BOT_NAME, message: "Заявка ещё не подтверждена администратором. Попробуйте позже." }), 403);
     }
     if (!row || !row.active || !(await verifyPassword(value, row.salt, row.pass_hash))) {
       await audit(env, login, "login.fail");
-      return html(page({ tgBot: env.TG_BOT_NAME, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
+      return html(page({returnTo, tgBot: env.TG_BOT_NAME, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
     }
     const s = await createSession(env, row.login, row.pass_hash);
-    if (!s) return html(page({message:"Срок доступа истёк. Обратитесь к администратору."}),403);
+    if (!s) return html(page({returnTo,message:"Срок доступа истёк. Обратитесь к администратору."}),403);
     await audit(env, row.login, "login");
-    return new Response(null, { status: 303, headers: { Location: "/shtab", "Set-Cookie": s.cookie, "Cache-Control": "no-store" } });
+    return new Response(null, { status: 303, headers: { Location: returnTo, "Set-Cookie": s.cookie, "Cache-Control": "no-store" } });
   }
   const personal = env.DB ? await currentUser(request, env,true) : null;
-  if (personal?.must_change) return new Response(null,{status:303,headers:{Location:"/__password","Cache-Control":"no-store"}});
+  if (personal?.must_change) return new Response(null,{status:303,headers:{Location:"/__password?returnTo="+encodeURIComponent(returnTo),"Cache-Control":"no-store"}});
   if (personal) {
     const sec = sectionOf(url.pathname);
     if (sec && level(personal, sec) === 0) {
@@ -265,5 +274,5 @@ export async function onRequest(context) {
     return out;
   }
 
-  return html(page({ tgBot: env.TG_BOT_NAME, message: "" }), 401);
+  return html(page({returnTo, tgBot: env.TG_BOT_NAME, message: "" }), 401);
 }

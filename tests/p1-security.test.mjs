@@ -18,6 +18,7 @@ import * as me from '../site/functions/api/me.js';
 import * as okna from '../site/functions/api/okna.js';
 import {teamOf,cleanDue} from '../site/functions/api/tasks/_tasks.js';
 import {cleanDate} from '../site/functions/api/hr/_hr.js';
+import {safeReturn} from '../site/functions/api/_return-to.js';
 import * as leave from '../site/functions/api/hr/leave.js';
 import * as structure from '../site/functions/api/hr/structure.js';
 import * as prep from '../site/functions/api/prep.js';
@@ -294,6 +295,13 @@ test('P2-10 points never report a truncated response as complete',async()=>{
   const last=await(await get('&page=10001&page_size=2')).json();assert.deepEqual(last.rows.map(r=>r.value),[20001]);assert.equal(last.has_more,false);
 });
 const paid=(id)=>({id,created_at:100,price:id});
+test('P2-14 password login returns to the original task; external and normalized redirects are refused',async()=>{
+  const dest='/tasks/?filter=mine#task-123';assert.equal(safeReturn(dest),dest);
+  for(const bad of ['https://evil.invalid','//evil.invalid','/a/..//evil.invalid','/%2fevil.invalid','/\\evil.invalid','/__logout','/api/users'])assert.equal(safeReturn(bad),'/');
+  const e=env();e.sqlite.prepare("UPDATE users SET salt='s',pass_hash=?").run(await lib.hashPassword('test-password','s'));
+  const req=new Request('https://audit.invalid/__login',{method:'POST',body:new URLSearchParams({login:'reader',password:'test-password',returnTo:dest})});
+  const r=await onRequest({request:req,env:e,next:async()=>new Response('unused')});assert.equal(r.headers.get('location'),dest);
+});
 test('P2-13 calendar validation covers leap years and rejects invalid HR fields before any write',async()=>{
   for(const d of ['2026-02-31','1900-02-29','2026-04-31','2026-99-01'])assert.equal(cleanDate(d,false),null);
   for(const d of ['2000-02-29','2024-02-29','--02-29'])assert.equal(cleanDate(d,true),d);
