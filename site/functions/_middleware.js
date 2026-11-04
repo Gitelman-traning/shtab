@@ -1,5 +1,6 @@
 /** Персональный вход по паролю или Telegram; общий пароль и публичный setup отключены. */
 
+import { changePassword } from "./api/me.js";
 import { beginLogin, redeemCode } from "./api/_tg-login.js";
 import { loadSecrets } from "./_secrets.js";
 import { currentUser, createSession, dropSession, verifyPassword, hashPassword, randomId, audit, tgVerify, tgSend, tgRequestAccess, now, level, sectionOf } from "./api/_lib.js";
@@ -144,6 +145,19 @@ export async function onRequest(context) {
   // проверка связи с АТС — скрытая страница без входа (23.10.2026): сотрудник открывает её по прямой ссылке
   if (/^\/pbx-check(\.html|\.js|\.css)?\/?$/.test(url.pathname)) return next();
 
+  if (url.pathname === "/__password") {
+    const user = await currentUser(request,env,true);
+    if (!user) return html(page({tgBot:env.TG_BOT_NAME,message:"Войдите для смены пароля."}),401);
+    const passwordSet = await env.DB.prepare("SELECT pass_hash != '' AS present FROM users WHERE login=?").bind(user.login).first();
+    let error="", status=200;
+    if (request.method === "POST") {
+      const form=await request.formData();
+      const result=await changePassword(request,env,{password:form.get("password"),new_password:form.get("new_password")});
+      if (result.ok) return new Response(null,{status:303,headers:{Location:"/","Set-Cookie":result.headers.get("Set-Cookie"),"Cache-Control":"no-store"}});
+      error=(await result.json()).error;status=result.status;
+    }
+    return html(`<!doctype html><html lang="ru"><meta charset=utf-8><meta name="viewport" content="width=device-width,initial-scale=1"><title>Штаб · Смена пароля</title>${STYLE}<form method="post"><h1>Смена пароля</h1><p class="hint">${user.must_change ? "Замените временный пароль, чтобы открыть Штаб." : "После смены пароля другие устройства выйдут из аккаунта."}</p>${error ? '<p class="err">'+error+'</p>' : ''}${passwordSet.present ? '<label>Текущий пароль<input name="password" type="password" required autocomplete="current-password"></label>' : ''}<label>Новый пароль<input name="new_password" type="password" required minlength="8" maxlength="1024" autocomplete="new-password"></label><button>Сохранить пароль</button><a href="/__logout">Выйти</a></form></html>`,status);
+  }
   if (url.pathname === "/__setup") return html(page({ tgBot: env.TG_BOT_NAME, message: "Общий вход отключён. Войдите под личным аккаунтом." }), 410);
   // тело читаем только у форм входа: иначе запрос уйдёт дальше уже «пустым»
   const isForm = request.method === "POST" &&
@@ -216,13 +230,14 @@ export async function onRequest(context) {
     const row = { login: req.login };
     await env.DB.prepare("UPDATE users SET tg_username = ?, photo = ? WHERE login = ?").bind(tg.username || "", tg.photo_url || "", row.login).run();
     const s = await createSession(env, row.login);
+    if (!s) return html(page({message:"Срок доступа истёк. Обратитесь к администратору."}),403);
     await audit(env, row.login, "login.tg");
     return new Response(null, { status: 303, headers: { Location: "/shtab", "Set-Cookie": s.cookie, "Cache-Control": "no-store" } });
   }
 
   // именной пользователь: проверяем только базу пользователей, сессия в cookie shtab_s
   if (posted && url.pathname === "/__login") {
-    const row = env.DB ? await env.DB.prepare("SELECT login, pass_hash, salt, active, role FROM users WHERE login = ?").bind(login).first() : null;
+    const row = env.DB ? await env.DB.prepare("SELECT login, pass_hash, salt, active, role,must_change,temp_expires FROM users WHERE login = ?").bind(login).first() : null;
     if (row && row.role === "pending" && await verifyPassword(value, row.salt, row.pass_hash)) {
       return html(page({ tgBot: env.TG_BOT_NAME, message: "Заявка ещё не подтверждена администратором. Попробуйте позже." }), 403);
     }
@@ -230,11 +245,13 @@ export async function onRequest(context) {
       await audit(env, login, "login.fail");
       return html(page({ tgBot: env.TG_BOT_NAME, message: "Логин или пароль не подошли. Попробуйте ещё раз." }), 401);
     }
-    const s = await createSession(env, row.login);
+    const s = await createSession(env, row.login, row.pass_hash);
+    if (!s) return html(page({message:"Срок доступа истёк. Обратитесь к администратору."}),403);
     await audit(env, row.login, "login");
     return new Response(null, { status: 303, headers: { Location: "/shtab", "Set-Cookie": s.cookie, "Cache-Control": "no-store" } });
   }
-  const personal = env.DB ? await currentUser(request, env) : null;
+  const personal = env.DB ? await currentUser(request, env,true) : null;
+  if (personal?.must_change) return new Response(null,{status:303,headers:{Location:"/__password","Cache-Control":"no-store"}});
   if (personal) {
     const sec = sectionOf(url.pathname);
     if (sec && level(personal, sec) === 0) {

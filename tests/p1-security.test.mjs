@@ -14,6 +14,7 @@ import * as view from '../site/functions/api/sections/[id]/view.js';
 import * as data from '../site/functions/api/sections/[id]/data.js';
 import * as versions from '../site/functions/api/sections/[id]/versions.js';
 import * as users from '../site/functions/api/users.js';
+import * as me from '../site/functions/api/me.js';
 import * as leave from '../site/functions/api/hr/leave.js';
 import * as structure from '../site/functions/api/hr/structure.js';
 import * as prep from '../site/functions/api/prep.js';
@@ -223,6 +224,23 @@ test('P2-7 server expiry and pending-account state cannot issue a session',async
   const e=env();const grant=await beginLogin(e,request('/__tglink'));assert(await reserveCode(e,grant.code,1234));
   const go=await confirmCode(e,grant.code,1234,false);assert.equal((await redeemCode(e,request('/'),go,true)).status,'pending');
   e.sqlite.exec("UPDATE tg_login_codes SET expires='2000-01-01'");assert.equal((await redeemCode(e,request('/'),go,true)).status,'expired');
+});
+test('P2-8 temporary password blocks pages/API, rotation revokes every previous device',async()=>{
+  const e=env();const hash=await lib.hashPassword('temporary-secret','salt');
+  e.sqlite.prepare("UPDATE users SET pass_hash=?,salt='salt',must_change=1,temp_expires='2099-01-01'").run(hash);
+  e.sqlite.exec("INSERT INTO sessions(id,login,expires) VALUES('device-two','reader','2099-01-01')");
+  assert.equal((await points.onRequestGet({request:request('/api/points?metric=l1.booked'),env:e})).status,401);
+  const page=await onRequest({request:request('/sales/l1/'),env:e,next:async()=>new Response('data')});assert.match(page.headers.get('location'),/^\/__password/);
+  const r=await me.onRequestPut({request:request('/api/me',{password:'temporary-secret',new_password:'personal-secret'},{method:'PUT'}),env:e});assert.equal(r.status,200);
+  const sessions=rows(e,'sessions');assert.equal(sessions.length,1);assert(!['device-two','fixture-session'].includes(sessions[0].id));
+  assert.equal(await lib.currentUser(request('/'),e),null);assert.equal(rows(e,'users')[0].must_change,0);
+  assert(await lib.currentUser(new Request('https://test.invalid/',{headers:{cookie:r.headers.get('set-cookie').split(';')[0]}}),e));
+});
+test('P2-8 expired temporary passwords and sessions cannot be used; Telegram-only can set a first password',async()=>{
+  const e=env();e.sqlite.exec("UPDATE users SET must_change=1,temp_expires='2000-01-01'");
+  assert.equal(await lib.createSession(e,'reader'),null);assert.equal(await lib.currentUser(request('/'),e,true),null);
+  e.sqlite.exec("UPDATE users SET must_change=0,tg_id=123");
+  assert.equal((await me.onRequestPut({request:request('/api/me',{new_password:'first-personal-password'},{method:'PUT'}),env:e})).status,200);
 });
 test('P1-4 section checks cover trailing slash and meeting endpoint',async()=>{
   const e=env({'sales.l2.okk':0});for(const path of ['/users/','/users.html','/__ask'])assert.equal((await onRequest({request:request(path),env:e,next:async()=>new Response('unexpected')})).status,403);

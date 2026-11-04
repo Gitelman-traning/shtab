@@ -1,6 +1,6 @@
 // GET /api/me — кто вошёл; PUT /api/me {password, new_password} — сменить свой пароль (только именные)
 // PATCH /api/me {notify: ["journal", …]} — свои уведомления в Telegram
-import { json, bad, canRead, currentUser, hashPassword, verifyPassword, randomId, audit, now, effectivePerms, NOTIFY, notifyList } from "./_lib.js";
+import { json, bad, canRead, currentUser, hashPassword, verifyPassword, randomId, audit, now, effectivePerms, NOTIFY, notifyList, sessionTicket, SESSION_COOKIE, getCookie } from "./_lib.js";
 
 export async function onRequestGet({ request, env }) {
   const user = await canRead(request, env);
@@ -33,17 +33,26 @@ export async function onRequestPatch({ request, env }) {
 }
 
 export async function onRequestPut({ request, env }) {
-  const user = await currentUser(request, env);
-  if (!user) return bad("сменить пароль может только именной пользователь", 401);
   let body;
   try { body = await request.json(); } catch (e) { return bad("тело не JSON"); }
+  return changePassword(request,env,body);
+}
+
+export async function changePassword(request,env,body) {
+  const user = await currentUser(request, env, true);
+  if (!user) return bad("сменить пароль может только именной пользователь", 401);
   const oldP = String(body.password || ""), newP = String(body.new_password || "");
-  if (newP.length < 8) return bad("новый пароль короче 8 символов");
-  const row = await env.DB.prepare("SELECT pass_hash, salt FROM users WHERE login = ?").bind(user.login).first();
-  if (!row || !(await verifyPassword(oldP, row.salt, row.pass_hash))) return bad("текущий пароль не подошёл", 403);
-  const salt = randomId(16);
-  await env.DB.prepare("UPDATE users SET pass_hash = ?, salt = ?, must_change = 0 WHERE login = ?")
-    .bind(await hashPassword(newP, salt), salt, user.login).run();
+  if (newP.length < 8 || newP.length > 1024 || newP === oldP) return bad("нужен новый пароль от 8 до 1024 символов");
+  const row = await env.DB.prepare("SELECT pass_hash,salt,tg_id FROM users WHERE login=?").bind(user.login).first();
+  if (!row || (row.pass_hash ? !(await verifyPassword(oldP,row.salt,row.pass_hash)) : !row.tg_id || oldP !== '')) return bad("текущий пароль не подошёл",403);
+  const salt=randomId(16), hash=await hashPassword(newP,salt), ticket=sessionTicket();
+  const result=await env.DB.batch([
+    env.DB.prepare('UPDATE users SET pass_hash=?,salt=?,must_change=0,temp_expires=NULL WHERE login=? AND active=1 AND pass_hash=? AND salt=? AND EXISTS (SELECT 1 FROM sessions WHERE id=? AND login=? AND expires>?)')
+      .bind(hash,salt,user.login,row.pass_hash,row.salt,getCookie(request,SESSION_COOKIE),user.login,now()),
+    env.DB.prepare('DELETE FROM sessions WHERE login=? AND EXISTS (SELECT 1 FROM users WHERE login=? AND salt=?)').bind(user.login,user.login,salt),
+    env.DB.prepare('INSERT INTO sessions (id,login,expires) SELECT ?,login,? FROM users WHERE login=? AND salt=?').bind(ticket.id,ticket.expires,user.login,salt),
+  ]);
+  if (!result[0].meta.changes) return bad('Сессия или пароль уже изменились. Войдите снова.',409);
   await audit(env, user.login, "user.password", user.login);
-  return json({ ok: true });
+  return json({ ok: true },200,{'Set-Cookie':ticket.cookie});
 }

@@ -2,7 +2,7 @@
 //   GET   /api/users                      — список
 //   POST  /api/users {login,name,role,sections}            — создать, вернёт временный пароль
 //   PATCH /api/users {login, action, ...}  — reset (новый временный пароль) / disable / enable / update {name,role,sections}
-import { json, bad, canRead, isAdmin, hashPassword, randomId, audit, now, tgSend, SECTIONS, NOTIFY, notifyList } from "./_lib.js";
+import { json, bad, canRead, isAdmin, hashPassword, randomId, audit, now, tgSend, SECTIONS, NOTIFY, notifyList, getCookie, SESSION_COOKIE } from "./_lib.js";
 
 const ROLES = ["admin", "head", "member", "viewer"];
 const RE_LOGIN = /^[a-z0-9._-]{3,32}$/;
@@ -44,8 +44,8 @@ export async function onRequestPost({ request, env }) {
   if (exists) return bad("такой логин уже есть", 409);
   const password = tempPassword(), salt = randomId(16);
   await env.DB.prepare(
-    "INSERT INTO users (login, pass_hash, salt, name, role, sections, active, must_change, created_at) VALUES (?,?,?,?,?,?,1,1,?)")
-    .bind(login, await hashPassword(password, salt), salt, String(b.name || "").slice(0, 80), role, sections, now()).run();
+    "INSERT INTO users (login, pass_hash, salt, name, role, sections, active, must_change, created_at, temp_expires) VALUES (?,?,?,?,?,?,1,1,?,?)")
+    .bind(login, await hashPassword(password, salt), salt, String(b.name || "").slice(0, 80), role, sections, now(), new Date(Date.now()+86400000).toISOString()).run();
   await audit(env, me.login, "user.create", login, role + (sections ? " " + sections : ""));
   return json({ ok: true, login, password });
 }
@@ -61,10 +61,12 @@ export async function onRequestPatch({ request, env }) {
   const action = String(b.action || "");
   if (action === "reset") {
     const password = tempPassword(), salt = randomId(16);
-    await env.DB.prepare("UPDATE users SET pass_hash = ?, salt = ?, must_change = 1 WHERE login = ?")
-      .bind(await hashPassword(password, salt), salt, login).run();
-    // чужие сессии закрываем; свою — оставляем, иначе админ выкинет сам себя, не успев прочитать пароль
-    if (login !== me.login) await env.DB.prepare("DELETE FROM sessions WHERE login = ?").bind(login).run();
+    const keep = login === me.login ? getCookie(request,SESSION_COOKIE) : "";
+    await env.DB.batch([
+      env.DB.prepare("UPDATE users SET pass_hash=?,salt=?,must_change=1,temp_expires=? WHERE login=?")
+        .bind(await hashPassword(password,salt),salt,new Date(Date.now()+86400000).toISOString(),login),
+      env.DB.prepare("DELETE FROM sessions WHERE login=? AND id!=?").bind(login,keep),
+    ]);
     await audit(env, me.login, "user.reset", login);
     return json({ ok: true, password });
   }

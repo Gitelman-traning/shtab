@@ -67,9 +67,11 @@ export function sessionTicket() {
   return { id, expires, cookie: `${SESSION_COOKIE}=${id}; Path=/; Max-Age=${SESSION_DAYS * 86400}; HttpOnly; Secure; SameSite=Lax` };
 }
 
-export async function createSession(env, login) {
+export async function createSession(env, login, verifiedHash = null) {
   const ticket = sessionTicket(), { id, expires } = ticket;
-  await env.DB.prepare("INSERT INTO sessions (id, login, expires) VALUES (?,?,?)").bind(id, login, expires).run();
+  const issued = await env.DB.prepare("INSERT INTO sessions (id,login,expires) SELECT ?,login,? FROM users WHERE login=? AND active=1 AND role!='pending' AND (must_change=0 OR temp_expires>?) AND (? IS NULL OR pass_hash=?)")
+    .bind(id,expires,login,now(),verifiedHash,verifiedHash).run();
+  if (!issued.meta.changes) return null;
   await env.DB.prepare("UPDATE users SET last_login = ? WHERE login = ?").bind(now(), login).run();
   return ticket;
 }
@@ -80,14 +82,14 @@ export async function dropSession(env, request) {
   return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
 }
 
-export async function currentUser(request, env) {
+export async function currentUser(request, env, allowTemporary = false) {
   const sid = getCookie(request, SESSION_COOKIE);
   if (!sid) return null;
   const row = await env.DB.prepare(
     "SELECT u.login, u.name, u.role, u.sections, u.must_change FROM sessions s JOIN users u ON u.login = s.login " +
-    "WHERE s.id = ? AND s.expires > ? AND u.active = 1"
-  ).bind(sid, now()).first();
-  if (!row) return null;
+    "WHERE s.id = ? AND s.expires > ? AND u.active = 1 AND u.role!='pending' AND (u.must_change=0 OR u.temp_expires>?)"
+  ).bind(sid, now(), now()).first();
+  if (!row || (row.must_change && !allowTemporary)) return null;
   row.perms = await loadPerms(env, row.login, row.sections);
   return row;
 }
