@@ -17,15 +17,7 @@ export function daysBetween(a, b) {   // b − a в днях
   return Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 864e5);
 }
 // дата: ГГГГ-ММ-ДД или --ММ-ДД (год неизвестен); пусто — ок
-export function cleanDate(v, allowNoYear) {
-  const s = String(v || "").trim();
-  if (!s) return "";
-  const m = /^(?:(\d{4})|-)-(\d{2})-(\d{2})$/.exec(s);
-  if (!m || (!m[1] && !allowNoYear)) return null;
-  const mm = +m[2], dd = +m[3];
-  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
-  return s;
-}
+export { calendarDate as cleanDate } from "../_calendar.js";
 // ближайшая дата с тем же днём и месяцем, не раньше from; 29.02 в невисокосный год — 28.02
 function nextOccur(mmdd, from) {
   for (const y of [+from.slice(0, 4), +from.slice(0, 4) + 1]) {

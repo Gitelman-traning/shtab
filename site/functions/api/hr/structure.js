@@ -89,6 +89,11 @@ export async function onRequestPost({ request, env }) {
     if (id && manager === id) return bad("человек не может быть руководителем самому себе");
     const hired = cleanDate(body.hired, false);
     if (hired === null) return bad("дата выхода: ГГГГ-ММ-ДД");
+    const birth=cleanDate(body.birth,true);
+    if(birth===null) return bad("дата рождения: ГГГГ-ММ-ДД или --ММ-ДД");
+    if(body.children!==undefined && (!Array.isArray(body.children) || body.children.length>10)) return bad("укажите до 10 детей");
+    const kids=(body.children || []).map(k=>({name:str(k?.name,60),birth:cleanDate(k?.birth,true)}));
+    if(kids.some(k=>!k.name || k.birth===null)) return bad("проверьте имена и даты рождения детей");
     // Telegram: принимаем @user, user или ссылку t.me/user
     const tg = str(body.tg, 80).replace(/^https?:\/\/(www\.)?t(elegram)?\.me\//i, "").replace(/^@/, "").replace(/[/?#].*$/, "");
     if (tg && !/^[A-Za-z0-9_]{4,32}$/.test(tg)) return bad("Telegram: @username латиницей, от 4 символов");
@@ -106,15 +111,11 @@ export async function onRequestPost({ request, env }) {
     }
     // личное — дата рождения, дети, поправка отпуска — пишет только сотрудник HR
     if (canManageHR(user) && pid) {
-      const birth = cleanDate(body.birth, true);
-      if (birth === null) return bad("дата рождения: ГГГГ-ММ-ДД или --ММ-ДД");
-      const kids = Array.isArray(body.children) ? body.children.slice(0, 10) : [];
-      const st = [env.DB.prepare("UPDATE hr_people SET birth = ?, leave_year = ?, leave_adj = ? WHERE id = ?")
-        .bind(birth, Number(body.leave_year) > 0 ? Number(body.leave_year) : 28, Number(body.leave_adj) || 0, pid),
-        env.DB.prepare("DELETE FROM hr_children WHERE person = ?").bind(pid)];
-      for (const k of kids) {
-        const kn = str(k.name, 60), kb = cleanDate(k.birth, true);
-        if (kn && kb !== null) st.push(env.DB.prepare("INSERT INTO hr_children (person, name, birth) VALUES (?,?,?)").bind(pid, kn, kb));
+      const st=[env.DB.prepare("UPDATE hr_people SET birth=COALESCE(?,birth),leave_year=COALESCE(?,leave_year),leave_adj=COALESCE(?,leave_adj) WHERE id=?")
+        .bind(body.birth===undefined?null:birth,body.leave_year===undefined?null:Number(body.leave_year)>0?Number(body.leave_year):28,body.leave_adj===undefined?null:Number(body.leave_adj)||0,pid)];
+      if(body.children!==undefined) {
+        st.push(env.DB.prepare("DELETE FROM hr_children WHERE person=?").bind(pid));
+        for(const k of kids) st.push(env.DB.prepare("INSERT INTO hr_children (person,name,birth) VALUES (?,?,?)").bind(pid,k.name,k.birth));
       }
       await env.DB.batch(st);
     }

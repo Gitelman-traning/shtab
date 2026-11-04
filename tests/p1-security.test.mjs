@@ -16,7 +16,8 @@ import * as versions from '../site/functions/api/sections/[id]/versions.js';
 import * as users from '../site/functions/api/users.js';
 import * as me from '../site/functions/api/me.js';
 import * as okna from '../site/functions/api/okna.js';
-import {teamOf} from '../site/functions/api/tasks/_tasks.js';
+import {teamOf,cleanDue} from '../site/functions/api/tasks/_tasks.js';
+import {cleanDate} from '../site/functions/api/hr/_hr.js';
 import * as leave from '../site/functions/api/hr/leave.js';
 import * as structure from '../site/functions/api/hr/structure.js';
 import * as prep from '../site/functions/api/prep.js';
@@ -293,6 +294,14 @@ test('P2-10 points never report a truncated response as complete',async()=>{
   const last=await(await get('&page=10001&page_size=2')).json();assert.deepEqual(last.rows.map(r=>r.value),[20001]);assert.equal(last.has_more,false);
 });
 const paid=(id)=>({id,created_at:100,price:id});
+test('P2-13 calendar validation covers leap years and rejects invalid HR fields before any write',async()=>{
+  for(const d of ['2026-02-31','1900-02-29','2026-04-31','2026-99-01'])assert.equal(cleanDate(d,false),null);
+  for(const d of ['2000-02-29','2024-02-29','--02-29'])assert.equal(cleanDate(d,true),d);
+  assert.equal(cleanDue('2026-11-03 23:59'),'2026-11-03T23:59');for(const d of ['2026-11-03T24:00','2026-02-30','2026-11-03T11:60'])assert.equal(cleanDue(d),null);
+  const e=env({hr:2});const prior=rows(e,'hr_people');for(const fields of [{birth:'2026-02-31'},{children:[{name:'Child',birth:'--04-31'}]}]){
+    const r=await structure.onRequestPost({request:request('/api/hr/structure',{action:'person_save',name:'Synthetic',...fields}),env:e});assert.equal(r.status,400);
+  }assert.deepEqual(rows(e,'hr_people'),prior);
+});
 test('P2-12 department moves reject indirect cycles and damaged hierarchies terminate',async()=>{
   const e=env({hr:2});const save=(id,parent)=>structure.onRequestPost({request:request('/api/hr/structure',{action:'dept_save',id,name:id,parent}),env:e});
   for(const [id,parent] of [['a',''],['b','a'],['c','b']])assert.equal((await save(id,parent)).status,200);

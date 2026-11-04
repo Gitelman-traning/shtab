@@ -1,3 +1,4 @@
+import { calendarDate } from "../_calendar.js";
 // Общее для задач: люди Штаба, подчинённые по структуре HR, права на задачу, уведомления в Telegram.
 import { tgSend, isAdmin } from "../_lib.js";
 
@@ -22,7 +23,10 @@ export function dueText(due) {
 export function cleanDue(v) {
   const s = String(v || "").trim().replace(" ", "T");
   if (!s) return "";
-  return /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/.test(s) ? s : null;
+  const parts=s.split("T");
+  if (!calendarDate(parts[0]) || parts.length>2) return null;
+  if (parts.length===2 && !/^([01]\d|2[0-3]):[0-5]\d$/.test(parts[1])) return null;
+  return s;
 }
 
 // все, у кого есть вход в Штаб: имя из структуры HR (если человек там есть), должность, отдел, Telegram
