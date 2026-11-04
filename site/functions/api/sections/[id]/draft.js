@@ -53,8 +53,12 @@ function stripFences(t) {
 async function jobResult(env, id, section, login) {
   const job=await env.DB.prepare('SELECT result,status,deadline FROM section_draft_jobs WHERE id=? AND section=? AND login=?').bind(id,section,login).first();
   if(!job)return bad("задание не найдено",404);
-  if(job.result)return json(JSON.parse(job.result),job.status);
-  return job.deadline<=now() ? bad("Время ожидания истекло. Создайте вариант повторно.",504) : json({ok:true,state:"running",job:id},202);
+  if(job.result){
+    const result=JSON.parse(job.result);
+    if(!result.ok)result.state="failed";
+    return json(result,job.status,result.retry_after ? {"Retry-After":String(result.retry_after)} : {});
+  }
+  return job.deadline<=now() ? json({ok:false,state:"failed",error:"Время ожидания истекло. Создайте вариант повторно."},504) : json({ok:true,state:"running",job:id},202);
 }
 
 export async function onRequestGet({request,env,params}) {

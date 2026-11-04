@@ -44,8 +44,8 @@ export async function redeemCode(env, request, code, direct) {
   const ticket = sessionTicket();
   // Сессия и погашение в одной транзакции. После COMMIT второй запрос не найдёт исходную строку.
   const result = await env.DB.batch([
-    env.DB.prepare(`INSERT INTO sessions (id,login,expires) SELECT ?,u.login,? FROM tg_login_codes g JOIN users u ON u.tg_id=g.tg_id WHERE ${match} AND g.expires>? AND g.state IN ('ok','pending') AND u.active=1 AND u.role!='pending' LIMIT 1`)
-      .bind(ticket.id,ticket.expires,...args,now()),
+    env.DB.prepare(`INSERT INTO sessions (id,login,expires) SELECT ?,u.login,? FROM tg_login_codes g JOIN users u ON u.tg_id=g.tg_id WHERE ${match} AND g.expires>? AND g.state IN ('ok','pending') AND u.active=1 AND u.role!='pending' AND (u.must_change=0 OR u.temp_expires>?) LIMIT 1`)
+      .bind(ticket.id,ticket.expires,...args,now(),now()),
     env.DB.prepare('DELETE FROM tg_login_codes WHERE code=? AND EXISTS (SELECT 1 FROM sessions WHERE id=?)').bind(grant.code,ticket.id),
     env.DB.prepare('UPDATE users SET last_login=? WHERE login=(SELECT login FROM sessions WHERE id=?)').bind(now(),ticket.id),
   ]);

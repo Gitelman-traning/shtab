@@ -246,6 +246,10 @@ test('P2-8 temporary password blocks pages/API, rotation revokes every previous 
 test('P2-8 expired temporary passwords and sessions cannot be used; Telegram-only can set a first password',async()=>{
   const e=env();e.sqlite.exec("UPDATE users SET must_change=1,temp_expires='2000-01-01'");
   assert.equal(await lib.createSession(e,'reader'),null);assert.equal(await lib.currentUser(request('/'),e,true),null);
+  e.sqlite.exec("UPDATE users SET tg_id=1234");
+  const grant=await beginLogin(e,request('/__tglink'));await reserveCode(e,grant.code,1234);
+  const direct=await confirmCode(e,grant.code,1234,true);
+  assert.equal((await redeemCode(e,request('/'),direct,true)).status,'expired');
   e.sqlite.exec("UPDATE users SET must_change=0,tg_id=123");
   assert.equal((await me.onRequestPut({request:request('/api/me',{new_password:'first-personal-password'},{method:'PUT'}),env:e})).status,200);
 });
@@ -352,6 +356,12 @@ test('P2-15 a completed draft can be recovered and retried without a second mode
   const a=await submit(),b=await submit();assert.equal(a.status,200);assert.equal(b.status,200);assert.deepEqual(await a.json(),await b.json());assert.equal(calls,1);
   const get=await draft.onRequestGet({request:request('/api/sections/sales/draft?job='+id),env:e,params:{id:'sales'}});assert.equal((await get.json()).state,'done');
   const ctl=new AbortController();ctl.abort();await assert.rejects(lib.llmChat(e,[],{signal:ctl.signal}),/время ожидания/);assert.equal(calls,1);
+});
+test('P2-15 polling a quota-rejected draft identifies a terminal job and preserves Retry-After',async()=>{
+  const e=env({sales:2}), id=crypto.randomUUID();
+  e.sqlite.prepare("INSERT INTO section_draft_jobs VALUES(?,?,?,'2026-01-01','2099-01-01',?,429)").run(id,'sales','reader',JSON.stringify({ok:false,error:'limit',retry_after:60}));
+  const res=await draft.onRequestGet({request:request('/api/sections/sales/draft?job='+id),env:e,params:{id:'sales'}});
+  assert.equal(res.status,429);assert.equal(res.headers.get('Retry-After'),'60');assert.equal((await res.json()).state,'failed');
 });
 test('P2-15 editor offers retry on offline, timeout, HTML and service failure',async()=>{
   const code=readFileSync(new URL('site/public/section-editor.js',root),'utf8');

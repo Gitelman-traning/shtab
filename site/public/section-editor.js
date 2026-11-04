@@ -28,7 +28,7 @@
       if(opt.body){opt.headers=Object.assign({},opt.headers,{"content-type":"application/json"});opt.body=JSON.stringify(opt.body);}
       var response=await fetch(path,opt), result;
       try{result=await response.json();}catch(e){return {ok:false,status:response.status,error:"Сервер вернул неожиданный ответ. Повторите запрос."};}
-      if(!response.ok)return {ok:false,status:response.status,error:result.error||"Сервер временно недоступен. Повторите запрос."};
+      if(!response.ok)return {ok:false,status:response.status,state:result.state,error:result.error||"Сервер временно недоступен. Повторите запрос."};
       return result;
     } catch(e){return {ok:false,status:0,error:e.name==="AbortError"?"Время ожидания истекло. Повторите запрос.":"Не удалось связаться со Штабом. Проверьте соединение и повторите запрос."};}
     finally{clearTimeout(timer);}
@@ -45,7 +45,7 @@
     var id=job,r=await api("/api/sections/"+SEC+"/draft?job="+encodeURIComponent(id));
     if(id!==job)return;
     if(r.state==="running"){jobMessage("Модель готовит вариант…");setTimeout(checkJob,3000);return;}
-    if(!r.ok){if(r.status===404||r.status===502||r.status===504){saveJob("");render();}jobMessage(r.error);return;}
+    if(!r.ok){if(r.status===404||r.state==="failed"){saveJob("");render();}jobMessage(r.error);return;}
     saveJob("");state.mode="versions";await load();showCustom(r.version);jobMessage("Черновик v"+r.version+" готов.");
   }
   var MAX_FILES = 4, MAX_IMG = 1600, MAX_TEXT = 60000;
@@ -95,7 +95,7 @@
       + (state.canEdit ? '<button data-a="edit">Изменить через Claude</button><button class="ghost" data-a="versions">Версии (' + v.length + ')</button>' : '')
        + (job ? '<button class="ghost" data-a="checkDraft">Проверить вариант</button>' : '') + '<span class="sub" id="se-msg" role="status"></span></div>';
     if (state.canEdit && state.mode === "edit") {
-      h += '<div><textarea id="se-prompt" placeholder="Что изменить? Например: «покажи источники кругом вместо таблицы» или «добавь сравнение с прошлым месяцем в каждую карточку»"></textarea></div>'
+      h += '<div><textarea id="se-prompt" placeholder="Что изменить? Например: «покажи источники кругом вместо таблицы» или «добавь сравнение с прошлым месяцем в каждую карточку»">'+esc(state.prompt)+'</textarea></div>'
         + '<div class="row"><button data-a="draft">Сделать вариант</button>'
         + '<button class="clip" data-a="attach" title="Приложить пример: скриншот нужного вида, csv или текст"><svg viewBox="0 0 20 20"><path d="M13.5 6.5l-6 6a2 2 0 002.8 2.8l6.5-6.5a3.5 3.5 0 00-5-5L5.3 10.3a5 5 0 007 7l5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>Приложить пример</button>'
         + '<input type="file" id="se-attach" multiple accept="image/*,.txt,.csv,.md,.html,.json,.svg" hidden>'
@@ -149,12 +149,13 @@
     else if (a === "preview") { showCustom(b.getAttribute("data-v")); msg("предпросмотр v" + b.getAttribute("data-v")); }
     else if (a === "draft") {
       var p = document.getElementById("se-prompt").value.trim(); if (p.length < 5) { msg("опишите, что изменить", "err"); return; }
+      state.prompt=p;
       var id=job||crypto.randomUUID();saveJob(id);b.disabled=true;msg("Модель пишет страницу…");
       api("/api/sections/"+SEC+"/draft",{method:"POST",headers:{"x-draft-job":id},body:{prompt:p,attachments:state.files}})
         .then(async function(r){
           if(!r.ok){if(r.status===0 || r.status>=500){render();jobMessage(r.error+" Можно проверить состояние варианта.");return;}saveJob("");msg(r.error,"err");return;}
           if(r.state==="running"){checkJob();return;}
-          saveJob("");state.files=[];state.mode="versions";await load();showCustom(r.version);jobMessage("Черновик v"+r.version+" готов.");
+          saveJob("");state.prompt="";state.files=[];state.mode="versions";await load();showCustom(r.version);jobMessage("Черновик v"+r.version+" готов.");
         }).catch(function(){msg("Не удалось показать результат. Повторите проверку.","err");})
         .finally(function(){b.disabled=false;});
     }

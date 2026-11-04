@@ -7,7 +7,8 @@ const date = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
 const batches = {
   points:[20000,metric], plans:[500,metric], okna:[200,r=>date(r?.day)&&r.mgr&&r.key],
   goals:[50,r=>r?.mgr&&/^\d{4}-(0[1-9]|1[0-2])$/.test(r.month)&&goalTerms(r)],
-  pings:[200,r=>deal(r)&&r.manager&&date(r.day)], prep:[50,deal], prep_cases:[200,deal],
+  pings:[200,r=>deal(r)&&r.manager&&date(r.day)],
+  prep:[50,r=>deal(r)&&(r.sources==null || (Array.isArray(r.sources)&&r.sources.length<=60))&&(r.cases==null || Array.isArray(r.cases))], prep_cases:[200,deal],
   prep_growth:[200,deal], prep_manager:[50,r=>deal(r)&&r.manager], prep_style:[20,r=>r?.manager&&r.text],
   prep_debrief:[20,r=>deal(r)&&r.text], prep_debrief_versions:[30,r=>deal(r)&&r.text], debrief_status:[200,deal],
   expenses:[500,r=>date(r?.day)&&r.service&&Number.isFinite(r.amount)], yt_leads:[1000,yt],
