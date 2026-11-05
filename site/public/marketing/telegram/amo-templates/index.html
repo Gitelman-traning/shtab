@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Штаб · Шаблоны для amo</title>
+<link rel="stylesheet" href="/ui.css"><link rel="stylesheet" href="./templates.css">
+</head>
+<body>
+<div class="layout"><aside class="side" id="side"></aside><div class="pane">
+<header><div><div class="crumbs">Маркетинг · Телеграм-канал · <b>Шаблоны для amo</b></div><h1>Голосовые и кружки для менеджеров</h1><p class="sub">Менеджер выбирает шаблон в чате amo — клиент получает запись от своего бота.</p></div><div class="spacer"></div><div class="themer" role="group" aria-label="Тема оформления"><button type="button" data-set="auto" aria-pressed="true">Авто</button><button type="button" data-set="light" aria-pressed="false">Светлая</button><button type="button" data-set="dark" aria-pressed="false">Тёмная</button></div></header>
+<main>
+<div id="message" class="message" role="status" aria-live="polite" hidden></div>
+<div class="steps"><span><b>1</b> Создайте шаблон</span><span><b>2</b> Пришлите запись боту</span><span><b>3</b> Проверьте на себе</span><span><b>4</b> Добавьте в amo</span></div>
+<div class="workspace" id="workspace">
+<section class="card library"><div class="section-head"><h2>Библиотека <small id="count"></small></h2><button class="btn ghost" id="new" type="button">+ Новый</button></div><div id="list" aria-live="polite"><p class="empty">Загрузка…</p></div></section>
+<section class="card editor"><h2 id="editor-title">Новый шаблон</h2>
+<form id="editor" autocomplete="off">
+<div class="fields"><label>Тип записи<select id="kind" required><option value="voice">Голосовое сообщение</option><option value="video_note">Видеокружок</option></select></label><label>Название в amo<input id="title" required maxlength="70" placeholder="Например, приглашение на встречу"></label><label>Код команды<input id="key" required minlength="2" maxlength="40" placeholder="Например, встреча" pattern="[а-яА-ЯёЁa-zA-Z0-9_\-]{2,40}"></label></div>
+<p class="hint">Код без пробелов: буквы, цифры, дефис или подчёркивание. После создания тип и код сохраняются.</p>
+<div class="command"><span>Команда из чата amo</span><code id="command">/голос …</code><button class="btn ghost" id="copy" type="button">Копировать</button></div>
+<label class="check"><input id="active" type="checkbox" checked> Шаблон включён</label>
+<div class="actions"><button class="btn" id="save" type="submit">Создать шаблон</button><span class="hint" id="saved-state"></span></div>
+</form>
+<div id="recording" hidden>
+<div class="divider"></div><h3>Запись</h3><p id="file-state" class="hint"></p><div id="preview"></div>
+<div class="actions"><button class="btn ghost" type="button" id="upload">Загрузить в Telegram</button><a class="telegram-link" href="https://t.me/Pavel_Gitelman_Traning2_bot" target="_blank" rel="noopener noreferrer">Открыть бота ↗</a><button class="btn ghost" type="button" id="refresh">Обновить</button></div>
+<p class="hint" id="upload-help">Нажмите «Загрузить в Telegram», затем запишите или перешлите запись в бота. Она сохранится в выбранный шаблон.</p>
+<div class="divider"></div><h3>Проверка и amoCRM</h3>
+<label>Проверить от бота<select id="bot"></select></label>
+<div class="actions"><button class="btn ghost" type="button" id="test">Отправить себе</button><button class="btn" type="button" id="publish">Создать шаблон в amo</button></div>
+<p class="hint" id="amo-state"></p><p class="hint">Пробная отправка приходит только в ваш Telegram. Для отправки клиенту менеджер выбирает шаблон в переписке соответствующего бота в amo.</p>
+</div>
+</section></div>
+<footer>Управление пока доступно только Никите. Выключенный шаблон не отправляет запись клиенту. Команда менеджера не уходит клиенту текстом.</footer>
+</main></div></div>
+<script src="/ui.js"></script><script src="./templates.js"></script><script src="/nav.js"></script>
+</body></html>

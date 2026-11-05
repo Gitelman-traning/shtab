@@ -20,7 +20,7 @@ async function forward(request, env, path, user) {
     "X-Shtab-User": user.login || "?",
   };
   // Тест рассылки уходит проверяющему в Telegram — его ID из входа в Штаб.
-  if ((path === "broadcasts/test" || path === "templates/preview" || path === "launch-circle-request") && user.login) {
+  if ((path === "broadcasts/test" || path === "templates/preview" || path === "launch-circle-request" || path.startsWith("manager-media")) && user.login) {
     const u = await env.DB.prepare("SELECT tg_id FROM users WHERE login = ?").bind(user.login).first().catch(() => null);
     if (u && u.tg_id) headers["X-Shtab-User-Tg"] = String(u.tg_id);
   }
@@ -31,7 +31,7 @@ async function forward(request, env, path, user) {
   const r = await fetch(`${env.TG_CORE_URL || CORE}/api/admin/${path}${url.search}`, {
     method: request.method, headers, body: request.method === "POST" ? request.body : undefined,
   });
-  return new Response(r.body, { status: r.status, headers: { "Content-Type": r.headers.get("content-type") || "application/json" } });
+  return new Response(r.body, { status: r.status, headers: { "Content-Type": r.headers.get("content-type") || "application/json", "Cache-Control": "no-store" } });
 }
 
 export async function onRequest({ request, env, params }) {
@@ -39,6 +39,17 @@ export async function onRequest({ request, env, params }) {
   if (!user) return bad("нет доступа", 401);
   if (!env.TG_CORE_API_TOKEN) return bad("ядро ботов не подключено", 500);
   const path = [].concat(params.path || []).join("/");
+
+  // Шаблоны amo пока настраивает только Никита. Обычных прав на Telegram недостаточно.
+  if (path === "manager-media" || path.startsWith("manager-media/")) {
+    if (user.login !== "nikita" || user.role !== "admin") return bad("Библиотекой шаблонов пока управляет только Никита", 403);
+    const allowed = request.method === "GET" ? ["manager-media", "manager-media/file"]
+      : request.method === "POST" ? ["manager-media", "manager-media/upload-request", "manager-media/test", "manager-media/publish"] : [];
+    if (!allowed.includes(path)) return bad("не найдено", 404);
+    const response = await forward(request, env, path, user);
+    if (request.method === "POST" && response.ok) await audit(env, user.login, "tgbots." + path, "");
+    return response;
+  }
 
   if (request.method === "GET") {
     if (!READ.has(path)) return bad("не найдено", 404);
