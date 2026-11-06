@@ -88,7 +88,8 @@
       { name: "Теги", href: "/tags", icon: I.tag, admin: true, sec: "tags" },
       { name: "Бюджет и расходы", href: "/budget", icon: I.coin, admin: true, sec: "budget" },
       { name: "Дашборд проектов", href: "/settings/dashboard/", icon: I.hub, admin: true, sec: "dashboard" },
-      { name: "Журнал проверок АТС", href: "/settings/pbx-log/", icon: I.db, admin: true, sec: "users" }
+      { name: "Журнал проверок АТС", href: "/settings/pbx-log/", icon: I.db, admin: true, sec: "users" },
+      { name: "Журнал триггеров amo", href: "/settings/amo-watch/", icon: I.db, admin: true, sec: "users" }
     ] }
   ];
 

@@ -164,6 +164,7 @@ export function sectionOf(pathname) {
   if (p === "/budget") return "budget";
   if (p.startsWith("/settings/dashboard")) return "dashboard";
   if (p.startsWith("/settings/pbx-log")) return "users";   // журнал проверок АТС — тем, кто управляет пользователями
+  if (p.startsWith("/settings/amo-watch")) return "users";
   return null;
 }
 

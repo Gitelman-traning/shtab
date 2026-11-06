@@ -1,0 +1,16 @@
+name = "shtab-amo-observer"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shtab"
+database_id = "d0671a0c-e19a-44f6-ac76-39f8c79b499c"
+
+[vars]
+AMO_ACCOUNT_ID = "29640721"
+AMO_BASE_URL = "https://pavelgitelman.amocrm.ru"
+# Секреты AMO_TOKEN и HOOK_KEY задаются при выпуске; не логировать URL хука.

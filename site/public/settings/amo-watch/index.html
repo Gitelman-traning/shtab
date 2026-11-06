@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Штаб · Журнал триггеров amo</title><link rel="stylesheet" href="/ui.css"><link rel="stylesheet" href="/settings/amo-watch/watch.css">
+</head><body><div class="layout"><aside class="side" id="side"></aside><div class="pane">
+<header><div><div class="crumbs">Настройки · amoCRM</div><h1>Журнал триггеров amo</h1><p class="sub">Наблюдение за входящими сообщениями, тегами и источником. Журнал не изменяет сделки.</p></div><div class="spacer"></div>
+<div class="themer" role="group" aria-label="Тема оформления"><button type="button" data-set="auto" aria-pressed="true">Авто</button><button type="button" data-set="light" aria-pressed="false">Светлая</button><button type="button" data-set="dark" aria-pressed="false">Тёмная</button></div></header>
+<main><div class="notice"><b>Режим наблюдения</b><span id="health">Проверяем подключение…</span></div>
+<div class="totals" id="totals"></div>
+<section class="card"><form id="filters" class="filters">
+<label>Период<select id="days"><option value="1">Сутки</option><option value="7" selected>7 дней</option><option value="30">30 дней</option></select></label>
+<label>Сделка<input id="lead" inputmode="numeric" pattern="[0-9]*" placeholder="ID сделки"></label>
+<label>Результат<select id="result"><option value="">Все</option value="missing">Разметка отсутствует / отличается</option><option value="ok">Разметка присутствует</option><option value="no_rule">Нет точного совпадения</option><option value="condition_mismatch">Отличаются условия</option><option value="pending">Ожидает проверки</option><option value="unresolved">Не найдена сделка</option><option value="error">Ошибка чтения</option><option value="mixed">Разные результаты</option></select></label>
+<label>Правило<select id="rule"><option value="">Все</option></select></label><button type="submit">Обновить</button></form>
+<p class="hint" id="count" aria-live="polite"></p><div class="wide"><table><thead><tr><th>Когда, МСК</th><th>Сделка</th><th>Сообщение</th><th>Наблюдение</th><th>Правило</th></tr></thead><tbody id="rows"><tr><td colspan="5">Загрузка…</td></tr></tbody></table></div>
+<button id="more" type="button" hidden>Ещё записи</button></section>
+<section class="card" id="detail" hidden><div class="card-head"><h2>Подробности сообщения</h2><button id="close-detail" type="button">Закрыть</button></div><div id="detail-body"></div></section>
+<details class="card"><summary>Правила наблюдения <span id="rule-count"></span></summary><p class="hint">Это копии условий для сравнения. Они не меняют F5 и не синхронизируются с ним автоматически. Для других кампаний добавьте их точные тексты и ожидаемую разметку.</p>
+<div id="rules" class="rule-list"></div><button id="new-rule" type="button">+ Правило наблюдения</button>
+<form id="rule-form" hidden><h2 id="form-title">Правило наблюдения</h2><div class="fields">
+<label>ID правила<input name="id" required maxlength="64" placeholder="f5-132" pattern="[a-zA-Z0-9_-]+"></label><label>Название<input name="name" required maxlength="120"></label>
+<label class="full">Точный текст сообщения<textarea name="match_text" required maxlength="4000" rows="3"></textarea></label>
+<label>ID воронки (пусто — любая)<input name="pipeline_id" type="number" min="1"></label><label>ID статуса (пусто — любой)<input name="status_id" type="number" min="1"></label>
+<label class="full">Ожидаемые теги — каждый с новой строки<textarea name="expected_tags" rows="2" maxlength="4000"></textarea></label>
+<label>Название ожидаемого источника<input name="source_value" maxlength="200"></label><label>ID значения источника (если известен)<input name="source_enum_id" type="number" min="1"></label><label>ID поля источника<input name="source_field_id" type="number" min="1" value="1439087" required></label>
+<label class="check"><input name="enabled" type="checkbox" checked> Наблюдать за правилом</label></div>
+<p class="hint">Сравнение текста точное: приветствие, пробелы, регистр и переносы имеют значение. Изменения действуют только для новых сообщений.</p><button type="submit">Сохранить копию правила</button><button type="button" id="cancel-rule">Отмена</button><span id="save-status" role="status"></span></form></details>
+<p class="hint">Контроль при получении события, затем через 1 и 5 минут с учётом очереди. Состояние этапа фиксируется при первом доступном чтении amoCRM: оно может отличаться от состояния в момент проверки F5. Наличие разметки не доказывает срабатывание F5 — её мог поставить менеджер. Хранение — 30 дней.</p>
+</main></div></div><script src="/ui.js"></script><script src="/settings/amo-watch/watch.js"></script><script src="/nav.js"></script></body></html>
