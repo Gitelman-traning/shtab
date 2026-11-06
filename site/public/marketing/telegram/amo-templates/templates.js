@@ -23,6 +23,12 @@
     $('saved-state').textContent = dirty && selected ? 'Есть несохранённые изменения' : '';
   }
   function drawList() {
+    var totals = {sent:0,replied:0,failed:0,pending:0};
+    function values(s) { return ['sent','replied','pending','failed'].map(function (k) { return '<td>' + Number(s[k] || 0).toLocaleString('ru-RU') + '</td>'; }).join('') + '<td>' + (s.sent ? (100 * s.replied / s.sent).toFixed(1) + '%' : '—') + '</td>'; }
+    $('metrics').innerHTML = '<table class="metrics-table"><thead><tr><th>Шаблон</th><th>Отправлено</th><th>С ответом</th><th>Ждём</th><th>Ошибки</th><th>Конверсия</th></tr></thead><tbody>' + rows.map(function (r) {
+      var s = r.stats || {}; Object.keys(totals).forEach(function (k) { totals[k] += Number(s[k] || 0); });
+      return '<tr><td>' + escapeText(r.title) + '<small>' + (r.kind === 'voice' ? 'Голосовое' : 'Кружок') + '</small></td>' + values(s) + '</tr>';
+    }).join('') + '<tr class="totals"><td>Всего</td>' + values(totals) + '</tr></tbody></table>';
     $('count').textContent = rows.length ? String(rows.length) : '';
     $('list').innerHTML = rows.length ? rows.map(function (r) {
       var status = !r.active ? 'Выключен' : !r.file_key ? 'Ждёт запись' : r.amo_template_id ? 'Есть в amo' : 'Запись готова';
@@ -99,5 +105,5 @@
     media.onerror = function () { message('Не удалось открыть запись. Обновите страницу и попробуйте ещё раз.', true); };
     $('preview').replaceChildren(media);
   };
-  load().then(function () { choose(rows.length ? rows[0].id : null); }).catch(function (e) { $('workspace').hidden = true; message(e.message, true); });
+  load().then(function () { choose(rows.length ? rows[0].id : null); }).catch(function (e) { $('workspace').hidden = true; $('metrics-card').hidden = true; message(e.message, true); });
 })();
