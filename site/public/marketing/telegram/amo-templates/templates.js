@@ -99,5 +99,5 @@
     media.onerror = function () { message('Не удалось открыть запись. Обновите страницу и попробуйте ещё раз.', true); };
     $('preview').replaceChildren(media);
   };
-  load().then(function () { choose(rows.length ? rows[0].id : null); }).catch(function (e) { $('workspace').hidden = true; $('metrics-card').hidden = true; message(e.message, true); });
+  load().then(function () { choose(rows.length ? rows[0].id : null); }).catch(function (e) { $('workspace').hidden = true; message(e.message, true); });
 })();
