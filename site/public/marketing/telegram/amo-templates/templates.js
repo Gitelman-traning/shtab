@@ -23,16 +23,10 @@
     $('saved-state').textContent = dirty && selected ? 'Есть несохранённые изменения' : '';
   }
   function drawList() {
-    var totals = {sent:0,replied:0,failed:0,pending:0};
-    function values(s) { return ['sent','replied','pending','failed'].map(function (k) { return '<td>' + Number(s[k] || 0).toLocaleString('ru-RU') + '</td>'; }).join('') + '<td>' + (s.sent ? (100 * s.replied / s.sent).toFixed(1) + '%' : '—') + '</td>'; }
-    $('metrics').innerHTML = '<table class="metrics-table"><thead><tr><th>Шаблон</th><th>Отправлено</th><th>С ответом</th><th>Ждём</th><th>Ошибки</th><th>Конверсия</th></tr></thead><tbody>' + rows.map(function (r) {
-      var s = r.stats || {}; Object.keys(totals).forEach(function (k) { totals[k] += Number(s[k] || 0); });
-      return '<tr><td>' + escapeText(r.title) + '<small>' + (r.kind === 'voice' ? 'Голосовое' : 'Кружок') + '</small></td>' + values(s) + '</tr>';
-    }).join('') + '<tr class="totals"><td>Всего</td>' + values(totals) + '</tr></tbody></table>';
     $('count').textContent = rows.length ? String(rows.length) : '';
     $('list').innerHTML = rows.length ? rows.map(function (r) {
       var status = !r.active ? 'Выключен' : !r.file_key ? 'Ждёт запись' : r.amo_template_id ? 'Есть в amo' : 'Запись готова';
-      return '<button type="button" class="template' + (r.id === selected ? ' selected' : '') + '" data-id="' + escapeText(r.id) + '"><strong>' + escapeText(r.title) + '</strong><small>' + (r.kind === 'voice' ? 'Голосовое' : 'Кружок') + ' · ' + escapeText(r.command) + '</small><span class="badge">' + status + '</span></button>';
+      return '<button type="button" class="template' + (r.id === selected ? ' selected' : '') + '" data-id="' + escapeText(r.id) + '"><strong>' + escapeText(r.title) + '</strong><small>' + (r.kind === 'voice' ? 'Голосовое' : 'Кружок') + ' · ' + escapeText(r.command) + '</small><span class="badge">' + status + '</span><span class="template-stats"><span><b>' + Number((r.stats || {}).sent || 0).toLocaleString('ru-RU') + '</b><span>Отправлено</span></span><span><b>' + Number((r.stats || {}).replied || 0).toLocaleString('ru-RU') + '</b><span>С ответом</span></span><span title="Первый ответ за 24 часа после последнего шаблона. Проверки на себе исключены."><b>' + ((r.stats || {}).sent ? (100 * (r.stats.replied || 0) / r.stats.sent).toFixed(1) + '%' : '—') + '</b><span>Конверсия</span></span></span></button>';
     }).join('') : '<p class="empty">Пока нет шаблонов. Создайте первый и пришлите запись в Telegram.</p>';
   }
   function details() {
