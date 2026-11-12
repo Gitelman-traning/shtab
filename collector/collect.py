@@ -461,7 +461,27 @@ def send(points, note, plans=None):
         log("отправлено %d/%d (записано %s)" % (min(i + 500, total), total, res.get("written")))
 
 
-def run_feed(source, period, producer, report, publish):
+def verify_deal_points(points, period):
+    """Успех — только после чтения записанных дневных цифр обратно из витрины."""
+    import requests
+    expected = {(p['metric'], p.get('dim', '')): p['value'] for p in points
+                if p['ptype'] == 'day' and p['period'] == period.isoformat()}
+    if not expected:
+        raise ValueError('Нет дневных показателей для проверки')
+    response = requests.get(URL + '/api/points', headers={'Authorization': 'Bearer ' + TOKEN},
+                            params={'metric': ','.join(sorted({m for m, _ in expected})), 'ptype': 'day',
+                                    'from': period.isoformat(), 'to': period.isoformat()}, timeout=120)
+    response.raise_for_status()
+    result = response.json()
+    if not result.get('ok') or result.get('has_more') or result.get('truncated'):
+        raise RuntimeError('Витрина не подтвердила дневные показатели')
+    actual = {(p['metric'], p['dim']): p['value'] for p in result.get('rows', [])}
+    if any(actual.get(key) != value for key, value in expected.items()):
+        raise RuntimeError('Дневные показатели записались не полностью')
+    log('проверено чтением из Штаба: %d дневных показателей по %s' % (len(expected), period))
+
+
+def run_feed(source, period, producer, report, publish, verify=None):
     """Публикуем только проверенный источник. Последняя успешная дата переживает частичный сбой."""
     issues = []
     report(source, 'running', '')
@@ -473,6 +493,8 @@ def run_feed(source, period, producer, report, publish):
     if points or plans:
         try:
             publish(points, '%s · %s' % (source, period), plans)
+            if verify:
+                verify(points, period)
         except Exception as exc:
             report(source, 'partial', 'Ошибка записи: ' + type(exc).__name__)
             return 'partial'
@@ -566,7 +588,7 @@ def main():
             ('gsc', lambda issue: (gsc_points(day_from,day_to,log,on_issue=issue), [])),
             ('webmaster', lambda issue: (webmaster_points(day_from,day_to,log,on_issue=issue), [])),
         ])
-    states=[run_feed(name,day_to,producer,report,send) for name,producer in feeds]
+    states=[run_feed(name,day_to,producer,report,send,verify_deal_points if name == 'deals' else None) for name,producer in feeds]
     if any(state in ('partial','failed') for state in states):
         raise SystemExit('Часть источников не собрана. Подробности на странице статуса Штаба.')
     log("ГОТОВО")

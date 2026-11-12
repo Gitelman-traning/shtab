@@ -70,3 +70,28 @@ class ReportTests(unittest.TestCase):
         self.assertEqual([p['value'] for p in pts if p['metric']=='l2.sales' and p['dim']=='src:Телеграм канал'],[0,0])
         with patch.object(collect,'LAYOUT',layout), patch.object(collect,'read',return_value=[]), self.assertRaises(ValueError):
             collect.deal_points(None,self.day,self.day)
+
+    def test_failed_readback_keeps_feed_partial(self):
+        statuses = []
+        def verify(points, period):
+            raise RuntimeError('missing day')
+        result = collect.run_feed('deals', self.day, lambda issue: ([{}], []),
+                                  lambda source, state, detail: statuses.append(state), lambda *args: None, verify)
+        self.assertEqual(result, 'partial')
+        self.assertEqual(statuses, ['running', 'partial'])
+
+    def test_readback_distinguishes_missing_day_from_confirmed_zero(self):
+        import sys
+        response = Mock()
+        points = [dict(metric='mkt.leads', dim='Телеграм канал', ptype='day', period=self.day.isoformat(), value=0)]
+        requests = Mock()
+        requests.get.return_value = response
+        with patch.dict(sys.modules, {'requests': requests}):
+            response.json.return_value = dict(ok=True, rows=[])
+            with self.assertRaises(RuntimeError):
+                collect.verify_deal_points(points, self.day)
+            response.json.return_value = dict(ok=True, rows=[dict(metric='mkt.leads', dim='Телеграм канал', value=0)])
+            collect.verify_deal_points(points, self.day)
+            response.json.return_value = dict(ok=True, has_more=True, rows=[])
+            with self.assertRaises(RuntimeError):
+                collect.verify_deal_points(points, self.day)

@@ -2,7 +2,9 @@ name: Shtab collect
 
 on:
   schedule:
-    - cron: '0 2 * * *'     # 05:00 МСК, после ночной выгрузки amo
+    - cron: '17 2 * * *'    # Запасной запуск 05:17 МСК; основной — Cloudflare refresh/.
+  repository_dispatch:
+    types: [shtab_collect]
   workflow_dispatch:
     inputs:
       deals_only:
@@ -29,6 +31,13 @@ on:
         description: 'Okna day, YYYY-MM-DD (empty = today MSK)'
         required: false
         default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shtab-collect
+  cancel-in-progress: false
 
 jobs:
   collect:
