@@ -78,9 +78,11 @@ class RecordingTests(unittest.TestCase):
         self.assertFalse(os.path.exists(audio.name))
 
     def test_flac_uses_audio_content_type(self):
-        with tempfile.NamedTemporaryFile(suffix='.flac') as audio, patch.object(recording.requests, 'post') as post:
+        with tempfile.TemporaryDirectory() as folder, patch.object(recording.requests, 'post') as post:
+            path = os.path.join(folder, 'synthetic.flac')
+            Path(path).write_bytes(b'fLaC')
             post.return_value.status_code = 200
-            recording.transcribe(audio.name)
+            recording.transcribe(path)
             self.assertEqual(post.call_args.kwargs['headers']['Content-Type'], 'audio/flac')
 
     def test_extraction_failure_cleans_its_partial_output(self):
