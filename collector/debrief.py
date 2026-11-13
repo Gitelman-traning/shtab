@@ -149,7 +149,8 @@ def process(base, l2id, z, dry, retry_note):
     post_status([dict(base, status="running", note="беру расшифровку записи")], dry)
     prep.log("сделка %d (Вторая линия %d): есть запись — разбираю" % (base["deal"], l2id))
     try:
-        text, minutes, fresh = recording.zoom_to_text(*z, deal=l2id)
+        text, minutes, fresh = recording.zoom_to_text(*z, deal=l2id,
+            progress=lambda note: post_status([dict(base, status='running', note=note)], dry))
     except recording.NoFunds:
         raise
     except Exception as e:

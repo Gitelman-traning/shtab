@@ -2,6 +2,9 @@ import importlib.util
 from pathlib import Path
 import os
 import sys
+import shutil
+import tempfile
+import wave
 import unittest
 from unittest.mock import Mock, patch
 
@@ -51,3 +54,55 @@ class RecordingTests(unittest.TestCase):
             self.assertTrue(get.call_args.kwargs['stream'])
         finally:
             os.unlink(path)
+
+    def test_video_pipeline_transcribes_only_extracted_audio_and_cleans_both_files(self):
+        original = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+        audio = tempfile.NamedTemporaryFile(delete=False, suffix='.flac')
+        original.close()
+        audio.close()
+        stages = []
+        with patch.object(recording, 'stored', return_value=None), patch.object(recording, 'deepgram_ok', return_value=True), \
+             patch.object(recording, 'APIFY_TOKEN', 'synthetic'), patch.object(recording, 'DEEPGRAM_TOKEN', 'synthetic'), \
+             patch.object(recording, 'apify_audio', return_value={'video_url': 'https://zoom.invalid/video.mp4'}), \
+             patch.object(recording, 'download', return_value=original.name), \
+             patch.object(recording, 'extract_audio', return_value=audio.name), \
+             patch.object(recording, 'transcribe', return_value={}) as transcribe, \
+             patch.object(recording, 'compact', return_value={}), patch.object(recording, 'share'), \
+             patch.object(recording, 'labeled_text', return_value=('synthetic dialogue', 45)):
+            result = recording.zoom_to_text('https://zoom.invalid/share', 'synthetic', deal=1, progress=stages.append)
+        self.assertEqual(result, ('synthetic dialogue', 45, True))
+        transcribe.assert_called_once_with(audio.name)
+        self.assertIn('выделяю аудио из видео', stages)
+        self.assertEqual(stages[-1], 'распознаю речь')
+        self.assertFalse(os.path.exists(original.name))
+        self.assertFalse(os.path.exists(audio.name))
+
+    def test_flac_uses_audio_content_type(self):
+        with tempfile.NamedTemporaryFile(suffix='.flac') as audio, patch.object(recording.requests, 'post') as post:
+            post.return_value.status_code = 200
+            recording.transcribe(audio.name)
+            self.assertEqual(post.call_args.kwargs['headers']['Content-Type'], 'audio/flac')
+
+    def test_extraction_failure_cleans_its_partial_output(self):
+        out = tempfile.NamedTemporaryFile(delete=False, suffix='.flac')
+        out.close()
+        with patch.object(recording.tempfile, 'NamedTemporaryFile', return_value=out), \
+             patch.object(recording.subprocess, 'run', side_effect=recording.subprocess.CalledProcessError(1, 'ffmpeg')):
+            with self.assertRaisesRegex(RuntimeError, 'выделить аудио'):
+                recording.extract_audio('synthetic.mp4')
+        self.assertFalse(os.path.exists(out.name))
+
+    @unittest.skipUnless(shutil.which('ffmpeg'), 'FFmpeg not installed in this test environment')
+    def test_actual_ffmpeg_extracts_a_valid_flac(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source = os.path.join(folder, 'synthetic.wav')
+            with wave.open(source, 'wb') as audio:
+                audio.setnchannels(1)
+                audio.setsampwidth(2)
+                audio.setframerate(16000)
+                audio.writeframes(bytes(32000))
+            result = recording.extract_audio(source)
+            try:
+                self.assertEqual(Path(result).read_bytes()[:4], b'fLaC')
+            finally:
+                os.unlink(result)

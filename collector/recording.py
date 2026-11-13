@@ -10,6 +10,7 @@
 import json
 import os
 import re
+import subprocess
 import tempfile
 import time
 
@@ -57,12 +58,36 @@ def media_url(item):
 def download(item):
     r = requests.get(media_url(item), headers={"Referer": item.get("finalUrl", ""), "Cookie": item.get("cookieHeader", ""),
                                                  "Origin": "https://us06web.zoom.us", "User-Agent": UA}, stream=True, timeout=900)
-    r.raise_for_status()
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    for chunk in r.iter_content(1 << 20):
-        tmp.write(chunk)
-    tmp.close()
-    return tmp.name
+    path = None
+    try:
+        r.raise_for_status()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+            path = tmp.name
+            for chunk in r.iter_content(1 << 20):
+                tmp.write(chunk)
+        return path
+    except Exception:
+        if path:
+            os.unlink(path)
+        raise
+    finally:
+        r.close()
+
+
+def extract_audio(path):
+    """Большой MP4 → моно FLAC для распознавания, без передачи видеоряда в Deepgram."""
+    out = tempfile.NamedTemporaryFile(delete=False, suffix='.flac')
+    out.close()
+    try:
+        subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', path,
+                        '-map', '0:a:0', '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'flac', out.name],
+                       check=True, capture_output=True, timeout=300)
+        if os.path.getsize(out.name) == 0:
+            raise RuntimeError('empty audio')
+        return out.name
+    except (OSError, subprocess.SubprocessError, RuntimeError):
+        os.unlink(out.name)
+        raise RuntimeError('Не удалось выделить аудио из видеозаписи') from None
 
 
 class NoFunds(RuntimeError):
@@ -84,7 +109,8 @@ def deepgram_ok():
 
 def transcribe(path):
     with open(path, "rb") as f:
-        r = requests.post(DEEPGRAM_URL, headers={"Content-Type": "video/mp4", "Authorization": "Token " + DEEPGRAM_TOKEN}, data=f, timeout=2400)
+        content_type = 'audio/flac' if path.endswith('.flac') else 'video/mp4'
+        r = requests.post(DEEPGRAM_URL, headers={"Content-Type": content_type, "Authorization": "Token " + DEEPGRAM_TOKEN}, data=f, timeout=2400)
     if r.status_code == 402:
         raise NoFunds("Deepgram: нет баланса (402)")
     r.raise_for_status()
@@ -149,7 +175,7 @@ def share(deal, rec, source, share_url=""):
         print("расшифровка в Штаб не ушла: %s" % str(e)[:120])
 
 
-def zoom_to_text(share_url, passcode, deal=None, source="debrief"):
+def zoom_to_text(share_url, passcode, deal=None, source="debrief", progress=None):
     """→ (размеченный текст, минут записи, расшифровано сейчас?). Есть готовая в Штабе — Deepgram не зовём."""
     rec = stored(deal)
     if rec:
@@ -158,13 +184,24 @@ def zoom_to_text(share_url, passcode, deal=None, source="debrief"):
         raise RuntimeError("нет APIFY_TOKEN / DEEPGRAM_TOKEN")
     if not deepgram_ok():
         raise NoFunds("Deepgram: нет баланса (402)")
-    path = download(apify_audio(share_url, passcode))
+    progress = progress or (lambda note: None)
+    progress('получаю ссылку на запись Zoom')
+    item = apify_audio(share_url, passcode)
+    progress('скачиваю запись Zoom')
+    path = download(item)
+    audio = None
     try:
-        rec = compact(transcribe(path))
+        if not item.get('audio_url') and item.get('video_url'):
+            progress('выделяю аудио из видео')
+            audio = extract_audio(path)
+        progress('распознаю речь')
+        rec = compact(transcribe(audio or path))
     finally:
-        try:
-            os.unlink(path)
-        except OSError:
-            pass
+        for file in (path, audio):
+            if file:
+                try:
+                    os.unlink(file)
+                except OSError:
+                    pass
     share(deal, rec, source, share_url)
     return labeled_text(rec) + (True,)

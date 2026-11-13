@@ -41,6 +41,12 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install --require-hashes -r collector/requirements.txt
+      - name: Audio extraction
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ffmpeg
+          fi
       - run: |
           if [ "$EVENT" = "repository_dispatch" ] && [ -n "$HELD_DEAL" ]; then python collector/debrief.py held --deal "$HELD_DEAL"
           elif [ -n "$ONE_DEAL" ]; then python collector/debrief.py one --deal "$ONE_DEAL" $DRY
