@@ -1,12 +1,15 @@
 import importlib.util
 from pathlib import Path
 import os
+import sys
 import unittest
 from unittest.mock import Mock, patch
 
 spec = importlib.util.spec_from_file_location('recording', Path(__file__).resolve().parents[1] / 'collector/recording.py')
 recording = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(recording)
+# Сетевой клиент заменён целиком: проверки сборки работают без зависимостей сборщика.
+with patch.dict(sys.modules, {'requests': Mock()}):
+    spec.loader.exec_module(recording)
 
 
 class RecordingTests(unittest.TestCase):
