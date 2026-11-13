@@ -44,13 +44,18 @@ def apify_audio(share_url, passcode, polls=40, every=30):
         raise RuntimeError("Apify: не дождались записи")
     items = requests.get("https://api.apify.com/v2/actor-runs/%s/dataset/items" % run_id,
                          params={"token": APIFY_TOKEN, "clean": "true"}, timeout=120).json()
-    if not items or not items[0].get("audio_url"):
+    if not items or not media_url(items[0]):
         raise RuntimeError("Apify не вернул ссылку на запись (запись ещё обрабатывается в Zoom или неверный код)")
     return items[0]
 
 
+def media_url(item):
+    """Zoom иногда отдаёт только MP4: Deepgram принимает видео с аудиодорожкой."""
+    return item.get("audio_url") or item.get("video_url")
+
+
 def download(item):
-    r = requests.get(item["audio_url"], headers={"Referer": item.get("finalUrl", ""), "Cookie": item.get("cookieHeader", ""),
+    r = requests.get(media_url(item), headers={"Referer": item.get("finalUrl", ""), "Cookie": item.get("cookieHeader", ""),
                                                  "Origin": "https://us06web.zoom.us", "User-Agent": UA}, stream=True, timeout=900)
     r.raise_for_status()
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
