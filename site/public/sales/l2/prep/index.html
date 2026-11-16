@@ -614,7 +614,7 @@ document.getElementById("add-btn").addEventListener("click", function(){
 
 // ---------- не хватает вводных (16.10.2026) ----------
 // пустые из {компания, сайт, оборот, сотрудники} → поля формы; «Отправить» → /api/prep fill → запись в сделку amo и подготовка
-var FILL = [["company", "Название компании", "ООО «Ромашка»", "text"], ["site", "Сайт", "romashka.ru", "text"],
+var FILL = [["company", "Название компании", "ООО «Ромашка»", "text"], ["site", "Сайт или соцсеть", "romashka.ru или ссылка на профиль", "text"],
             ["turn", "Оборот, млн ₽ в год", "120", "number"], ["staff", "Сотрудников", "45", "number"]];
 function fillForm(r){
   var box = document.getElementById("d-fill"), inp = {};
@@ -626,7 +626,7 @@ function fillForm(r){
   document.getElementById("fill-fields").innerHTML = (known ? empty : FILL).map(function(f){
     return '<label for="fill-' + f[0] + '">' + esc(f[1]) + '<input type="' + (f[3] === "number" ? "text" : "text") + '" inputmode="' + (f[3] === "number" ? "decimal" : "text") + '" id="fill-' + f[0] + '" placeholder="' + esc(f[2]) + '"></label>';
   }).join("");
-  document.getElementById("fill-msg").textContent = r.status === "error" ? "Нужно хотя бы название компании или сайт." : "Подготовка уже есть — после отправки пересчитается с новыми вводными.";
+  document.getElementById("fill-msg").textContent = r.status === "error" ? "Нужно название компании, сайт или ссылка на соцсеть. Если профиль недоступен, подготовим по данным CRM." : "Подготовка уже есть — после отправки пересчитается с новыми вводными.";
   var btn = document.getElementById("fill-send");
   btn.disabled = false; btn.textContent = "Отправить";
   btn.onclick = function(){

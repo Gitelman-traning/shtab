@@ -26,6 +26,7 @@ import os
 import re
 import sys
 import time
+from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
@@ -130,7 +131,7 @@ class MissingInputs(RuntimeError):
 
 def inputs_of(ctx):
     """Что есть в карточке: {company, site, turn, staff} — по пустым Штаб предложит дописать."""
-    return {"company": ctx.get("company") or "", "site": site_url(ctx) or ctx["card"].get("Сайт / соцсети") or ctx["card"].get("Сайт") or "",
+    return {"company": ctx.get("company") or "", "site": site_url(ctx) or next(iter(social_urls(ctx)), "") or ctx["card"].get("Сайт / соцсети") or ctx["card"].get("Сайт") or "",
             "turn": ctx.get("turn") or "", "staff": ctx.get("staff") or ""}
 
 
@@ -368,18 +369,58 @@ def fetch(url):
     return _raw_cache[url]
 
 
+SOCIAL_HOSTS = ("instagram.com", "instagr.am", "facebook.com", "fb.com", "vk.com", "vk.ru",
+                "youtube.com", "youtu.be", "tiktok.com", "t.me", "telegram.me", "taplink.cc", "linktr.ee")
+
+
+def on_host(url, hosts):
+    host = (urlsplit(url).hostname or "").lower()
+    return any(host == h or host.endswith("." + h) for h in hosts)
+
+
+def card_urls(ctx):
+    """Ссылки из CRM; отдельное поле Instagram тоже может быть единственной ссылкой клиента."""
+    for key in ("Сайт", "Сайт / соцсети", "Instagram", "Компания"):
+        for tok in re.split(r"[\s,;]+", ctx["card"].get(key) or ""):
+            tok = tok.strip("<>\"'()[]").rstrip(".")
+            if re.match(r"^(https?://)?([\w-]+\.)+[a-zа-я]{2,}([/?#]\S*)?$", tok, re.I):
+                yield tok if re.match(r"^https?://", tok, re.I) else "https://" + tok
+
+
+def social_urls(ctx):
+    """Публичные страницы из карточки — опора для поиска, а не подтверждение фактов о компании."""
+    out = []
+    for url in card_urls(ctx):
+        if not on_host(url, SOCIAL_HOSTS):
+            continue
+        parts = urlsplit(url)
+        path = parts.path.strip("/")
+        if not path or path.lower().split("/")[0] in ("accounts", "login", "explore", "joinchat") or path.startswith("+"):
+            continue
+        # Метки Instagram не нужны для поиска профиля; Facebook profile.php требует id в query.
+        url = urlunsplit((parts.scheme, parts.netloc, parts.path.rstrip("/"),
+                         "" if on_host(url, ("instagram.com", "instagr.am")) else parts.query, ""))
+        if url not in out:
+            out.append(url)
+    return out[:3]
+
+
 def site_url(ctx):
-    """Сайт из карточки: поля «Сайт», «Сайт / соцсети», иногда домен вписан в «Компания». Соцсети и мессенджеры — не сайт."""
-    card = ctx["card"]
-    for key in ("Сайт", "Сайт / соцсети", "Компания"):
-        for tok in re.split(r"[\s,;]+", card.get(key) or ""):
-            tok = tok.strip().rstrip("/.")
-            if not re.match(r"^(https?://)?([\w-]+\.)+[a-zа-я]{2,}(/\S*)?$", tok, re.I):
-                continue
-            if re.search(r"instagram\.|t\.me|wa\.me|vk\.com|facebook\.|youtube\.|tiktok\.|taplink|linktr", tok, re.I):
-                continue
-            return tok if tok.startswith("http") else "https://" + tok
+    """Обычный сайт хранится отдельно от соцсетей и ссылок на переписку."""
+    for url in card_urls(ctx):
+        if not on_host(url, SOCIAL_HOSTS + ("wa.me", "api.whatsapp.com")):
+            return url
     return ""
+
+
+def social_profile_text(url):
+    """Не передавать модели страницу входа под видом содержимого профиля."""
+    text, raw = fetch(url)
+    title = re.search(r"<title[^>]*>(.*?)</title>", raw, re.I | re.S)
+    title = re.sub(r"\s+", " ", title.group(1)).strip().lower() if title else ""
+    if len(text) < 200 or title == "instagram" or re.search(r"log\s*in|sign\s*in|вход|войти|access denied|just a moment", title):
+        return ""
+    return text
 
 
 def site_pages(url, extra=3):
@@ -461,16 +502,22 @@ def registry(inn):
 FIND_SYS = """Ты находишь в интернете страницы о компании собственника перед бизнес-встречей. Пересказывать их не нужно — только адреса.
 Нужны: страница компании в реестре юрлиц (rusprofile, checko, list-org, saby, audit-it или реестр страны клиента) — ради ИНН,
 выручки и штата; интервью, статьи, подкасты, выступления собственника; рейтинги и награды; вакансии (hh.ru и аналоги);
-новости за последние два года; страницы на картах с отзывами. Официальный сайт уже есть — его страницы не ищи.
-Это автоматический прогон: вопросов не задавай и уточнений не проси — никто не ответит. Если названия компании и сайта нет,
-всё равно ищи: по нише + городу/региону, по имени и нику собственника из заметок (Telegram, Instagram), по формулировкам из карточки;
-сделай минимум 3 разных запроса. Ничего не нашёл — так и ответь одной строкой «не найдено». Ответ — только строки вида
+новости за последние два года; страницы на картах с отзывами. Если официальный сайт уже известен, его страницы не ищи.
+Это автоматический прогон: вопросов не задавай и уточнений не проси — никто не ответит.
+Если дана соцсеть, ищи по точной ссылке и нику профиля, затем по найденному названию. Соцсеть не называй официальным сайтом.
+Ниша, город и имя сами по себе не доказывают, что найденная компания — клиент. Не подбирай компании только по нише.
+Возвращай только страницы, связь которых с названием, сайтом или профилем из CRM подтверждается в источнике.
+Если профиль закрыт и связь подтвердить нельзя — «не найдено». Не придумывай название или сайт по нику.
+Ничего не нашёл — так и ответь одной строкой «не найдено». Ответ — только строки вида
 URL | что там, до 12 слов (цифры, если видны в выдаче)
 и для каждого найденного юрлица строка «ИНН: <номер> | <название>». До 10 адресов, самые содержательные первыми."""
 
 
 def find_pages(ctx, site, inns):
     hint = "\nОфициальный сайт: %s" % site if site else "\nОфициальный сайт неизвестен — найди его первым."
+    social = social_urls(ctx)
+    if social:
+        hint += "\nСоцсети из карточки CRM (связь найденных страниц с клиентом проверяй по ним):\n" + "\n".join(social)
     if inns:
         hint += "\nИНН уже известны: %s — реестр по ним искать не нужно." % ", ".join(inns)
     text, sources, usage = claude(FIND_SYS, card_text(ctx) + hint, search_uses=int(os.environ.get("PREP_FIND_SEARCHES", "5")),
@@ -491,8 +538,8 @@ def find_pages(ctx, site, inns):
 
 
 def identified(ctx, site):
-    """Клиент опознан: есть сайт или название компании в карточке (а не только ниша и имя)."""
-    return bool(site) or len(re.sub(r"\W", "", ctx["card"].get("Компания") or "")) >= 3
+    """Есть опора для поиска: сайт, название компании или профиль из CRM; ниша и имя не достаточны."""
+    return bool(site or social_urls(ctx)) or len(re.sub(r"\W", "", ctx["card"].get("Компания") or "")) >= 3
 
 
 def gather_material(ctx, search=True):
@@ -503,14 +550,33 @@ def gather_material(ctx, search=True):
     if pages:
         parts.append("# САЙТ КОМПАНИИ\n" + "\n\n".join("## %s\n%s" % (u, t[:PAGE_CHARS]) for u, t in pages))
         sources += [{"url": u, "title": "сайт компании"} for u, _ in pages]
+    social = social_urls(ctx)
+    ctx["unavailable_social"] = []
+    for url in social:
+        text = social_profile_text(url)
+        if text:
+            parts.append("# СОЦСЕТЬ ИЗ КАРТОЧКИ CRM\n## %s\n%s" % (url, text[:PAGE_CHARS]))
+            sources.append({"url": url, "title": "соцсеть из CRM"})
+        else:
+            ctx["unavailable_social"].append(url)
+            parts.append("# ОГРАНИЧЕНИЕ ИСТОЧНИКОВ\nПрофиль %s недоступен или требует входа. "
+                         "Содержимое профиля не проверено. Подготовку продолжай по данным CRM; "
+                         "прямо отметь это ограничение в разделе «Что интересного». "
+                         "Ник, ссылка и поисковые сниппеты сами по себе не подтверждают факты о компании." % url)
     inns = find_inns([t for _, t in pages] + [card_text(ctx)])
     links = []
     if search:
-        links, more, u = find_pages(ctx, site, inns)
+        try:
+            links, more, u = find_pages(ctx, site, inns)
+        except (RuntimeError, requests.RequestException):
+            if not social:
+                raise
+            more, u = [], {}
+            parts.append("# ОГРАНИЧЕНИЕ ИСТОЧНИКОВ\nВеб-поиск недоступен. Подготовку составь по данным CRM "
+                         "и уже полученным материалам; недостающие внешние сведения не выдумывай.")
         add_usage(usage, u, cheap=True)
-        # 13.10.2026: без названия и сайта в карточке поиск находит компании «по нише» — это может быть не клиент,
-        # поэтому их ИНН в отчётность ФНС не идут, а материал помечается как кандидаты
-        if identified(ctx, site):
+        # Для профиля без названия/сайта не привязываем найденное поиском юрлицо к клиенту автоматически.
+        if site or len(re.sub(r"\W", "", ctx["card"].get("Компания") or "")) >= 3:
             inns += [i for i in more if i not in inns]
     reg = []
     for inn in inns[:4]:
@@ -524,9 +590,9 @@ def gather_material(ctx, search=True):
         parts.append("# РЕЕСТР: ОТКРЫТАЯ БУХОТЧЁТНОСТЬ ФНС (ГИР БО)\n" + "\n".join(reg))
         sources += [{"url": m, "title": "ГИР БО ФНС"} for m in re.findall(r"\((https://bo\.nalog[^)]+)\)", "\n".join(reg))]
     found = []
-    site_host = re.sub(r"^https?://(www\.)?", "", site).split("/")[0] if site else "-"
+    site_host = (urlsplit(site).hostname or "").removeprefix("www.") if site else ""
     for url, what in links:
-        if site_host in url:
+        if site_host and on_host(url, (site_host,)):
             continue
         text, _ = fetch(url)
         if text and len(text) > 300:
@@ -536,6 +602,12 @@ def gather_material(ctx, search=True):
             found.append("## %s — %s\n(страницу скачать не удалось; что там — только со слов поиска)" % (url, what))
     if found:
         parts.append("# НАЙДЕННЫЕ СТРАНИЦЫ\n" + "\n\n".join(found))
+    if social and not site:
+        parts.insert(0, "# ПРАВИЛА РАБОТЫ С СОЦСЕТЯМИ\nВ CRM указана соцсеть, обычный сайт неизвестен. "
+                     "Не выводи название компании, юрлицо, выручку или биографию из ника профиля. "
+                     "Данные CRM указывай как слова клиента. Факты из найденных страниц используй только при явной связи "
+                     "с профилем клиента; иначе отметь, что сведения не удалось проверить. "
+                     "При недостатке источников заход и гипотезы строй по CRM, а название и сайт предложи уточнить на встрече.")
     material = "\n\n".join(parts)[:MATERIAL_CHARS]
     if material and not identified(ctx, site):
         material = ("ВНИМАНИЕ: в карточке CRM нет ни названия компании, ни сайта. Найденные ниже компании — кандидаты по нише и городу, "
@@ -900,8 +972,10 @@ def build_brief(ctx, facts, picked, prompt, owner=""):
 OWNER_SYS = """Ты ищешь в открытых источниках материал о собственнике компании и её победах — чтобы менеджер на встрече показал,
 что изучил компанию глубоко. Ищи: интервью, подкасты, выступления, статьи и колонки собственника; награды, рейтинги, победы
 компании; необычные факты из истории компании и биографии собственника.
-Это автоматический прогон: вопросов не задавай, уточнений не проси, без вступлений и вежливых фраз. Если имени собственника и
-названия нет — ищи по нише, городу и нику из заметок. Ответ — markdown, до 2 500 знаков:
+Это автоматический прогон: вопросов не задавай, уточнений не проси, без вступлений и вежливых фраз.
+Ищи только собственника компании из CRM. Совпадения имени, ниши или города недостаточно.
+Если дана соцсеть, проверяй связь интервью и биографии с этим профилем; если связь не подтверждается, так и напиши.
+Не подбирай других предпринимателей и не выводи название компании из ника. Ответ — markdown, до 2 500 знаков:
 ## Интервью и выступления
 - <где, когда> — 2–3 главных тезиса; 1–2 дословные цитаты в кавычках (источник: адрес)
 ## Победы и награды
@@ -1290,9 +1364,9 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
     usage = {}
     ctx = lead_context(deal)
     log("сделка %d: контекст собран (%d полей, %d заметок), диагност %s" % (deal, len(ctx["card"]), len(ctx["notes"]), ctx["manager"]))
-    # решение Никиты 13.10.2026: без названия компании или сайта в карточке подготовку не считаем — поиск «по нише» находит чужие фирмы
+    # 16.11.2026: соцсеть тоже даёт опору для поиска; недоступный профиль не блокирует подготовку по CRM.
     if not facts_path and not identified(ctx, site_url(ctx)):
-        raise MissingInputs("в карточке amo нет названия компании и сайта — впишите их в форме ниже, Штаб запишет в сделку и запустит подготовку", ctx)
+        raise MissingInputs("в карточке amo нет названия компании, сайта или ссылки на соцсеть — впишите хотя бы одно в форме ниже", ctx)
     if facts_path:
         facts, sources = open(facts_path, encoding="utf-8").read(), []
         log("  досье взято из файла %s (%d символов)" % (facts_path, len(facts)))
@@ -1366,6 +1440,11 @@ def process(deal, cases, prompt, dry, out_path, facts_path=None, picked_path=Non
     log("  текст подготовки: %d/%d токенов, ≈ %.0f ₽" % (u.get("in", 0), u.get("out", 0), cost(u)))
     before = usage.get("rub", 0)
     brief = factcheck_brief(brief, usage)
+    if ctx.get("unavailable_social"):
+        warning = "Профиль соцсети недоступен или требует входа. Сведения о компании из него не удалось проверить; данные CRM — со слов клиента."
+        brief, count = re.subn(r"(^##\s+3\.[^\n]*\n)", lambda m: m.group(1) + "\n" + warning + "\n", brief, count=1, flags=re.M)
+        if not count:
+            brief += "\n\n" + warning
     log("  проверка фактов ≈ %.0f ₽" % (usage.get("rub", 0) - before))
     log("  подготовка: %d символов, всего токенов %d/%d, поисков %d, %d сек, ≈ %.0f ₽" % (
         len(brief), usage["in"], usage["out"], usage["search"], time.time() - t0, usage.get("rub", 0)))

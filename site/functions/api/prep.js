@@ -193,7 +193,7 @@ export async function onRequestPost({ request, env }) {
     if (!fill.company && !fill.site && !fill.turn && !fill.staff) return bad("заполните хотя бы одно поле");
     const old = await env.DB.prepare("SELECT inputs FROM prep WHERE deal = ?").bind(deal).first();
     let had = {}; try { had = JSON.parse((old && old.inputs) || "{}"); } catch (e) { had = {}; }
-    if (!fill.company && !fill.site && !had.company && !had.site) return bad("нужно название компании или сайт — без них подготовку не считаем");
+    if (!fill.company && !fill.site && !had.company && !had.site) return bad("нужно название компании, сайт или ссылка на соцсеть — без них подготовку не считаем");
     await env.DB.prepare(
       "INSERT INTO prep (deal, status, queued_by, amo_url, created_at, updated_at) VALUES (?, 'queued', ?, ?, ?, ?) " +
       "ON CONFLICT(deal) DO UPDATE SET status = 'queued', queued_by = excluded.queued_by, error = '', updated_at = excluded.updated_at")
