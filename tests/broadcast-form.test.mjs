@@ -57,3 +57,9 @@ test('migrated draft preserves text, button and schedule in the existing form; t
 test('plain-text transport failures are visible as connection errors and never unlock launch',async()=>{
  const f=await fixture({rawFailure:true});f.open();await f.element('test').onclick();assert.ok(f.element('msgs').innerHTML.includes('1042'));assert.ok(!f.element('msgs').innerHTML.includes('Unexpected token'));assert.equal(f.element('start').disabled,true);
 });
+test('opening a normal broadcast after a saved audience restores its original bot and filters',async()=>{
+ const f=await fixture();f.open();assert.equal(f.form.bot.disabled,true);
+ const normal={...f.campaign,bot:'one',segment:JSON.stringify({bot:'one',phone:'no',rules:'anna'})};
+ f.context.edit(normal);assert.equal(f.form.audience.value,'');assert.equal(f.form.bot.disabled,false);assert.equal(f.form.bot.value,'one');
+ assert.equal(f.form.phone.value,'no');assert.equal(f.form.rules.checked,true);assert.equal(f.element('audience-filters').hidden,false);
+});
