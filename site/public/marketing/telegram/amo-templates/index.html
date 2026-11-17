@@ -31,7 +31,12 @@
 <p class="hint" id="amo-state"></p><p class="hint">Пробная отправка приходит только в ваш Telegram. Для отправки клиенту менеджер выбирает шаблон в переписке соответствующего бота в amo.</p>
 </div>
 </section></div>
+<details class="card delivery-journal" id="delivery-journal"><summary>Журнал доставки сообщений из amo</summary>
+<p class="hint">Последние 100 сообщений, полученных после включения журнала. Здесь также видны сообщения, восстановленные сверкой с amo. «Доставлено» означает подтверждение Telegram; прочтение клиентом бот определить не может.</p>
+<div class="actions"><button class="btn ghost" type="button" id="delivery-refresh">Обновить журнал</button><label>Поиск по загруженным сообщениям<input id="delivery-search" type="search" placeholder="Имя клиента или номер сделки"></label></div>
+<p class="hint" id="delivery-note" role="status" aria-live="polite">Откройте журнал, чтобы загрузить сообщения.</p><div class="delivery-table" id="delivery-rows"></div>
+</details>
 <footer>Управление пока доступно только Никите. Выключенный шаблон не отправляет запись клиенту. Команда менеджера не уходит клиенту текстом.</footer>
 </main></div></div>
-<script src="/ui.js"></script><script src="./templates.js"></script><script src="/nav.js"></script>
+<script src="/ui.js"></script><script src="./templates.js"></script><script src="./delivery.js"></script><script src="/nav.js"></script>
 </body></html>
