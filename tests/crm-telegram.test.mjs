@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {isCrmTelegramUpdate,routeCrmTelegram} from '../site/functions/api/_crm-telegram.js';
-import {onRequestPost} from '../site/functions/api/tgtask.js';
+import {isCrmTelegramUpdate,routeCrmTelegram,probeCrmTelegram} from '../site/functions/api/_crm-telegram.js';
+import {onRequestPost,onRequestGet} from '../site/functions/api/tgtask.js';
 const secret='synthetic-shared-webhook-secret',id='a'.repeat(32),nonce='b'.repeat(16),url='https://synthetic-crm.trycloudflare.com/api/staff-telegram/webhook';
 const env={CRM_STAFF_TELEGRAM_URL:url,CRM_STAFF_TELEGRAM_WEBHOOK_SECRET:secret};
 const message=text=>({update_id:1,message:{from:{id:11,is_bot:false},chat:{id:11,type:'private'},text}});
@@ -34,4 +34,9 @@ test('shared webhook verifies existing Shtab secret before forwarding a CRM conf
  const config={...env,OKK_KV:{get:async key=>key==='dash:tg-secret'?'existing-shtab-webhook-secret':null}};
  const request=token=>new Request('https://shtab-20v.pages.dev/api/tgtask',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Bot-Api-Secret-Token':token},body:JSON.stringify(message('/start c'+id))});
  try{assert.equal((await onRequestPost({request:request('wrong'),env:config})).status,403);assert.equal(calls,0);assert.equal((await onRequestPost({request:request('existing-shtab-webhook-secret'),env:config})).status,200);assert.equal(calls,1);}finally{globalThis.fetch=oldFetch;}
+});
+test('relay health is guarded by existing ingest auth, sends no actor and returns no provider body or secret',async()=>{
+ const request=new Request('https://shtab-20v.pages.dev/api/tgtask?crm_probe=1');assert.equal((await onRequestGet({request,env})).status,401);
+ let payload;const result=await probeCrmTelegram(env,{fetcher:async(url,init)=>{payload=JSON.parse(init.body);return Response.json({error:'PRIVATE TOKEN: '+secret},{status:403});}});assert.equal(result.code,'upstream_rejected');assert.equal(result.upstream_status,403);assert.ok(!JSON.stringify(result).includes(secret));assert.deepEqual(Object.keys(payload),['update_id']);
+ const html=await probeCrmTelegram(env,{fetcher:async()=>new Response('<html>private body</html>',{status:403})});assert.equal(html.code,'upstream_content');assert.ok(!JSON.stringify(html).includes('private body'));
 });
