@@ -1,4 +1,5 @@
 import { reserveCode, confirmCode } from "./_tg-login.js";
+import { routeCrmTelegram } from "./_crm-telegram.js";
 // /api/tgtask — задачи из Telegram для личного дашборда Никиты (Настройки → Дашборд проектов).
 // Вебхук бота Штаба (TG_BOT_TOKEN — тот же, что у входа через Telegram). Слушает только администраторов:
 // отправитель ищется в users по tg_id с role = admin, остальные сообщения молча пропускаются.
@@ -561,6 +562,8 @@ export async function onRequestPost({ request, env }) {
   const secret = await env.OKK_KV.get(K.secret);
   if (!secret || request.headers.get("x-telegram-bot-api-secret-token") !== secret) return bad("нет доступа", 403);
   const update = await request.json().catch(() => null);
+  const crmResponse=await routeCrmTelegram(update,env);
+  if(crmResponse)return crmResponse;
   const cq = update && update.callback_query;
   if (cq) {
     // кнопка «✅ Заведено в amo» из канала генератора ссылок (Маркетинг → Инфлюенс)
