@@ -10,11 +10,12 @@
   function status(){
     var a=selected(),editable=!current||['draft','tested'].includes(current.status);
     el('save').disabled=busy||!a||!editable;
-    el('test').disabled=busy||!current||dirty||!editable||!form.text.value.trim()||!form.link.value.trim();
+    el('test').disabled=busy||!a||!editable||!form.text.value.trim()||!form.link.value.trim();
+    el('test').textContent=!current||dirty?'Сохранить и отправить тест':'Тест себе';
     el('start').disabled=busy||!current||dirty||!['tested','partial'].includes(current.status);
     form.audience.disabled=busy||!!current;
     ['title','text','link','date_from','date_to','hours_from','hours_to','per_hour','per_day'].forEach(function(k){form[k].disabled=busy||!editable;});
-    el('draft-state').textContent=current?(dirty?'Есть несохранённые изменения.':('Статус: '+(labels[current.status]||current.status)+'. Тест — по одному сообщению от каждого бота аудитории.')):'Можно сохранить черновик без текста. Запуск станет доступен после добавления текста, ссылки и теста себе.';
+    el('draft-state').textContent=current?(dirty?'Есть изменения. «Сохранить и отправить тест» сохранит их перед проверкой.':('Статус: '+(labels[current.status]||current.status)+'. Тест — по одному сообщению от каждого бота аудитории.')):'Добавьте текст и Telegram-ссылку для теста. Кнопка сохранит черновик и отправит проверку только вам; клиентам ничего не уйдёт.';
   }
   function stats(){
     var a=selected(),s=a&&a.stats;
@@ -54,7 +55,16 @@
   form.onsubmit=function(e){e.preventDefault();action('/campaigns',body(),function(){dirty=false;return 'Черновик сохранён. Когда будут текст и ссылка, отправьте тест себе.';});};
   el('collect').onclick=function(){action('',{},function(){return 'Сбор начался. Список появится здесь после обработки данных amoCRM.';});};
   el('new').onclick=function(){edit(null);};
-  el('test').onclick=function(){action('/test',{id:current.id},function(j){return 'Тест отправлен вам от '+j.bots+' бот(ов). Проверьте текст и переход по кнопке.';});};
+  el('test').onclick=function(){
+    if(busy||!selected()||!form.text.value.trim()||!form.link.value.trim())return;
+    var data=!current||dirty?body():null;
+    busy=true;status();
+    var saved=data?api('/campaigns',data).then(function(j){return refresh(j.id);}):Promise.resolve();
+    return saved.then(function(){return api('/test',{id:current.id});}).then(function(j){
+      say('ok','Тест отправлен вам от '+j.bots+' бот(ов). Проверьте текст и переход по кнопке.');
+      return refresh(current.id);
+    }).catch(notice).finally(function(){busy=false;status();});
+  };
   el('start').onclick=function(){
     if(!current||busy)return;
     api('/count',{id:current.id}).then(function(j){var answer=prompt('Рассылка «'+current.title+'». Получателей: '+j.total+'.\nВведите это число для запуска:');if(answer!==null)action('/start',{id:current.id,confirm:Number(answer)},function(r){return 'Запущено для '+n(r.total)+' клиентов. Каждому — одно сообщение от знакомого бота.';});}).catch(notice);
