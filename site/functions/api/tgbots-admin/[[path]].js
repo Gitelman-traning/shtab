@@ -20,7 +20,7 @@ async function forward(request, env, path, user) {
     "X-Shtab-User": user.login || "?",
   };
   // Тест рассылки уходит проверяющему в Telegram — его ID из входа в Штаб.
-  if ((path === "broadcasts/test" || path === "templates/preview" || path === "launch-circle-request" || path.startsWith("manager-media")) && user.login) {
+  if ((path === "broadcasts/test" || path === "crm-audiences/test" || path === "templates/preview" || path === "launch-circle-request" || path.startsWith("manager-media")) && user.login) {
     const u = await env.DB.prepare("SELECT tg_id FROM users WHERE login = ?").bind(user.login).first().catch(() => null);
     if (u && u.tg_id) headers["X-Shtab-User-Tg"] = String(u.tg_id);
   }
@@ -28,7 +28,9 @@ async function forward(request, env, path, user) {
     const v = request.headers.get(h);
     if (v) headers[h] = v;
   }
-  const r = await fetch(`${env.TG_CORE_URL || CORE}/api/admin/${path}${url.search}`, {
+  const target = path === "crm-audiences" || path.startsWith("crm-audiences/")
+    ? "https://tg-l1-campaigns.gitelmanteam.workers.dev" : (env.TG_CORE_URL || CORE);
+  const r = await fetch(`${target}/api/admin/${path}${url.search}`, {
     method: request.method, headers, body: request.method === "POST" ? request.body : undefined,
   });
   return new Response(r.body, { status: r.status, headers: { "Content-Type": r.headers.get("content-type") || "application/json", "Cache-Control": "no-store" } });
@@ -39,6 +41,16 @@ export async function onRequest({ request, env, params }) {
   if (!user) return bad("нет доступа", 401);
   if (!env.TG_CORE_API_TOKEN) return bad("ядро ботов не подключено", 500);
   const path = [].concat(params.path || []).join("/");
+
+  if (path === "crm-audiences" || path.startsWith("crm-audiences/")) {
+    const allowed = request.method === "GET" ? ["crm-audiences", "crm-audiences/campaigns", "crm-audiences/members"]
+      : request.method === "POST" ? ["crm-audiences", "crm-audiences/collect", "crm-audiences/campaigns", "crm-audiences/test", "crm-audiences/start", "crm-audiences/count", "crm-audiences/stop", "crm-audiences/resume"] : [];
+    if (!allowed.includes(path)) return bad("не найдено", 404);
+    if (request.method === "GET" ? !canView(user, SECTION) : (!canEdit(user, SECTION) || user.login === "shared")) return bad("нет доступа к рассылкам", 403);
+    const response = await forward(request, env, path, user);
+    if (request.method === "POST" && response.ok) await audit(env, user.login, "tgbots." + path, "");
+    return response;
+  }
 
   // Шаблоны amo пока настраивает только Никита. Обычных прав на Telegram недостаточно.
   if (path === "manager-media" || path.startsWith("manager-media/")) {

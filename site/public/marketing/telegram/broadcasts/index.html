@@ -31,6 +31,8 @@
 .tg-pv{background:#0e1621;border-radius:14px;padding:12px;margin-top:8px}.tg-pv .bub{background:#182533;color:#e9edf1;border-radius:12px 12px 12px 4px;padding:8px 11px;font-size:13.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word;max-width:100%}
 .tg-pv .bub a{color:#6ab3f3}.tg-pv img{display:block;max-width:100%;max-height:260px;border-radius:10px;margin-bottom:6px}.tg-pv .kb{margin-top:6px;background:#17212b;border-radius:9px;padding:7px;text-align:center;color:#6ab3f3;font-size:13px;font-weight:600}
 .photo-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.crm-workspace{margin-bottom:24px}.crm-workspace h2{margin-top:0}.crm-compose{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:16px}.crm-compose h3{font-size:14px;margin:12px 0 0}.crm-workspace .acts{flex-wrap:wrap}.crm-workspace select,.crm-workspace input,.crm-workspace textarea{min-width:0}.crm-workspace td{overflow-wrap:anywhere}.crm-workspace .cnt{line-height:1.7}.crm-workspace button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+@media(max-width:760px){.crm-compose{grid-template-columns:1fr;gap:8px}.crm-workspace{padding:16px}}
 </style>
 </head>
 <body>
@@ -49,6 +51,37 @@
 </header>
 <main>
   <div id="msgs"></div>
+  <section class="card crm-workspace" id="crm-workspace" aria-labelledby="crm-heading">
+    <h2 id="crm-heading">Запись на диагностику · Первая линия</h2>
+    <p class="hint">НДЗ1 → Квалифицирован прогрев, включая все промежуточные этапы и всех менеджеров. Состав сохраняется при сборе. Каждый клиент получает сообщение один раз от бота последнего общения; отписавшиеся исключаются.</p>
+    <div class="acts"><button class="btn ghost" type="button" id="crm-collect">Собрать аудиторию из amoCRM</button><span class="hint" id="crm-progress" aria-live="polite">Загружаем сохранённые аудитории…</span></div>
+    <form class="f" id="crm-form" autocomplete="off">
+      <label for="crm-audience">Сохранённая аудитория</label><select id="crm-audience" name="audience" required></select>
+      <div class="cnt" id="crm-stats" aria-live="polite">Аудитория ещё не собрана.</div>
+      <div class="hint" id="crm-bots"></div>
+      <button class="btn ghost" type="button" id="crm-preview-members" hidden>Посмотреть получателей</button>
+      <div class="wrap" id="crm-members" hidden></div>
+      <div class="crm-compose">
+        <div>
+          <label for="crm-title">Название рассылки</label><input id="crm-title" name="title" value="Запись на диагностику · Первая линия" required>
+          <label for="crm-text">Текст сообщения</label><textarea id="crm-text" name="text" maxlength="3500" placeholder="Текст от коллег. Можно сохранить черновик, пока сообщение готовится."></textarea>
+          <label for="crm-link">Личный Telegram для записи</label><input id="crm-link" name="link" placeholder="https://t.me/username или @username">
+          <p class="hint">Под текстом будет кнопка «Записаться на диагностику» с этой ссылкой.</p>
+        </div>
+        <div>
+          <h3>Расписание</h3>
+          <div class="two"><div><label for="crm-from">С</label><input id="crm-from" name="date_from" type="date" required></div><div><label for="crm-to">По</label><input id="crm-to" name="date_to" type="date" required></div></div>
+          <div class="two"><div><label for="crm-hours-from">Часы с, МСК</label><input id="crm-hours-from" name="hours_from" type="number" min="0" max="23" value="10" required></div><div><label for="crm-hours-to">До, МСК</label><input id="crm-hours-to" name="hours_to" type="number" min="1" max="24" value="20" required></div></div>
+          <div class="two"><div><label for="crm-hour">Сообщений в час на бота</label><input id="crm-hour" name="per_hour" type="number" min="1" max="7200" value="300" required></div><div><label for="crm-day">В сутки на бота</label><input id="crm-day" name="per_day" type="number" min="1" max="50000" value="2000" required></div></div>
+          <p class="hint">После первых 500 доставленных от каждого бота — пауза для проверки реакции. Действует общий автостоп по отпискам.</p>
+          <label>Как увидит клиент</label><div class="tg-pv"><div class="bub" id="crm-message-preview">Текст пока не добавлен.</div><div class="kb">Записаться на диагностику</div></div>
+        </div>
+      </div>
+      <div class="acts"><button class="btn ghost" id="crm-save" type="submit" disabled>Сохранить черновик</button><button class="btn ghost" id="crm-test" type="button" disabled>Тест себе</button><button class="btn" id="crm-start" type="button" disabled>Запустить…</button><button class="btn ghost" id="crm-new" type="button">Новая рассылка</button></div>
+      <p class="hint" id="crm-draft-state">Для запуска понадобятся текст, ссылка и тест себе. Тест придёт по одному сообщению от каждого бота аудитории.</p>
+    </form>
+    <div class="wrap" id="crm-campaigns"></div>
+  </section>
   <div class="msg mid" id="guard"></div>
   <div class="grid">
     <div class="card">
@@ -283,5 +316,6 @@ Promise.all([get("bots"), get("lists"), get("materials")]).then(function(r){
 });
 </script>
 <script src="/nav.js"></script>
+<script src="/marketing/telegram/broadcasts/crm-audiences.js"></script>
 </body>
 </html>
