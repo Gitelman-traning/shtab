@@ -16,7 +16,7 @@ test('shared Telegram bot routes only private CRM prefix, preserves Shtab login/
 });
 test('shared Telegram forwarding uses fixed trusted HTTPS route, dedicated secret and no redirects',async()=>{
  for(const update of [message('/start c'+id),callback()]){
-  let calls=0;const response=await routeCrmTelegram(update,env,{fetcher:async(target,init)=>{calls++;assert.equal(target,url);assert.equal(init.redirect,'error');assert.equal(init.headers['X-Telegram-Bot-Api-Secret-Token'],secret);assert.deepEqual(JSON.parse(init.body),update);assert.equal(init.headers.Authorization,undefined);return Response.json({ok:true});}});assert.equal(response.status,200);assert.equal(calls,1);
+  let calls=0;const response=await routeCrmTelegram(update,env,{fetcher:async(target,init)=>{calls++;assert.equal(target,url);assert.equal(init.redirect,'manual');assert.equal(init.headers['X-Telegram-Bot-Api-Secret-Token'],secret);assert.deepEqual(JSON.parse(init.body),update);assert.equal(init.headers.Authorization,undefined);return Response.json({ok:true});}});assert.equal(response.status,200);assert.equal(calls,1);
  }
 });
 test('missing/bad relay configuration never leaks confirmations or falls through to Shtab tasks',async()=>{
@@ -39,4 +39,10 @@ test('relay health is guarded by existing ingest auth, sends no actor and return
  const request=new Request('https://shtab-20v.pages.dev/api/tgtask?crm_probe=1');assert.equal((await onRequestGet({request,env})).status,401);
  let payload;const result=await probeCrmTelegram(env,{fetcher:async(url,init)=>{payload=JSON.parse(init.body);return Response.json({error:'PRIVATE TOKEN: '+secret},{status:403});}});assert.equal(result.code,'upstream_rejected');assert.equal(result.upstream_status,403);assert.ok(!JSON.stringify(result).includes(secret));assert.deepEqual(Object.keys(payload),['update_id']);
  const html=await probeCrmTelegram(env,{fetcher:async()=>new Response('<html>private body</html>',{status:403})});assert.equal(html.code,'upstream_content');assert.ok(!JSON.stringify(html).includes('private body'));
+});
+test('Cloudflare-compatible manual redirect rejects every 3xx without sending the secret to Location',async()=>{
+ for(const status of [301,302,303,307,308]){
+  let calls=0;const result=await probeCrmTelegram(env,{fetcher:async(target,init)=>{calls++;assert.equal(target,url);if(init.redirect==='error')throw new TypeError('Workers does not support error redirect');assert.equal(init.redirect,'manual');return new Response(null,{status,headers:{Location:'https://outside.example/stolen'}});}});
+  assert.equal(calls,1);assert.equal(result.ok,false);assert.equal(result.code,'upstream_redirect');assert.equal(result.upstream_status,status);assert.ok(!JSON.stringify(result).includes(secret));
+ }
 });

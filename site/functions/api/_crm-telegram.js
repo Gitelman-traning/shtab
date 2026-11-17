@@ -10,7 +10,9 @@ async function forward(update,env,{fetcher=fetch}={}){
   const secret=env.CRM_STAFF_TELEGRAM_WEBHOOK_SECRET;
   if(url.protocol!=='https:'||url.username||url.password||url.port||url.search||url.hash||url.pathname!=='/api/staff-telegram/webhook'||!(url.hostname==='crm.gitelman.team'||/^[a-z0-9-]+\.trycloudflare\.com$/.test(url.hostname))||!(/^[A-Za-z0-9_-]{16,256}$/.test(secret||'')))return unavailable('configuration_invalid');
   try{
-    const response=await fetcher(url.href,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Bot-Api-Secret-Token':secret},body:JSON.stringify(update),redirect:'error',signal:AbortSignal.timeout(10000)});
+    // Workers rejects redirect:'error' before sending. Manual + explicit rejection keeps the secret on this origin.
+    const response=await fetcher(url.href,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Bot-Api-Secret-Token':secret},body:JSON.stringify(update),redirect:'manual',signal:AbortSignal.timeout(10000)});
+    if(response.status>=300&&response.status<400)return unavailable('upstream_redirect',response.status);
     let result;try{result=await response.json();}catch{return unavailable('upstream_content',response.status);}
     if(!response.ok||result?.ok!==true)return unavailable('upstream_rejected',response.status);
     return Response.json({ok:true},{headers:{'Cache-Control':'no-store'}});
