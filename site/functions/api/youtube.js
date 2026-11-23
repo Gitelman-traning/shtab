@@ -1,5 +1,6 @@
 // YouTube: сделки и выручка (Маркетинг → YouTube → Сделки и выручка), таблицы yt_leads и yt_paid (schema38/39.sql, collector/youtube.py).
 // YouTube-сделка — «Источник» = YouTube или SHORTS Youtube, либо utm_source / utm_medium содержит youtube; создана с 26.07.2025.
+// Только действующие Первая (8733326) и Вторая (9701010) линии. Архив и остальные воронки не учитываются.
 //   лиды            — YouTube-сделки по месяцу создания;
 //   встречи         — из них Первая линия в «Встреча проведена» (142), по месяцу закрытия;
 //   оплаты прямые   — YouTube-сделки Второй линии в «100% оплаты получено» (142), по месяцу закрытия, выручка = бюджет сделки;
@@ -19,6 +20,8 @@ const day = (ts) => (ts ? new Date((Number(ts) + MSK) * 1000).toISOString().slic
 const NO_UTM = "без UTM";
 const DETAIL = ["leads", "meetings", "paid", "cpaid"];
 const LIMIT = 1000;
+const LEAD_PIPELINES = [8733326, 9701010];
+const PAID_PIPELINES = [9701010];
 
 function campaign(r) {
   if (!r.utm_source && !r.utm_medium && !r.utm_campaign) return NO_UTM;
@@ -45,8 +48,10 @@ export async function onRequestGet({ request, env }) {
   const hit = (table, key, metric) => want && want.metric === metric && (want.table === "total" ? table === "month" : want.table === table && want.key === key);
 
   // SELECT *: страница не падает, пока миграция 39 (названия) не применена
-  const leads = (await env.DB.prepare("SELECT * FROM yt_leads").all()).results || [];
-  const paidAll = (await env.DB.prepare("SELECT * FROM yt_paid").all()).results || [];
+  // Отбираем до группировок и first: сделка из реанимации/архива не может ни увеличить
+  // показатель, ни связать оплату через контакт, ни подменить её кампанию/выпуск.
+  const leads = (await env.DB.prepare("SELECT * FROM yt_leads WHERE pipeline_id IN (?,?)").bind(...LEAD_PIPELINES).all()).results || [];
+  const paidAll = (await env.DB.prepare("SELECT * FROM yt_paid WHERE pipeline_id IN (?)").bind(...PAID_PIPELINES).all()).results || [];
   const run = await env.DB.prepare("SELECT finished, note FROM runs WHERE collector = 'amo-youtube' ORDER BY finished DESC LIMIT 1").first();
 
   const T = { month: {}, camp: {}, cont: {} }, srcOf = {}, months = new Set();
