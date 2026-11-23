@@ -1,11 +1,11 @@
 // YouTube: сделки и выручка (Маркетинг → YouTube → Сделки и выручка), таблицы yt_leads и yt_paid (schema38/39.sql, collector/youtube.py).
 // YouTube-сделка — «Источник» = YouTube или SHORTS Youtube, либо utm_source / utm_medium содержит youtube; создана с 26.07.2025.
-// Только действующие Первая (8733326) и Вторая (9701010) линии. Архив и остальные воронки не учитываются.
+// Лиды и прямые показатели — действующие Первая (8733326) и Вторая (9701010) линии.
 //   лиды            — YouTube-сделки по месяцу создания;
 //   встречи         — из них Первая линия в «Встреча проведена» (142), по месяцу закрытия;
 //   чеки            — YouTube-сделки Второй линии, по дате первого входа в «Клиент прислал чек»;
 //   оплаты прямые   — YouTube-сделки Второй линии в «100% оплаты получено» (142), по месяцу закрытия, выручка = бюджет сделки;
-//   через контакт   — любые оплаченные сделки Второй линии, у контакта которых есть хоть одна YouTube-сделка (прямые входят сюда же);
+//   через контакт   — оплаты действующей Второй линии, у контакта которых есть YouTube-сделка в любой воронке;
 //                     кампания и выпуск — от самой ранней YouTube-сделки контакта.
 //   GET /api/youtube[?from=YYYY-MM&to=YYYY-MM] — по месяцам и годам, по кампаниям, по выпускам
 //   GET /api/youtube?detail=leads|meetings|receipts|paid|cpaid&table=month|year|camp|cont|total&key=…[&from&to]
@@ -53,9 +53,10 @@ export async function onRequestGet({ request, env }) {
   };
 
   // SELECT *: страница не падает, пока миграция 39 (названия) не применена
-  // Отбираем до группировок и first: сделка из реанимации/архива не может ни увеличить
-  // показатель, ни связать оплату через контакт, ни подменить её кампанию/выпуск.
-  const leads = (await env.DB.prepare("SELECT * FROM yt_leads WHERE pipeline_id IN (?,?)").bind(...LEAD_PIPELINES).all()).results || [];
+  // Вне двух линий нужны только сделки контактов с оплатой действующей Второй линии.
+  const leads = (await env.DB.prepare(`SELECT * FROM yt_leads WHERE pipeline_id IN (?,?)
+    OR contact_id IN (SELECT contact_id FROM yt_paid WHERE pipeline_id IN (?))`)
+    .bind(...LEAD_PIPELINES, ...PAID_PIPELINES).all()).results || [];
   const paidAll = (await env.DB.prepare("SELECT * FROM yt_paid WHERE pipeline_id IN (?)").bind(...PAID_PIPELINES).all()).results || [];
   const receiptSnapshot = await env.OKK_KV.get("youtube:receipt-dates");
   const receiptDates = receiptSnapshot ? JSON.parse(receiptSnapshot) : {};
@@ -68,9 +69,13 @@ export async function onRequestGet({ request, env }) {
   };
   // самая ранняя YouTube-сделка контакта — от неё кампания и выпуск для оплат через контакт
   const first = {};
+  const ytIds = new Set();
   for (const r of leads) {
     const c = r.contact_id;
-    if (c && (!first[c] || r.created_at < first[c].created_at)) first[c] = r;
+    const prev = first[c];
+    if (c && (!prev || r.created_at < prev.created_at || (r.created_at === prev.created_at && r.id < prev.id))) first[c] = r;
+    if (!LEAD_PIPELINES.includes(r.pipeline_id)) continue;
+    ytIds.add(r.id);
     const ck = campaign(r);
     if (r.utm_source) (srcOf[ck] = srcOf[ck] || new Set()).add(String(r.utm_source).toLowerCase());
     const keys = [["month", null], ["camp", ck], ["cont", content(r)]];
@@ -91,17 +96,18 @@ export async function onRequestGet({ request, env }) {
     }
     if (r.paid && inP(mx)) for (const [t, k] of keys) { add(t, k || mx, "paid", 1, it); add(t, k || mx, "revenue", Number(r.price) || 0); }
   }
-  const ytIds = new Set(leads.map((r) => r.id));
   for (const p of paidAll) {
     const f = p.contact_id && first[p.contact_id];
     const mx = month(p.closed_at || p.created_at);
     if (!f) continue;
     months.add(mx);
     if (!inP(mx)) continue;
+    const ck = campaign(f);
+    if (f.utm_source) (srcOf[ck] = srcOf[ck] || new Set()).add(String(f.utm_source).toLowerCase());
     const it = () => ({ paid: { id: p.id, url: `${AMO}/leads/detail/${p.id}`, name: p.name || "", closed: day(p.closed_at), price: Number(p.price) || 0 },
       contact: { id: p.contact_id, url: `${AMO}/contacts/detail/${p.contact_id}`, name: p.contact_name || f.contact_name || "" },
       direct: ytIds.has(p.id), via: deal(f) });
-    for (const [t, k] of [["month", mx], ["camp", campaign(f)], ["cont", content(f)]]) { add(t, k, "cpaid", 1, it); add(t, k, "crevenue", Number(p.price) || 0); }
+    for (const [t, k] of [["month", mx], ["camp", ck], ["cont", content(f)]]) { add(t, k, "cpaid", 1, it); add(t, k, "crevenue", Number(p.price) || 0); }
   }
   if (want) {
     const sortKey = (x) => (x.paid?.closed || x.receipt || (want.metric === "leads" ? x.created : x.closed)) || "";

@@ -1,4 +1,4 @@
-"""Collector selection must match the two current sales pipelines in the report."""
+"""Check which deals supply YouTube attribution and which supply payments."""
 import importlib.util
 import pathlib
 import sys
@@ -26,16 +26,20 @@ class YouTubePipelinesTests(unittest.TestCase):
         self.assertEqual((first['meeting'],first['paid']),(1,0))
         second=youtube.yt_row(lead(9701010))
         self.assertEqual((second['meeting'],second['paid']),(0,1))
-    def test_archive_reanimation_duplicates_and_unknown_are_dropped(self):
-        for pipeline in [8733518,10637862,6609134,10639774,10242466,0]:
+    def test_archive_reanimation_and_duplicates_are_kept_for_contact_attribution(self):
+        for pipeline in [8733518,10637862,6609134,10639774,10242466]:
             with self.subTest(pipeline=pipeline):
-                self.assertIsNone(youtube.yt_row(lead(pipeline)))
-    def test_source_and_utm_rules_still_apply_within_current_lines(self):
+                row=youtube.yt_row(lead(pipeline))
+                self.assertEqual((row['pipeline_id'],row['src'],row['meeting'],row['paid']),(pipeline,'YouTube',0,0))
+    def test_source_and_utm_rules_apply_across_pipelines_and_statuses(self):
         row=lead(8733326,False)
         self.assertIsNone(youtube.yt_row(row))
         row['custom_fields_values']=[{'field_id':453161,'values':[{'value':'youtube'}]}]
         self.assertEqual(youtube.yt_row(row)['src'],'utm_source')
         row['pipeline_id']=10637862
+        row['status_id']=143
+        self.assertEqual(youtube.yt_row(row)['src'],'utm_source')
+        row['custom_fields_values']=[]
         self.assertIsNone(youtube.yt_row(row))
     def test_contact_payment_collection_only_requests_current_second_line(self):
         calls=[]
