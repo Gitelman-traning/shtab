@@ -1,12 +1,20 @@
 """Collector selection must match the two current sales pipelines in the report."""
 import importlib.util
 import pathlib
+import sys
+import types
 import unittest
+from unittest.mock import patch
 
 source=pathlib.Path(__file__).resolve().parents[1]/'collector'/'youtube.py'
 spec=importlib.util.spec_from_file_location('youtube_scope',source)
 youtube=importlib.util.module_from_spec(spec)
-spec.loader.exec_module(youtube)
+# These checks exercise selection only. Keep CI dependency-free and forbid HTTP.
+def no_network(*args,**kwargs):
+    raise AssertionError('network is not part of pipeline selection tests')
+requests_stub=types.SimpleNamespace(get=no_network,post=no_network,RequestException=RuntimeError)
+with patch.dict(sys.modules,{'requests':requests_stub}):
+    spec.loader.exec_module(youtube)
 
 def lead(pipeline,source=True):
     return {'id':1,'pipeline_id':pipeline,'status_id':142,'created_at':1,'price':100,
