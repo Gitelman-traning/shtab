@@ -1,6 +1,6 @@
 name: YouTube deals
 
-# Маркетинг → YouTube → Сделки и выручка: YouTube-сделки и оплаты Второй линии из amo (только чтение) → yt_leads / yt_paid.
+# Маркетинг → YouTube → Сделки и выручка: сделки, оплаты и история этапа «Клиент прислал чек» из amo.
 # Ночью — сделки, изменённые за 3 дня; вручную можно перезалить всё (mode=full, ~25 минут).
 on:
   schedule:
@@ -15,6 +15,10 @@ on:
         description: 'Days back for inc mode'
         required: false
         default: '3'
+
+concurrency:
+  group: youtube-deals
+  cancel-in-progress: false
 
 jobs:
   youtube:

@@ -13,6 +13,7 @@ const batches = {
   prep_debrief:[20,r=>deal(r)&&r.text], prep_debrief_versions:[30,r=>deal(r)&&r.text], debrief_status:[200,deal],
   expenses:[500,r=>date(r?.day)&&r.service&&Number.isFinite(r.amount)], yt_leads:[1000,yt],
   yt_drop:[5000,id=>Number.isSafeInteger(Number(id))&&Number(id)>0],
+  yt_receipts:[20000,r=>Number.isSafeInteger(r?.id)&&r.id>0&&Number.isSafeInteger(r.at)&&r.at>0&&r.at<=253402289999],
 };
 
 export function inspectIngest(body) {

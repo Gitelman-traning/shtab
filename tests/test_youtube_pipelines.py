@@ -48,4 +48,17 @@ class YouTubePipelinesTests(unittest.TestCase):
         self.assertEqual(calls[0]['filter[statuses][0][pipeline_id]'],9701010)
         self.assertNotIn('filter[statuses][1][pipeline_id]',calls[0])
 
+    def test_receipt_history_deduplicates_across_pages_by_first_transition(self):
+        def event(deal, at, pipeline=9701010):
+            return {'entity_type':'lead','entity_id':deal,'created_at':at,
+                    'value_after':[{'lead_status':{'pipeline_id':pipeline,'id':77665974}}]}
+        def get(path, params):
+            self.assertEqual(path, '/events')
+            self.assertEqual(params['filter[value_after][leads_statuses][0][status_id]'], 77665974)
+            if params['page'] == 1:
+                return {'_embedded':{'events':[event(1,20),event(2,19,8733518)]},'_links':{'next':True}}
+            return {'_embedded':{'events':[event(1,10),event(3,15)]}}
+        with patch.object(youtube,'get',get), patch.object(youtube.time,'sleep'):
+            self.assertEqual(youtube.receipt_dates(), {1:10,3:15})
+
 if __name__=='__main__':unittest.main()

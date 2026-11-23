@@ -56,7 +56,8 @@ export async function onRequestPost({ request, env }) {
   const collector = String(body.collector || "unknown").slice(0, 60);
   const has = (k) => Array.isArray(body[k]) && body[k].length;
   if (!points.length && !plans.length && !has("okna") && !has("goals") && !has("pings") && !has("prep") && !has("prep_cases") && !has("prep_growth") && !has("prep_manager") && !has("prep_style") && !has("prep_debrief") && !has("prep_debrief_versions") && !has("debrief_status") && !(body.prep_alumni && body.prep_alumni.rows) && !has("expenses")
-      && !has("yt_leads") && !body.yt_reset && !body.yt_leads_replace && !has("yt_drop") && !(body.yt_paid && body.yt_paid.rows)) return bad("пустая пачка");
+      && !has("yt_leads") && !body.yt_reset && !body.yt_leads_replace && !has("yt_drop") && !(body.yt_paid && body.yt_paid.rows) && !Array.isArray(body.yt_receipts)) return bad("пустая пачка");
+  if (body.yt_receipts !== undefined && collector !== "amo-youtube") return bad("yt_receipts: нужен сборщик amo-youtube");
 
   const stamp = now();
   let replacements;
@@ -288,6 +289,13 @@ export async function onRequestPost({ request, env }) {
       batch.push(gs.bind(String(g.mgr).slice(0, 40), String(g.month), goal,base,rate, String(g.note || "").slice(0, 200), "collector:" + collector, stamp));
     }
     if (batch.length) { await env.DB.batch(batch); written += batch.length; }
+  }
+  if (Array.isArray(body.yt_receipts)) {
+    // Этот снимок хранит даты событий. При чтении отчёт связывает их с актуальными YouTube-сделками.
+    const dates = {};
+    for (const { id, at } of body.yt_receipts) dates[id] = Math.min(dates[id] ?? at, at);
+    await env.OKK_KV.put("youtube:receipt-dates", JSON.stringify(dates));
+    written += body.yt_receipts.length;
   }
   if (body.run_note !== undefined || body.finalize) {
     await env.DB.prepare("INSERT INTO runs (collector, started, finished, points, note) VALUES (?,?,?,?,?)")

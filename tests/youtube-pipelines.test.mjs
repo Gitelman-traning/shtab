@@ -2,6 +2,7 @@ import {test,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {fixture,request} from './helpers.mjs';
 import {onRequestGet} from '../site/functions/api/youtube.js';
+import {onRequestPost} from '../site/functions/api/ingest.js';
 
 const envs=[];
 afterEach(()=>{for(const e of envs.splice(0))e.sqlite.close();});
@@ -38,7 +39,7 @@ async function run(e,q=''){
 }
 test('только действующие линии входят в итоги, месяцы, кампании и выпуски',async()=>{
  const d=await run(env());
- assert.deepEqual(d.total,{leads:3,meetings:1,paid:1,revenue:100,cpaid:2,crevenue:170});
+ assert.deepEqual(d.total,{leads:3,meetings:1,receipts:0,paid:1,revenue:100,cpaid:2,crevenue:170});
  assert.deepEqual(d.months,['2026-11','2026-10']);
  assert.deepEqual(d.campaigns.map(r=>r.key).sort(),['held','l1','sale']);
  assert.deepEqual(d.contents.map(r=>r.key).sort(),['held-video','l1-video','sale-video']);
@@ -65,4 +66,26 @@ test('ограничение периода сохраняет раннюю ра
  const d=await run(env(),'?from=2026-11&to=2026-11');
  assert.equal(d.total.leads,2);assert.equal(d.total.meetings,1);assert.equal(d.total.crevenue,170);
  assert.equal((await run(env(),'?from=2026-12&to=2026-12')).total.leads,0);
+});
+
+test('чеки зачисляются по дате перехода, включая оплаченные сделки, и открываются из годового итога',async()=>{
+ const e=env();
+ e.sqlite.prepare('UPDATE yt_leads SET created_at=? WHERE id=103').run(at('2025-12-27'));
+ const put=(yt_receipts)=>onRequestPost({request:request('/api/ingest',{collector:'amo-youtube',yt_receipts},{auth:'collector'}),env:e});
+ assert.equal((await run(e)).receipts_ready,false);
+ assert.equal((await put([{id:103,at:at('2026-11-02')},{id:103,at:at('2026-01-02')},
+   {id:201,at:at('2025-12-29')},{id:101,at:at('2026-11-05')}])).status,200);
+ assert.equal((await put([{id:103,at:'bad'}])).status,400);
+ const d=await run(e);
+ assert.equal(d.receipts_ready,true);
+ assert.deepEqual(d.years.map(r=>[r.year,r.leads,r.receipts,r.paid]),[['2026',2,1,1],['2025',1,0,0]]);
+ assert.equal(d.rows.find(r=>r.month==='2026-01').receipts,1);
+ assert.equal(d.campaigns.find(r=>r.key==='sale').receipts,1);
+ assert.equal(d.contents.find(r=>r.key==='sale-video').receipts,1);
+ const list=await run(e,'?detail=receipts&table=year&key=2026');
+ assert.deepEqual(list.items.map(r=>[r.id,r.receipt]),[[103,'2026-01-02']]);
+ assert.equal((await run(e,'?detail=receipts&table=year&key=2025')).items.length,0);
+ const partial=await run(e,'?from=2026-11&to=2026-11');
+ assert.equal(partial.years[0].receipts,0);
+ assert.equal((await run(e,'?detail=receipts&table=year&key=2026&from=2026-11')).items.length,0);
 });

@@ -20,6 +20,7 @@ table.yt th.grp{text-align:center;border-bottom:1px solid var(--line)}
 table.yt td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
 table.yt .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 table.yt tfoot td{font-weight:700;border-bottom:0}
+table.yt .year-total{background:var(--soft);font-weight:700}
 table.yt .bl{border-left:1px solid var(--line)}
 .src{font-size:11.5px;color:var(--dim);margin-top:2px}
 .z{color:var(--faint)}
@@ -84,7 +85,7 @@ table.yt .bl{border-left:1px solid var(--line)}
     <div class="tw"><table class="yt" id="t-cont"></table></div>
     <p class="note">Метку выпуска пока почти никто не ставит, поэтому большая часть в строке «без выпуска». Когда в ссылках под видео появится utm_content, здесь будут видны отдельные выпуски.</p>
   </div>
-  <footer>Лиды — по месяцу создания сделки, встречи и оплаты — по месяцу, когда сделка перешла в «Встреча проведена» или «100% оплаты получено». Выручка — бюджет оплаченной сделки Второй линии. Расходы и окупаемость появятся во второй версии.</footer>
+  <footer>Лиды считаются по дате создания сделки, встречи и оплаты — по дате закрытия. Чеки считаются по дате первого перехода в «Клиент прислал чек». Итоги за год включают месяцы, попавшие в выбранный период. Выручка — бюджет оплаченной сделки Второй линии. Расходы и окупаемость появятся во второй версии.</footer>
 </main>
 </div>
 </div>
@@ -106,6 +107,7 @@ function cnum(v){ return v ? Math.round(v).toLocaleString("ru-RU") : "0"; }
 var CAMP = { "description": "description — ссылка в описании видео", "0": "0 — метка без кампании" };
 function head(first){
   return '<thead><tr><th rowspan="2">' + first + '</th><th rowspan="2" class="num"><span class="tip" data-k="leads">Лиды</span></th><th rowspan="2" class="num"><span class="tip" data-k="meetings">Встречи</span></th>'
+    + '<th rowspan="2" class="num"><span class="tip" data-k="receipts">Прислал чек</span></th>'
     + '<th colspan="2" class="grp bl"><span class="tip" data-k="paid">Оплаты сделки</span></th><th colspan="2" class="grp bl"><span class="tip" data-k="cpaid">Оплаты через контакт</span></th></tr>'
     + '<tr><th class="num bl">шт.</th><th class="num">выручка</th><th class="num bl">шт.</th><th class="num">выручка</th></tr></thead>';
 }
@@ -113,12 +115,24 @@ function head(first){
 function clk(html, v, m, tb, k, title){ return v ? '<span class="clk" role="button" tabindex="0" data-m="' + m + '" data-t="' + tb + '" data-k="' + esc(k) + '" data-title="' + esc(title) + '">' + html + '</span>' : html; }
 function cells(r, tb, k, title){
   return '<td class="num">' + clk(n(r.leads), r.leads, "leads", tb, k, "Лиды · " + title) + '</td><td class="num">' + clk(n(r.meetings), r.meetings, "meetings", tb, k, "Встречи · " + title) + '</td>'
+    + '<td class="num">' + (D.receipts_ready ? clk(n(r.receipts), r.receipts, "receipts", tb, k, "Клиент прислал чек · " + title) : '<span class="z" title="История чеков ещё не загружена">—</span>') + '</td>'
     + '<td class="num bl">' + clk(n(r.paid), r.paid, "paid", tb, k, "Оплаты сделки · " + title) + '</td><td class="num">' + clk(rub(r.revenue), r.paid, "paid", tb, k, "Оплаты сделки · " + title) + '</td>'
     + '<td class="num bl">' + clk(n(r.cpaid), r.cpaid, "cpaid", tb, k, "Оплаты через контакт · " + title) + '</td><td class="num">' + clk(rub(r.crevenue), r.cpaid, "cpaid", tb, k, "Оплаты через контакт · " + title) + '</td>';
 }
 function table(id, first, rows, label, tb, keyOf, titleOf){
   var t = D.total;
-  $(id).innerHTML = head(first) + '<tbody>' + (rows.length ? rows.map(function(r){ return '<tr><td>' + label(r) + '</td>' + cells(r, tb, keyOf(r), titleOf(r)) + '</tr>'; }).join("") : '<tr><td colspan="7" class="empty">за этот период данных нет</td></tr>') + '</tbody>'
+  var lastYear = "";
+  var body = rows.map(function(r){
+    var prefix = "";
+    if (tb === "month") {
+      var year = r.month.slice(0, 4);
+      var yearly = year !== lastYear && (D.years || []).find(function(x){ return x.year === year; });
+      if (yearly) prefix = '<tr class="year-total"><td>Итого за ' + year + '</td>' + cells(yearly, "year", year, year + " год") + '</tr>';
+      lastYear = year;
+    }
+    return prefix + '<tr><td>' + label(r) + '</td>' + cells(r, tb, keyOf(r), titleOf(r)) + '</tr>';
+  }).join("");
+  $(id).innerHTML = head(first) + '<tbody>' + (body || '<tr><td colspan="8" class="empty">за этот период данных нет</td></tr>') + '</tbody>'
     + (rows.length ? '<tfoot><tr><td>Итого</td>' + cells(t, "total", "", "за период") + '</tr></tfoot>' : '');
 }
 function opts(sel, val){ return MONTHS.map(function(m){ return '<option value="' + m + '"' + (m === val ? ' selected' : '') + '>' + mname(m) + '</option>'; }).join(""); }
@@ -140,6 +154,7 @@ function load(){
 function render(){
   var t = D.total;
   $("kpis").innerHTML = [["YouTube-лиды", cnum(t.leads), "", "leads"], ["Встречи проведены", cnum(t.meetings), t.leads ? fmtPct(pct(t.meetings, t.leads)) + " от лидов" : "", "meetings"],
+    ["Клиент прислал чек", D.receipts_ready ? cnum(t.receipts) : "—", D.receipts_ready ? "" : "история ещё не загружена", "receipts"],
     ["Оплаты сделки", cnum(t.paid), t.revenue ? cnum(t.revenue) + " ₽" : "", "paid"], ["Оплаты через контакт", cnum(t.cpaid), t.crevenue ? cnum(t.crevenue) + " ₽" : "", "cpaid"]]
     .map(function(k){ return '<div class="kpi"><span class="nm"><span class="tip" data-k="' + k[3] + '">' + k[0] + '</span></span><span class="v">' + clk(k[1], t[k[3]], k[3], "total", "", k[0] + " · за период") + (k[2] ? ' <span class="plan">' + k[2] + '</span>' : '') + '</span></div>'; }).join("");
   var key = function(r){ return r.key; };
@@ -149,8 +164,9 @@ function render(){
   $("stamp").textContent = D.updated ? "обновлено " + D.updated.slice(8, 10) + "." + D.updated.slice(5, 7) + " " + D.updated.slice(11, 16) + " UTC" : "ещё не собиралось";
 }
 var TIPS = {
-  leads: "Сделки действующих Первой и Второй линий с полем «Источник» = YouTube (или SHORTS Youtube) или с меткой utm_source / utm_medium = youtube, созданные в этом месяце. Архивные и остальные воронки исключены. Один человек с несколькими сделками считается несколько раз — как в amo.",
+  leads: "Сделки действующих Первой и Второй линий с полем «Источник» = YouTube (или SHORTS Youtube) или с меткой utm_source / utm_medium = youtube, созданные в выбранном периоде. Архивные и остальные воронки исключены. Один человек с несколькими сделками считается несколько раз — как в amo.",
   meetings: "Из YouTube-сделок Первой линии — перешедшие в «Встреча проведена». Месяц — когда сделка туда перешла.",
+  receipts: "YouTube-сделки действующей Второй линии, которые побывали на этапе «Клиент прислал чек». Каждая сделка считается один раз по дате первого перехода, в том числе после дальнейшего перехода в оплату.",
   paid: "YouTube-сделки Второй линии в «100% оплаты получено (Фин блок)» и сумма их бюджета. Месяц — когда сделка туда перешла.",
   cpaid: "Все оплаченные сделки действующей Второй линии, у контакта которых есть хоть одна YouTube-сделка в действующей Первой или Второй линии, даже если сама оплаченная сделка размечена другим источником. Прямые оплаты входят сюда же. Кампания и выпуск — от первой YouTube-сделки контакта в этих двух воронках."
 };
@@ -186,8 +202,9 @@ function dmyS(s){ return s ? s.slice(8, 10) + "." + s.slice(5, 7) + "." + s.slic
 function lnk(o, txt){ return '<a href="' + esc(o.url) + '" target="_blank" rel="noopener">' + esc(txt || ("#" + o.id)) + '</a>'; }
 function who(c){ return c ? lnk(c, c.name || ("контакт #" + c.id)) : '<span class="z">—</span>'; }
 function dealRows(items, m){
-  return '<table><thead><tr><th>Сделка</th><th>Контакт</th><th>' + (m === "leads" ? "Создана" : "Дата") + '</th><th class="hide-m">Этап</th><th class="num">Бюджет</th><th class="hide-m">Откуда YouTube</th><th class="hide-m">Кампания</th></tr></thead><tbody>'
-    + items.map(function(x){ return '<tr><td>' + lnk(x, x.name || ("#" + x.id)) + '<div class="dim">#' + x.id + '</div></td><td>' + who(x.contact) + '</td><td>' + dmyS(m === "leads" ? x.created : x.closed || x.created) + '</td>'
+  var dateLabel = m === "leads" ? "Создана" : m === "receipts" ? "Дата чека" : "Дата";
+  return '<table><thead><tr><th>Сделка</th><th>Контакт</th><th>' + dateLabel + '</th><th class="hide-m">Текущий этап</th><th class="num">Бюджет</th><th class="hide-m">Откуда YouTube</th><th class="hide-m">Кампания</th></tr></thead><tbody>'
+    + items.map(function(x){ return '<tr><td>' + lnk(x, x.name || ("#" + x.id)) + '<div class="dim">#' + x.id + '</div></td><td>' + who(x.contact) + '</td><td>' + dmyS(m === "leads" ? x.created : m === "receipts" ? x.receipt : x.closed || x.created) + '</td>'
       + '<td class="hide-m dim">' + esc(x.stage || "—") + '</td><td class="num">' + rub(x.price) + '</td><td class="hide-m dim">' + esc(x.how) + '</td><td class="hide-m dim">' + esc(x.campaign) + (x.content ? " · " + esc(x.content) : "") + '</td></tr>'; }).join("") + '</tbody></table>';
 }
 function contactRows(items){
@@ -205,7 +222,7 @@ function openList(el){
   fetch("/api/youtube?" + q.join("&"), { credentials: "same-origin" }).then(function(r){ return r.json(); }).then(function(d){
     if (!d.ok) { $("mdl-s").textContent = d.error || "нет доступа"; return; }
     var sum = d.items.reduce(function(a, x){ return a + ((x.paid ? x.paid.price : x.price) || 0); }, 0);
-    var per = el.dataset.t === "month" ? mname(el.dataset.k) : ($("from").selectedOptions[0] ? $("from").selectedOptions[0].text + " — " + $("to").selectedOptions[0].text : "");
+    var per = el.dataset.t === "month" ? mname(el.dataset.k) : el.dataset.t === "year" ? el.dataset.k + " год" : ($("from").selectedOptions[0] ? $("from").selectedOptions[0].text + " — " + $("to").selectedOptions[0].text : "");
     $("mdl-s").textContent = d.items.length + (d.truncated ? "+ (показаны первые " + d.items.length + ")" : "") + " · " + per + (m === "paid" || m === "cpaid" ? " · " + cnum(sum) + " ₽" : "");
     $("mdl-b").innerHTML = d.items.length ? (m === "cpaid" ? contactRows(d.items) : dealRows(d.items, m)) : '<p class="empty">записей нет</p>';
   }).catch(function(){ $("mdl-s").textContent = "не удалось загрузить список"; });

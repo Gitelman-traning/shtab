@@ -12,6 +12,7 @@ YouTube-сделка — поле «Источник» (1439087) = YouTube ил�
   MODE=full (вручную) — все сделки с 26.07.2025, витрина заливается заново (~70 тыс. сделок, ~25 минут).
 Оплаты действующей Второй линии (9701010, статус 142) — каждый запуск целиком, любые источники:
 страница считает «через контакт» — оплаты контактов, у которых есть хоть одна YouTube-сделка.
+Чеки — первое попадание в этап «Клиент прислал чек» действующей Второй линии по журналу событий.
 
 Переменные окружения:
   AMO_TOKEN_REPORTS (или AMO_TOKEN) — токен amo, только чтение
@@ -46,6 +47,7 @@ F_UTM = {453161: "utm_source", 453157: "utm_medium", 453159: "utm_campaign", 453
 L1, L2 = 8733326, (9701010,)   # только действующие Первая и Вторая линии (Никита, 23.11.2026)
 YT_PIPELINES = (L1, *L2)
 WON = 142
+RECEIPT_STAGE = (9701010, 77665974)
 STAGES = {}   # (воронка, этап) → «Воронка / Этап», заполняется в main()
 PHONE = re.compile(r"\+?\d[\d\s()\-]{7,}\d")
 
@@ -135,6 +137,35 @@ def paid_rows():
             for l in leads(params, "оплаты Второй линии")]
 
 
+def receipt_dates():
+    """Первый переход каждой сделки в этап чека с начала отчёта."""
+    pipeline, status = RECEIPT_STAGE
+    params = {
+        "filter[type]": "lead_status_changed",
+        "filter[created_at][from]": SINCE,
+        "filter[created_at][to]": int(time.time()),
+        "filter[value_after][leads_statuses][0][pipeline_id]": pipeline,
+        "filter[value_after][leads_statuses][0][status_id]": status,
+        "limit": 100,
+    }
+    first = {}
+    page = 1
+    while True:
+        data = get("/events", dict(params, page=page))
+        for event in (data.get("_embedded") or {}).get("events") or []:
+            if event.get("entity_type") != "lead":
+                continue
+            for value in event.get("value_after") or []:
+                stage = value.get("lead_status") or {}
+                if (stage.get("pipeline_id"), stage.get("id")) == RECEIPT_STAGE:
+                    deal, at = int(event["entity_id"]), int(event["created_at"])
+                    first[deal] = min(first.get(deal, at), at)
+        if not (data.get("_links") or {}).get("next"):
+            return first
+        page += 1
+        time.sleep(0.2)
+
+
 def contact_names(ids):
     """id контакта → имя (без телефонов), пачками по 200"""
     out, ids = {}, sorted({int(x) for x in ids if x})
@@ -178,6 +209,7 @@ def main():
         elif MODE == "inc":
             drop.append(l["id"])
     paid = paid_rows()
+    receipts = receipt_dates()
     names = contact_names([r["contact_id"] for r in rows + paid])
     for r in rows + paid:
         r["contact_name"] = names.get(r["contact_id"], "")
@@ -188,13 +220,16 @@ def main():
     if not (URL and STOKEN):
         log("SHTAB_URL/SHTAB_TOKEN не заданы — записан только youtube.local.json")
         return
-    publish(rows, paid, drop, started)
+    publish(rows, paid, drop, started, receipts)
     log("отправлено в витрину")
 
 
-def publish(rows, paid, drop, started):
+def publish(rows, paid, drop, started, receipts=None):
     body = {"collector": "amo-youtube", "yt_paid": {"replace": True, "rows": paid}, "finalize": True, "started": started,
             "total_points": len(rows) + len(paid), "run_note": "%s: YouTube-сделок %d, оплат Второй линии %d" % (MODE, len(rows), len(paid))}
+    if receipts is not None:
+        body["yt_receipts"] = [{"id": deal, "at": at} for deal, at in receipts.items()]
+        log("история чеков Второй линии: %d сделок" % len(receipts))
     if MODE == "full":
         # Весь снимок — одним запросом: прежние сделки и оплаты видны до общей транзакционной замены.
         body["yt_leads_replace"] = {"rows": rows}
